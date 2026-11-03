@@ -229,7 +229,8 @@ class CompanionTaskRuntime:
                     "enum": ["reminder", "monitor"],
                     "description": "Required for create: reminder delivers existing note; monitor performs a fresh online search each run.",
                 }
-                params.setdefault("required", []).append("action")
+                if "action" not in params.setdefault("required", []):
+                    params["required"].append("action")
                 cached = FutureTool(
                     name="future_task",
                     description=tool.description

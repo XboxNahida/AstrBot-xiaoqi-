@@ -2,6 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from jsonschema.exceptions import ValidationError
+
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 from astrbot.core.provider.entities import ProviderRequest
 from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
@@ -72,6 +74,23 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         configure = await self.invoke(plugin, event, req)
         configure.assert_not_called()
         event.stop_event.assert_called_once()
+
+    async def test_tool_schema_failure_is_not_reported_as_model_configuration(self):
+        plugin, event, req, runtime = self.setup_route()
+        runtime.register.side_effect = ValidationError("api_key=topsecret invalid required")
+        event.send = AsyncMock()
+        event.plain_result = lambda value: value
+        with patch("astrbot_plugin_private_companion.main.logger.warning") as warning:
+            configure = await self.invoke(plugin, event, req)
+        configure.assert_not_called()
+        runtime.submit.assert_not_awaited()
+        event.stop_event.assert_called_once()
+        message = event.send.await_args.args[0]
+        self.assertIn("工具定义校验失败", message)
+        self.assertNotIn("模型设置", message)
+        self.assertNotIn("topsecret", message)
+        self.assertIn("invalid required", str(warning.call_args))
+        self.assertNotIn("topsecret", str(warning.call_args))
 
     async def test_mixed_keeps_chat_and_separate_stable_task_fragments(self):
         plugin, event, req, runtime = self.setup_route("mixed")

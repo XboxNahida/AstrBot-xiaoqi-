@@ -32,6 +32,8 @@ from typing import Any
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlunparse
 from xml.etree import ElementTree as ET
 
+from jsonschema.exceptions import SchemaError, ValidationError as ToolSchemaValidationError
+
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
@@ -15959,13 +15961,18 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 )
         except Exception as exc:
             logger.warning(
-                "Companion conversation route unavailable: %s", type(exc).__name__
+                "Companion conversation route unavailable: %s detail=%s",
+                type(exc).__name__,
+                _single_line(_redact_outbound_secrets(str(exc), owner=self), 600),
             )
-            text = (
-                str(exc)
-                if isinstance(exc, ValueError)
-                else "模型分工配置暂时不可用，请检查本次请求对应的模型设置。"
-            )
+            if isinstance(exc, (ToolSchemaValidationError, SchemaError)):
+                text = "任务工具定义校验失败，本次处理已中止；请查看后台日志。"
+            else:
+                text = (
+                    str(exc)
+                    if isinstance(exc, ValueError)
+                    else "回复或任务接入发生内部错误，本次处理已中止；请查看后台日志。"
+                )
             event.stop_event()
             scope = str(getattr(event, "unified_msg_origin", "") or "")
             if not scope:

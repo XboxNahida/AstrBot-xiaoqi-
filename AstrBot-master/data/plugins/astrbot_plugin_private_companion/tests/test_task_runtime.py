@@ -1,4 +1,5 @@
 import json
+import copy
 import sqlite3
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ from astrbot.core.platform.astr_message_event import AstrMessageEvent
 from astrbot.core.platform.astrbot_message import AstrBotMessage, MessageMember
 from astrbot.core.platform.message_type import MessageType
 from astrbot.core.platform.platform_metadata import PlatformMetadata
+from astrbot.core.tools.cron_tools import FutureTaskTool
 
 try:
     from astrbot_plugin_private_companion.task_runtime import CompanionTaskRuntime
@@ -87,6 +89,44 @@ def register(rt, e, **kwargs):
         reply_eligible=True,
         **kwargs,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route,actions", [("chat", ()), ("task", ()), ("task", ("schedule",))]
+)
+async def test_official_future_tool_registers_without_mutating_schema(
+    runtime, route, actions
+):
+    official = FutureTaskTool()
+    original = copy.deepcopy(official.parameters)
+    runtime.test_tools.append(official)
+    runtime.plugin.context.get_config = lambda **_: {
+        "provider_settings": {"proactive_capability": {"add_cron_tools": True}}
+    }
+    decision = SimpleNamespace(route=route, actions=actions, reply=True)
+    e = event()
+    assert runtime.register(e, runtime.test_request, decision, reply_eligible=True)
+    registry = runtime._registry(e.unified_msg_origin)
+    wrapped = registry["future_task"]
+    assert wrapped.parameters["required"] == ["action"]
+    assert wrapped.parameters["properties"]["task_kind"]["enum"] == [
+        "reminder",
+        "monitor",
+    ]
+    assert runtime._registry(e.unified_msg_origin)["future_task"] is wrapped
+    assert official.parameters == original
+    if route == "task":
+        receipt = await runtime.submit(
+            e, {"action": "submit", "goal": "检查功能"}, source="hub"
+        )
+        assert receipt["accepted"]
+        job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+        assert job.metadata["request"]["required_tool_names"] == (
+            ["future_task"] if actions else []
+        )
+    else:
+        assert runtime.make_intent_tool(e).name == "pc_submit_task_intent"
 
 
 @pytest.mark.asyncio

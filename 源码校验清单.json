@@ -6781,7 +6781,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/main.py",
-    "SHA256": "9fd4005b09114dc4bce7b25064fa208d4077203898c32b71489c7df903119f1f"
+    "SHA256": "0f483a288e8d63e0a2f498955e56bf0b4bcba5da35dcf2421e9f150a94ea1634"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/memo_notes.py",
@@ -7297,7 +7297,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_runtime.py",
-    "SHA256": "920b637668fe06a6c89d80821a66052a27494a2e548790f7ce811114221e1edd"
+    "SHA256": "1b00bfb145fc7772c450043a867388cd1c019585bc6432cdac752d19a2ce632a"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_service.py",
@@ -8069,7 +8069,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_persistent_task_route.py",
-    "SHA256": "44e365cd01639c7da1c86fff8f66568fd145c99a528fe6e025be6eb1e456fc3f"
+    "SHA256": "e67efbd440e1a0afd6bfa6b2d4cdf6419ffeadd9d6dfca2e0a4d8092a062598d"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_persona_only_reply_style.py",
@@ -8749,7 +8749,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_runtime.py",
-    "SHA256": "c12de731d39702c08a50f6b10b358b9ad0806becc0d58cefa7df1661398e030a"
+    "SHA256": "6a844d90051a6d7c248b3d4a3af0840a90e24eb2b33c46efe7e25269e2222c9d"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_service.py",
@@ -13325,7 +13325,7 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "284576c5de87d651e6b5abb71b5d1a6906d5f77b13ce2a9d25b94a0151e20c5f"
+    "SHA256": "58e4a0410cf07a6af10e60e2e65b4908e922bf387d20bf115da1d78502b87ec2"
   },
   {
     "路径": "deployment/配置受限任务执行.ps1",
@@ -13549,7 +13549,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "13fb1063c1c17ba4359b4c25ec829bcccd745b04743be699455c5aedece62560"
+    "SHA256": "f11a1fcf120c3e99116395f0a4d2be8b983e043c451dfc8f82daee493d1af8bd"
   },
   {
     "路径": "第三方与发布说明.md",
