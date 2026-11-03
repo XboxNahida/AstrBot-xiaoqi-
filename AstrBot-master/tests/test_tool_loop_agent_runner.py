@@ -1381,6 +1381,9 @@ async def test_required_tool_missing_uses_fallback_without_duplicate_execution(
     assert runner.get_final_llm_resp().completion_text == "Real tool result received."
     assert fallback.text_chat.await_count == 2
     assert mock_hooks.on_tool_start.call_count == 1
+    assert primary.text_chat.await_args.kwargs["tool_choice"] == "required"
+    assert fallback.text_chat.await_args_list[0].kwargs["tool_choice"] == "required"
+    assert fallback.text_chat.await_args_list[1].kwargs["tool_choice"] == "auto"
 
 
 @pytest.mark.asyncio
@@ -1401,6 +1404,8 @@ async def test_required_tool_missing_from_all_models_is_error(
     assert "Required tool was not called" in runner.get_final_llm_resp().completion_text
     assert primary.call_count == fallback.call_count == 1
     mock_hooks.on_tool_start.assert_not_called()
+    assert mock_hooks.agent_done_called
+    assert "执行协议" in runner.get_final_llm_resp().completion_text
 
 
 @pytest.mark.asyncio

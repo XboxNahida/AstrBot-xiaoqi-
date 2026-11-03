@@ -426,6 +426,52 @@ class CapabilityHubTests(unittest.TestCase):
 
 
 class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_workspace_action_available_only_for_current_file_authorization(self):
+        from pathlib import Path
+        from unittest.mock import Mock
+        from astrbot_plugin_private_companion.task_permissions import TaskActor
+        for allowed in (False, True):
+            runtime = SimpleNamespace(
+                workspace=Path("C:/AstrBotTasks"),
+                actor=lambda _: TaskActor("bot1", "", "u1", False),
+                permissions=SimpleNamespace(check=Mock(return_value=allowed)),
+                snapshot_for_scope=Mock(return_value=""),
+                snapshot=Mock(return_value=""),
+            )
+            plugin = SimpleNamespace(
+                _persistent_task_runtime=runtime,
+                context=SimpleNamespace(get_config=lambda **_: {}),
+                _event_scope_key=lambda _: "private:u1", _recall_message_cache={},
+                _llm_call=AsyncMock(return_value='{"reply":true,"actions":["workspace"],"route":"chat"}'),
+            )
+            event = SimpleNamespace(
+                unified_msg_origin="bot1:FriendMessage:u1", message_str="读取共享脚本",
+                message_obj=SimpleNamespace(message_id="workspace"),
+                is_private_chat=lambda: True, get_sender_id=lambda: "u1", get_sender_name=lambda: "甲",
+            )
+            await append_capability_guidance(plugin, event, None)
+            decision = event._private_companion_capability_decision
+            self.assertEqual(("workspace",) if allowed else (), decision.actions)
+            if allowed:
+                self.assertEqual("task", decision.route)
+
+    async def test_hub_reads_persistent_task_snapshot_for_exact_scope(self):
+        from dataclasses import replace
+        from unittest.mock import Mock
+
+        runtime = SimpleNamespace(snapshot_for_scope=Mock(return_value="task-new: running"))
+        plugin = SimpleNamespace(
+            _persistent_task_runtime=runtime,
+            _llm_call=AsyncMock(return_value='{"reply":true,"actions":[],"route":"chat"}'),
+        )
+        context = replace(build_capability_context(
+            scope="private:u1", current_text="好了吗", sender_id="u1", sender_name="甲",
+            now=datetime.now(timezone.utc),
+        ), task_session_key="bot1:FriendMessage:u1")
+        await judge_capabilities(plugin, context, available_capabilities=())
+        runtime.snapshot_for_scope.assert_called_once_with("bot1", "bot1:FriendMessage:u1", "u1")
+        self.assertIn("task-new: running", plugin._llm_call.await_args.args[0])
+
     def test_scheduling_a_future_media_reminder_does_not_perform_media_now(self):
         for text in ("十分钟后提醒我唱歌", "明天七点提醒我播放音乐"):
             with self.subTest(text=text):

@@ -357,6 +357,9 @@ class CronJobManager:
             await result
 
     async def _run_active_agent_job(self, job: CronJob, start_time: datetime) -> None:
+        bridge = getattr(self.ctx, "_persistent_task_cron_bridge", None)
+        if callable(bridge) and await bridge(job, start_time) is True:
+            return
         payload = job.payload or {}
         delivery_session_str = str(payload.get("session") or "").strip()
         session_str = delivery_session_str or str(

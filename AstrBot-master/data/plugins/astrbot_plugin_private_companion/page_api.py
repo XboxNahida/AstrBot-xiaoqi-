@@ -89,6 +89,8 @@ from .relationship_policy import (
 from .page_api_qzone import PrivateCompanionPageApiQzoneMixin
 from .page_api_users_groups import PrivateCompanionPageApiUsersGroupsMixin
 from .page_api_settings import PageSettingNormalizerMixin
+from .page_api_tasks import TasksPageApiMixin
+from .page_api_task_tools import SharedTaskToolsPageMixin
 from .planning import evaluate_daily_plan_quality, generate_daily_plan, generate_detail_enhancement
 from .memo_notes import (
     apply_memo_note_action,
@@ -281,6 +283,8 @@ except Exception:  # pragma: no cover - Pillow 缺失时回退到原图预览
 
 
 class PrivateCompanionPageApi(
+    TasksPageApiMixin,
+    SharedTaskToolsPageMixin,
     PageSettingNormalizerMixin,
     PrivateCompanionPageApiQzoneMixin,
     PrivateCompanionPageApiUsersGroupsMixin,
@@ -706,6 +710,16 @@ class PrivateCompanionPageApi(
     def register_routes(self) -> None:
         register = self.plugin.context.register_web_api
         routes = [
+            ("/tasks/tools", self.get_shared_task_tools, ["GET"], "Private Companion shared task tools"),
+            ("/tasks/tools/upload", self.upload_shared_task_tool, ["POST"], "Private Companion upload shared task tool"),
+            ("/tasks", self.get_tasks, ["GET"], "Private Companion tasks"),
+            ("/tasks/detail", self.get_task_detail, ["GET"], "Private Companion task detail"),
+            ("/tasks/control", self.control_task, ["POST"], "Private Companion task control"),
+            ("/tasks/grants", self.get_task_grants, ["GET"], "Private Companion task grants"),
+            ("/tasks/grants/grant", self.grant_task_access, ["POST"], "Private Companion task grant"),
+            ("/tasks/grants/revoke", self.revoke_task_access, ["POST"], "Private Companion task revoke"),
+            ("/tasks/proactive-policy", self.get_task_proactive_policy, ["GET"], "Private Companion task push policy"),
+            ("/tasks/proactive-policy/update", self.update_task_proactive_policy, ["POST"], "Private Companion update push policy"),
             ("/overview", self.get_overview, ["GET"], "Private Companion Page overview"),
             ("/extension-migration-notice", self.get_extension_migration_notice, ["GET"], "Private Companion Page extension migration notice preference"),
             ("/extension-migration-notice/update", self.update_extension_migration_notice, ["POST"], "Private Companion Page update extension migration notice preference"),

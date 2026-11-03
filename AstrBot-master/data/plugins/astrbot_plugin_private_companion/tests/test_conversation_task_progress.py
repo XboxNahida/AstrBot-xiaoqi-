@@ -1,6 +1,8 @@
 import asyncio
 import json
 import unittest
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
@@ -13,6 +15,28 @@ from .test_conversation_route import fake_provider
 
 
 class CancelledTaskStateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_persistent_request_survives_cache_eviction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ConversationTaskStateStore(max_tasks=1, db_path=Path(directory) / "tasks.db")
+            plugin = SimpleNamespace(_conversation_task_states=store)
+            event = SimpleNamespace(message_str="补写测试", unified_msg_origin="bot:GroupMessage:g", get_sender_id=lambda: "u")
+            request = SimpleNamespace(provider_id="chosen-model", fallback_provider_ids=[])
+            decision = SimpleNamespace(route="task", segments=(), estimated_seconds=120)
+            ready = asyncio.Event()
+
+            async def worker():
+                route.register_conversation_task(plugin, event, request, decision)
+                ready.set()
+                await asyncio.Event().wait()
+
+            task = asyncio.create_task(worker())
+            await asyncio.wait_for(ready.wait(), 1)
+            store.start_task(session_key="other", task_text="另一个任务", provider_id="chosen")
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            saved = ConversationTaskStateStore(db_path=Path(directory) / "tasks.db").get(event._private_companion_task_id)
+            self.assertEqual("failed", saved.status)
+
     async def test_cancelled_request_keeps_model_and_unfinished_work(self):
         store = ConversationTaskStateStore()
         plugin = SimpleNamespace(_conversation_task_states=store)
@@ -83,6 +107,67 @@ class TaskProgressHookTests(unittest.IsolatedAsyncioTestCase):
             _private_companion_chat_provider_ids=["gemini"],
             _private_companion_chat_system_prompt="小七：嘴硬但关心对方",
             send=AsyncMock(), plain_result=lambda text: text, stop_event=MagicMock(), get_sender_id=lambda: "u1")
+
+    async def test_agent_error_ends_task_before_late_progress(self):
+        from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
+
+        response = LLMResponse(role="err", completion_text="Required tool was not called: future_task")
+        await PrivateCompanionPlugin.sync_conversation_task_history.__wrapped__(
+            self.plugin, self.event, SimpleNamespace(messages=[]), response
+        )
+        self.assertEqual("failed", self.task.status)
+        self.assertIn("future_task", self.task.error)
+        await route.send_task_progress(self.plugin, self.event)
+        self.event.send.assert_not_awaited()
+
+    async def test_agent_timeout_records_timeout_and_keeps_unfinished_work(self):
+        from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
+
+        response = LLMResponse(role="err", completion_text="APITimeoutError: request timed out")
+        await PrivateCompanionPlugin.sync_conversation_task_history.__wrapped__(
+            self.plugin, self.event, SimpleNamespace(messages=[]), response
+        )
+        self.assertEqual("timeout", self.task.status)
+        self.assertIn("补写测试", self.task.unfinished_task)
+
+    async def test_recovered_task_query_does_not_claim_still_running(self):
+        self.store.recover_interrupted()
+        self.event._private_companion_chat_provider_ids = []
+        await route._send_task_notice(self.plugin, self.event, "query")
+        self.assertIn("核实", self.event.send.await_args.args[0])
+        self.assertNotIn("还在等待", self.event.send.await_args.args[0])
+
+    async def test_outbound_failure_preserves_recorded_timeout(self):
+        self.store.timeout_task(self.task.task_id, "APITimeoutError: request timed out")
+        self.event._private_companion_chat_provider_ids = []
+        await route.send_task_failure(self.plugin, self.event, "后台模型不可用")
+        self.assertEqual("timeout", self.store.get(self.task.task_id).status)
+        self.assertIn("timed out", self.store.get(self.task.task_id).error)
+
+    async def test_persistent_registration_and_notice_survive_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "tasks.db"
+            self.plugin._conversation_task_states = ConversationTaskStateStore(db_path=db_path)
+            request = SimpleNamespace(provider_id="chosen", fallback_provider_ids=["backup"])
+            decision = SimpleNamespace(route="task", segments=(), estimated_seconds=90)
+            state = route.register_conversation_task(self.plugin, self.event, request, decision)
+            await route.send_task_ack(self.plugin, self.event)
+            saved = ConversationTaskStateStore(db_path=db_path).get(state.task_id)
+            self.assertEqual(self.event.message_str, saved.reply_context["user_message"])
+            self.assertEqual(["gemini"], saved.reply_context["chat_provider_ids"])
+            self.assertEqual(1, len(saved.notices))
+
+    async def test_persistent_image_delivery_survives_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "tasks.db"
+            store = ConversationTaskStateStore(db_path=db_path)
+            self.plugin._conversation_task_states = store
+            self.task = store.start_task(session_key="qq:Friend:u1", task_text="图片", provider_id="chosen")
+            self.event._private_companion_task_id = self.task.task_id
+            self.record_image_delivery()
+            saved = ConversationTaskStateStore(db_path=db_path).get(self.task.task_id)
+            self.assertTrue(saved.reply_context.get("visible_delivery"))
+            self.assertEqual("media_delivered", saved.phase)
 
     async def test_real_tool_hooks_update_current_task(self):
         from astrbot_plugin_private_companion.main import PrivateCompanionPlugin

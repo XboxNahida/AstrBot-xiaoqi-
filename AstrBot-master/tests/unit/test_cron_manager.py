@@ -59,6 +59,31 @@ def sample_cron_job():
     )
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("handled", [True, False])
+async def test_active_agent_persistent_bridge(cron_manager, sample_cron_job, handled):
+    """Use the persistent bridge once and preserve unrelated cron execution."""
+    bridge = AsyncMock(return_value=handled)
+    cron_manager.ctx = type("Context", (), {})()
+    cron_manager.ctx._persistent_task_cron_bridge = bridge
+    cron_manager._woke_main_agent = AsyncMock()
+    started = datetime.now(timezone.utc)
+    await cron_manager._run_active_agent_job(sample_cron_job, started)
+    bridge.assert_awaited_once_with(sample_cron_job, started)
+    assert cron_manager._woke_main_agent.await_count == (0 if handled else 1)
+
+
+@pytest.mark.asyncio
+async def test_active_agent_bridge_failure_never_reexecutes(cron_manager, sample_cron_job):
+    """Do not repeat external work when a persistent handoff fails."""
+    cron_manager.ctx = type("Context", (), {})()
+    cron_manager.ctx._persistent_task_cron_bridge = AsyncMock(side_effect=RuntimeError("handoff"))
+    cron_manager._woke_main_agent = AsyncMock()
+    with pytest.raises(RuntimeError, match="handoff"):
+        await cron_manager._run_active_agent_job(sample_cron_job, datetime.now(timezone.utc))
+    cron_manager._woke_main_agent.assert_not_awaited()
+
+
 class TestCronJobManagerInit:
     """Tests for CronJobManager initialization."""
 

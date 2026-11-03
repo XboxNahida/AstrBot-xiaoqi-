@@ -7281,6 +7281,17 @@ async function loadMemoNotes(force = false) {
 }
 
 async function ensureTabData(tabName, force = false) {
+  if (tabName === "tasks") {
+    if (!window.PrivateCompanionTasksPanel) {
+      await loadOptionalClassicScript("./js/panels/tasks-panel.js?v=20261103-persistent-tasks");
+    }
+    const root = document.getElementById("persistentTasksRoot");
+    if (root && !root.dataset.mounted) {
+      window.PrivateCompanionTasksPanel.mount(root, { fetchJson, showToast });
+      root.dataset.mounted = "1";
+    }
+    return;
+  }
   if (tabName === "dashboard") {
     return;
   }

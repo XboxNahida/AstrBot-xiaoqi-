@@ -1,0 +1,11 @@
+{
+  "WorkspaceRoot": "..",
+  "OutputRoot": "..\\03_成品输出",
+  "CacheRoot": "..\\缓存",
+  "Python": "..\\..\\.venv\\Scripts\\python.exe",
+  "Node": "..\\..\\依赖\\node\\node.exe",
+  "BundledNodeModules": "..\\..\\依赖\\node_modules",
+  "NodeModulesLink": "..\\缓存\\依赖缓存\\node_modules",
+  "AllowOverwrite": false,
+  "LogRetentionDays": 30
+}

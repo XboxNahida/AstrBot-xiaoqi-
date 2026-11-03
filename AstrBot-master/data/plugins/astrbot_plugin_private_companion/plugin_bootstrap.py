@@ -517,6 +517,11 @@ def _initialize_world_and_model_config(self: Any, c: Any) -> None:
     self.page_theme = _page_theme if _page_theme in PAGE_THEME_NAMES else "classic"
     self.fast_response_provider_id = self._cfg_str(c, "FAST_RESPONSE_PROVIDER_ID", "")
     self.enable_conversation_model_routing = self._cfg_bool(c, "enable_conversation_model_routing", False)
+    self.enable_persistent_tasks = self._cfg_bool(c, "enable_persistent_tasks", True)
+    self.enable_reply_task_intents = self._cfg_bool(c, "enable_reply_task_intents", True)
+    self.task_workspace_root = self._cfg_str(c, "task_workspace_root", "C:/AstrBotTasks")
+    self.task_progress_after_seconds = max(0, min(120, self._cfg_int(c, "task_progress_after_seconds", 90)))
+    self.task_dashboard_primary_user_id = self._cfg_str(c, "task_dashboard_primary_user_id", "")
     self.enable_short_term_emotion = self._cfg_bool(c, "enable_short_term_emotion", False)
     self.conversation_chat_provider_id = self._cfg_str(c, "CONVERSATION_CHAT_PROVIDER_ID", "")
     self.conversation_chat_fallback_provider_id = self._cfg_str(c, "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "")
@@ -1966,9 +1971,15 @@ def initialize_plugin_runtime(self: Any) -> None:
     self._daily_diary_generation_lock = asyncio.Lock()
     self._daily_review_generation_lock = asyncio.Lock()
     self._conversation_db_lock = asyncio.Lock()
-    self._conversation_task_states = ConversationTaskStateStore(max_tasks=64)
+    self._conversation_task_states = ConversationTaskStateStore(
+        max_tasks=64, db_path=Path(self.data_dir) / "conversation_tasks.db"
+    )
+    recovered_tasks = self._conversation_task_states.recover_interrupted()
+    if recovered_tasks:
+        logger.warning("Recovered %s interrupted conversation tasks for reconciliation", len(recovered_tasks))
     self._framework_agent_lock = asyncio.Lock()
     self._stop_event = asyncio.Event()
+    self._persistent_task_runtime = None
     self._task: asyncio.Task | None = None
     self._default_persona_prompt_cache = ""
     self._default_persona_prompt_cache_at = 0.0

@@ -146,6 +146,17 @@ class ConversationRouteTests(unittest.TestCase):
         self.assertIsNone(req.provider_id)
         self.assertIsNone(req.fallback_provider_ids)
 
+    def test_unavailable_hub_uses_chat_only_after_host_identity_check(self):
+        self.event._private_companion_capability_decision = CapabilityDecision(
+            True, "text", "neutral", (), False, "hub_unavailable"
+        )
+        self.event._private_companion_persistent_hub_fallback = True
+        req = ProviderRequest()
+        route.configure_conversation_request(self.plugin, self.event, req)
+        self.assertEqual("gemini", req.provider_id)
+        self.assertIsNone(req.func_tool)
+        self.assertEqual((), req.required_tool_names)
+
     def test_rejudged_task_is_applied_to_current_request(self):
         self.request("chat")
         req = self.request("mixed")

@@ -25,6 +25,60 @@ class _ErrorWithBody(Exception):
         self.body = body
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize(
+    "budget,successful_call,expected_calls",
+    [(0, None, 1), (0, 1, 1), (None, 10, 10), (None, None, 10)],
+)
+async def test_outer_request_budget_and_last_attempt_success(
+    monkeypatch, streaming, budget, successful_call, expected_calls
+):
+    provider = ProviderOpenAIOfficial.__new__(ProviderOpenAIOfficial)
+    provider.api_keys = ["fake-key"]
+    provider.client = SimpleNamespace(api_key=None)
+    calls = 0
+    result = LLMResponse(role="assistant", completion_text="done")
+
+    async def prepare(*args, **kwargs):
+        return {"messages": []}, []
+
+    async def pop_record(*args):
+        pass
+
+    async def query(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls != successful_call:
+            raise RuntimeError("context length")
+        return result
+
+    async def query_stream(*args, **kwargs):
+        yield await query(*args, **kwargs)
+
+    monkeypatch.setattr(provider, "_prepare_chat_payload", prepare)
+    monkeypatch.setattr(provider, "pop_record", pop_record)
+    monkeypatch.setattr(provider, "_query", query)
+    monkeypatch.setattr(provider, "_query_stream", query_stream)
+
+    async def run():
+        if streaming:
+            return [
+                item
+                async for item in provider.text_chat_stream(
+                    prompt="fake", request_max_retries=budget
+                )
+            ]
+        return await provider.text_chat(prompt="fake", request_max_retries=budget)
+
+    if successful_call is None:
+        with pytest.raises(RuntimeError, match="context length"):
+            await run()
+    else:
+        assert await run() == ([result] if streaming else result)
+    assert calls == expected_calls
+
+
 class _ErrorWithResponse(Exception):
     def __init__(self, message: str, response_text: str):
         super().__init__(message)
@@ -90,7 +144,9 @@ async def test_transport_timeout_attempts_match_configured_limit(
     try:
         with pytest.raises(APITimeoutError):
             if streaming:
-                async for _ in provider._query_stream(payload, None, request_max_retries=3):
+                async for _ in provider._query_stream(
+                    payload, None, request_max_retries=3
+                ):
                     pass
             else:
                 await provider._query(payload, None, request_max_retries=3)

@@ -1215,7 +1215,7 @@ class ProviderOpenAIOfficial(Provider):
             payloads["tool_choice"] = tool_choice
 
         llm_response = None
-        max_retries = 10
+        max_retries = 1 if request_max_retries == 0 else 10
         available_api_keys = self.api_keys.copy()
         chosen_key = random.choice(available_api_keys)
         image_fallback_used = False
@@ -1255,7 +1255,7 @@ class ProviderOpenAIOfficial(Provider):
                 if success:
                     break
 
-        if retry_cnt == max_retries - 1 or llm_response is None:
+        if llm_response is None:
             logger.error(f"API 调用失败，重试 {max_retries} 次仍然失败。")
             if last_exception is None:
                 raise Exception("未知错误")
@@ -1291,7 +1291,7 @@ class ProviderOpenAIOfficial(Provider):
         if func_tool and not func_tool.empty():
             payloads["tool_choice"] = tool_choice
 
-        max_retries = 10
+        max_retries = 1 if request_max_retries == 0 else 10
         available_api_keys = self.api_keys.copy()
         chosen_key = random.choice(available_api_keys)
         image_fallback_used = False
@@ -1307,7 +1307,7 @@ class ProviderOpenAIOfficial(Provider):
                     request_max_retries=request_max_retries,
                 ):
                     yield response
-                break
+                return
             except Exception as e:
                 last_exception = e
                 (

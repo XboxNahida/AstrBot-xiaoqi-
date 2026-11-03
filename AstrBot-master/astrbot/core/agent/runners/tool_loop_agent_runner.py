@@ -211,7 +211,12 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         timed_out = any(
             marker in detail.lower() for marker in ("timeout", "timed out", "超时")
         )
-        reason = "请求超时" if timed_out else "暂时不可用"
+        protocol_error = "Required tool was not called:" in detail
+        reason = (
+            "执行协议未满足（缺少必需工具调用）"
+            if protocol_error
+            else ("请求超时" if timed_out else "暂时不可用")
+        )
         unfinished = "本次任务未完成，" if is_task else ""
         suffix = f" 最后错误：{detail[:240]}" if detail else ""
         return (
@@ -561,6 +566,10 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             "abort_signal": self._abort_signal,
             "request_max_retries": self.request_max_retries,
         }
+        if payload["func_tool"]:
+            payload["tool_choice"] = (
+                "required" if self._pending_required_tools else "auto"
+            )
         routing_notice = Message(
             role="system",
             content=self._model_routing_notice(
@@ -963,6 +972,10 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             self.stats.end_time = time.time()
             self._transition_state(AgentState.ERROR)
             self._resolve_unconsumed_follow_ups()
+            try:
+                await self.agent_hooks.on_agent_done(self.run_context, llm_resp)
+            except Exception as exc:
+                logger.error("Error in failed on_agent_done hook: %s", exc, exc_info=True)
             custom_error_message = self._get_persona_custom_error_message()
             error_text = custom_error_message or (
                 f"LLM 响应错误: {llm_resp.completion_text or '未知错误'}"

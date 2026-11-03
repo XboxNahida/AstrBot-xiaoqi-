@@ -4869,6 +4869,42 @@
       }
     }
   },
+  "persistent_task_config": {
+    "description": "持久任务与执行授权",
+    "type": "object",
+    "items": {
+      "enable_persistent_tasks": {
+        "description": "启用持久任务清单",
+        "type": "bool",
+        "default": true,
+        "hint": "任务独立入队，保存执行记录、错误与待发通知。重启后结果未知的操作先核实，不自动重复。保存后重启生效。"
+      },
+      "enable_reply_task_intents": {
+        "description": "允许回复模型补交任务",
+        "type": "bool",
+        "default": true,
+        "hint": "中枢漏判任务时，回复模型可以按原消息提交；程序统一核验真实账号授权，同源任务去重。自动通知不能产生新授权。"
+      },
+      "task_workspace_root": {
+        "description": "任务工作目录",
+        "type": "string",
+        "default": "C:/AstrBotTasks",
+        "hint": "独立于机器人程序和数据。文件与命令权限须经受限执行账户配置和实际验证后开放，不能只设置这个目录就获得权限。"
+      },
+        "task_progress_after_seconds": {
+          "description": "后台任务进度补报等待秒数",
+          "type": "int",
+          "default": 90,
+          "hint": "任务到此时间仍未结束时补报一次真实进度；允许0至120秒，0关闭。默认90秒。结束通知独立发送，重启后生效。"
+        },
+        "task_dashboard_primary_user_id": {
+        "description": "网页授权管理绑定的主要用户账号",
+        "type": "string",
+        "default": "",
+        "hint": "填写已在当前机器人人格中绑定为主要用户的真实账号标识。程序会再次核验；留空时仍可查看任务，但不能给群友授权。不能填写昵称。"
+      }
+    }
+  },
   "model_assignment_config": {
     "description": "模型分流",
     "type": "object",
@@ -4877,7 +4913,7 @@
       "enable_conversation_model_routing": {
         "description": "启用聊天与后台任务分工",
         "type": "bool",
-        "hint": "由中枢判断闲聊、任务或混合意图。聊天主备不可选 GPT、Claude、DeepSeek；后台任务模型由你自由选择任意已启用 Provider。请先配置下面的独立模型，保存后完整重启 AstrBot。独立分工不受快速/精准模式覆盖。",
+        "hint": "由中枢判断闲聊、任务或混合意图。聊天主备不可选 GPT、Claude，可选 Gemini 或 DeepSeek；后台任务模型由你自由选择任意已启用 Provider。请先配置下面的独立模型，保存后完整重启 AstrBot。独立分工不受快速/精准模式覆盖。",
         "default": false
       },
       "enable_short_term_emotion": {

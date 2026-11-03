@@ -527,6 +527,14 @@ async def append_capability_guidance(
             "emoji",
             "voice",
         ]
+        runtime = getattr(self, "_persistent_task_runtime", None)
+        if runtime is not None:
+            from .task_execution import actor_workspace
+
+            actor = runtime.actor(event)
+            directory = actor_workspace(runtime.workspace, actor)
+            if any(runtime.permissions.check(actor, capability, directory) for capability in ("read", "write", "shell", "install")):
+                available_actions.append("workspace")
         request_has_search = "AIsearch" in tool_names or any(
             name.startswith("web_search_") for name in tool_names
         )
@@ -631,6 +639,8 @@ async def append_capability_guidance(
         existing_decision = getattr(event, "_private_companion_capability_decision", None)
         reuse_enabled = bool(getattr(self, "enable_hub_decision_reuse", False))
         task_summary = {}
+        task_runtime = getattr(self, "_persistent_task_runtime", None)
+        persistent_snapshot = task_runtime.snapshot(event) if task_runtime is not None else ""
         task_store = getattr(self, "_conversation_task_states", None)
         if task_store is not None:
             try:
@@ -656,6 +666,7 @@ async def append_capability_guidance(
             "persona": persona_key,
             "identity": getattr(event, "_private_companion_bot_identity", None),
             "task": task_summary,
+            "persistent_tasks": persistent_snapshot,
             "settings": [getattr(self, name, None) for name in (
                 "conversation_hub_provider_id", "llm_provider_id", "enable_short_term_emotion",
                 "enable_conversation_model_routing", "enable_hub_context_compaction",
