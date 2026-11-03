@@ -138,6 +138,36 @@ def test_all_chat_models_failed_has_stable_error_code():
     assert error.startswith("[E_LLM_ALL_PROVIDERS_FAILED]")
     assert "TimeoutError" in error
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("task,cron,timeout,expected", [
+    (True, False, True, "后台任务模型请求超时"),
+    (True, False, False, "后台任务模型暂时不可用"),
+    (False, False, True, "聊天模型请求超时"),
+    (False, True, True, "后台任务模型请求超时"),
+])
+async def test_model_error_identifies_actual_request_purpose(
+    runner, provider_request, mock_tool_executor, mock_hooks, task, cron, timeout, expected
+):
+    provider_request.final_response_only = task
+    provider = MockProvider()
+    error = TimeoutError("request timed out") if timeout else RuntimeError("offline")
+    provider.text_chat = AsyncMock(side_effect=error)
+    context = SimpleNamespace(event=SimpleNamespace(
+        get_extra=lambda key: {"id": "test-job"} if cron and key == "cron_job" else None
+    ))
+    await runner.reset(provider=provider, request=provider_request,
+        run_context=ContextWrapper(context=context), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks)
+    async for _ in runner.step_until_done(2):
+        pass
+    response = runner.get_final_llm_resp()
+    assert response.role == "err"
+    assert expected in response.completion_text
+    assert "E_LLM_ALL_PROVIDERS_FAILED" in response.completion_text
+    if task or cron:
+        assert "聊天模型" not in response.completion_text
+
 class MockProvider(Provider):
     """模拟Provider用于测试"""
 
@@ -1325,6 +1355,52 @@ async def test_fallback_provider_used_when_primary_raises(
     assert final_resp.completion_text == "这是我的最终回答"
     assert primary_provider.call_count == 1
     assert fallback_provider.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_required_tool_missing_uses_fallback_without_duplicate_execution(
+    runner, provider_request, mock_tool_executor, mock_hooks
+):
+    provider_request.required_tool_names = ("test_tool",)
+    mock_hooks.on_tool_start = AsyncMock()
+    primary = MockProvider()
+    primary.text_chat = AsyncMock(return_value=LLMResponse(
+        role="assistant", completion_text="Processing completed successfully."
+    ))
+    fallback = MockProvider()
+    fallback.text_chat = AsyncMock(side_effect=[
+        LLMResponse(role="assistant", tools_call_name=["test_tool"],
+                    tools_call_args=[{"query": "test"}], tools_call_ids=["one-call"]),
+        LLMResponse(role="assistant", completion_text="Real tool result received."),
+    ])
+    await runner.reset(provider=primary, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks, fallback_providers=[fallback])
+    async for _ in runner.step_until_done(5):
+        pass
+    assert runner.get_final_llm_resp().completion_text == "Real tool result received."
+    assert fallback.text_chat.await_count == 2
+    assert mock_hooks.on_tool_start.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_required_tool_missing_from_all_models_is_error(
+    runner, provider_request, mock_tool_executor, mock_hooks
+):
+    provider_request.required_tool_names = ("test_tool",)
+    mock_hooks.on_tool_start = AsyncMock()
+    primary = MockProvider()
+    fallback = MockProvider()
+    primary.should_call_tools = fallback.should_call_tools = False
+    await runner.reset(provider=primary, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks, fallback_providers=[fallback])
+    async for _ in runner.step_until_done(5):
+        pass
+    assert runner.get_final_llm_resp().role == "err"
+    assert "Required tool was not called" in runner.get_final_llm_resp().completion_text
+    assert primary.call_count == fallback.call_count == 1
+    mock_hooks.on_tool_start.assert_not_called()
 
 
 @pytest.mark.asyncio

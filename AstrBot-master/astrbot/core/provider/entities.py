@@ -122,6 +122,8 @@ class ProviderRequest:
     """Buffer this request when its final response needs postprocessing."""
     final_response_only: bool = False
     """Hide intermediate assistant text and reasoning during task execution."""
+    required_tool_names: tuple[str, ...] = ()
+    """Tools that must be requested before accepting a final assistant response."""
 
     def __repr__(self) -> str:
         return (

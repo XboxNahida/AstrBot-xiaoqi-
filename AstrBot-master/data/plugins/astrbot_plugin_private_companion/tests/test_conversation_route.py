@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -72,6 +73,26 @@ class ConversationRouteTests(unittest.TestCase):
         self.assertEqual(
             "当前人格：小七", self.event._private_companion_chat_system_prompt
         )
+
+    def test_schedule_task_keeps_future_task_and_user_selected_task_provider(self):
+        decision = CapabilityDecision(
+            True, "text", "neutral", ("schedule",), False, "test", route="task"
+        )
+        self.event._private_companion_capability_decision = decision
+        req = ProviderRequest(
+            prompt="明天早上7:30提醒我起床", system_prompt="当前人格：小七", model="旧模型"
+        )
+        from astrbot.core.agent.tool import ToolSet
+
+        req.func_tool = ToolSet()
+        schedule_tool = MagicMock()
+        schedule_tool.name = "future_task"
+        req.func_tool.add_tool(schedule_tool)
+        route.configure_conversation_request(self.plugin, self.event, req)
+        self.assertEqual("gpt", req.provider_id)
+        self.assertIn(schedule_tool, req.func_tool.tools)
+        self.assertEqual("task", self.event._private_companion_conversation_route)
+        self.assertEqual(("future_task",), req.required_tool_names)
 
     def test_task_accepts_user_selected_non_gpt_provider(self):
         self.plugin.conversation_task_provider_id = "kimi"
@@ -188,7 +209,7 @@ class TaskPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.grok.text_chat.side_effect = RuntimeError("offline")
         resp = LLMResponse(role="assistant", completion_text="任务失败：没有权限")
         await route.present_task_response(self.plugin, self.event, resp)
-        self.assertIn("聊天模型暂时不可用", resp.completion_text)
+        self.assertIn("回复整理暂时失败", resp.completion_text)
         self.assertTrue(resp.completion_text.endswith("任务失败：没有权限"))
         self.assertNotIn("已完成", resp.completion_text)
 
@@ -204,7 +225,7 @@ class TaskPresentationTests(unittest.IsolatedAsyncioTestCase):
         )
         await route.present_task_response(self.plugin, self.event, resp)
         self.assertTrue(resp.completion_text.endswith("任务失败：没有权限"))
-        self.assertIn("聊天模型暂时不可用", resp.completion_text)
+        self.assertIn("回复整理暂时失败", resp.completion_text)
         self.assertIsNone(resp.reasoning_content)
         self.event.set_extra.assert_called_with("_llm_reasoning_content", None)
 
@@ -293,6 +314,65 @@ class TaskNoticeContextTests(unittest.IsolatedAsyncioTestCase):
         )
         return state
 
+    async def test_schedule_without_tool_receipt_stays_failed_and_unfinished(self):
+        state = self.prepare_task("明天早上7:30提醒我起床")
+        self.event._private_companion_capability_decision = CapabilityDecision(
+            True, "text", "neutral", ("schedule",), False, "test", route="task"
+        )
+        resp = LLMResponse(role="assistant", completion_text="Processing completed successfully.")
+        await route.present_task_response(self.plugin, self.event, resp)
+        self.assertEqual("failed", state.status)
+        self.assertIn("7:30", state.unfinished_task)
+        self.assertIn("没有取得定时工具的成功回执", resp.completion_text)
+        self.assertNotIn("Processing completed successfully", resp.completion_text)
+        self.gemini.text_chat.assert_not_awaited()
+
+    async def test_task_timeout_notice_rejects_chat_model_misattribution(self):
+        self.prepare_task("帮我查询资料")
+        self.gemini.text_chat.return_value = LLMResponse(
+            role="assistant", completion_text="聊天模型暂时不可用，任务没能完成。"
+        )
+        self.grok.text_chat.return_value = self.gemini.text_chat.return_value
+        await route.send_task_failure(self.plugin, self.event, "APITimeoutError: Request timed out")
+        sent = self.event.send.await_args.args[0]
+        self.assertIn("后台任务模型请求超时", sent)
+        self.assertNotIn("聊天模型", sent)
+
+    async def test_task_timeout_notice_preserves_normalized_core_timeout(self):
+        self.prepare_task("帮我查询资料")
+        self.gemini.text_chat.return_value = LLMResponse(
+            role="assistant", completion_text="后台执行出了点问题，任务还没完成。"
+        )
+        self.grok.text_chat.return_value = self.gemini.text_chat.return_value
+        await route.send_task_failure(
+            self.plugin, self.event,
+            "[E_LLM_ALL_PROVIDERS_FAILED] 后台任务模型请求超时，本次任务未完成。",
+        )
+        sent = self.event.send.await_args.args[0]
+        self.assertIn("后台任务模型请求超时", sent)
+
+    async def test_schedule_with_real_receipt_keeps_success(self):
+        state = self.prepare_task("明天提醒我起床")
+        self.event._private_companion_capability_decision = CapabilityDecision(
+            True, "text", "neutral", ("schedule",), False, "test", route="task"
+        )
+        self.event.private_companion_future_task_succeeded = True
+        resp = LLMResponse(role="assistant", completion_text="提醒已登记，job_id=real-id")
+        await route.present_task_response(self.plugin, self.event, resp)
+        self.assertEqual("complete", state.status)
+        self.assertIn("real-id", resp.completion_text)
+
+    async def test_schedule_list_receipt_does_not_require_mutation(self):
+        state = self.prepare_task("查查我的定时任务")
+        self.event._private_companion_capability_decision = CapabilityDecision(
+            True, "text", "neutral", ("schedule",), False, "test", route="task"
+        )
+        self.event.private_companion_future_task_result_observed = True
+        self.event.private_companion_future_task_action = "list"
+        resp = LLMResponse(role="assistant", completion_text="No cron jobs found.")
+        await route.present_task_response(self.plugin, self.event, resp)
+        self.assertEqual("complete", state.status)
+
     async def test_all_notices_strip_internal_markers(self):
         for kind in ("ack", "progress", "failure"):
             with self.subTest(kind=kind):
@@ -375,6 +455,41 @@ class TaskNoticeContextTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(route.send_task_ack(self.plugin, self.event), route.send_task_ack(self.plugin, self.event))
         self.event.send.assert_awaited_once()
         self.gemini.text_chat.assert_awaited_once()
+
+    async def test_task_finishing_before_90_seconds_skips_progress_query(self):
+        for status in ("complete", "failed", "timeout"):
+            with self.subTest(status=status):
+                state = self.prepare_task()
+                self.gemini.text_chat.reset_mock()
+                self.grok.text_chat.reset_mock()
+
+                async def finish_during_wait(seconds):
+                    self.assertEqual(90.0, seconds)
+                    store = self.plugin._conversation_task_states
+                    if status == "complete":
+                        store.complete_task(state.task_id, "真实结果")
+                    elif status == "failed":
+                        store.fail_task(state.task_id, "任务已取消或失败")
+                    else:
+                        store.timeout_task(state.task_id, "请求超时")
+
+                with patch.object(route.asyncio, "sleep", side_effect=finish_during_wait):
+                    await route.delayed_task_progress(self.plugin, self.event, 90.0)
+                self.event.send.assert_not_awaited()
+                self.gemini.text_chat.assert_not_awaited()
+                self.grok.text_chat.assert_not_awaited()
+
+    async def test_task_finishing_during_progress_query_drops_late_notice(self):
+        state = self.prepare_task()
+
+        async def finish_while_generating(**kwargs):
+            self.plugin._conversation_task_states.complete_task(state.task_id, "真实结果")
+            return LLMResponse(role="assistant", completion_text="还在等后台结果。")
+
+        self.gemini.text_chat.side_effect = finish_while_generating
+        with patch.object(route.asyncio, "sleep", new_callable=AsyncMock):
+            await route.delayed_task_progress(self.plugin, self.event, 90.0)
+        self.event.send.assert_not_awaited()
 
     async def test_failed_delivery_is_retryable_and_not_added_to_history(self):
         self.prepare_task()
@@ -459,14 +574,14 @@ class ConversationHookTests(unittest.IsolatedAsyncioTestCase):
                 await hook(plugin, event, ProviderRequest())
         self.assertEqual(3, event.send.await_count)
 
-    async def test_progress_query_accepts_zero_and_subminute_delays(self):
+    async def test_progress_query_waits_90_seconds_regardless_of_hub_estimate(self):
         from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
 
         plugin = SimpleNamespace(
             enabled=True, enable_conversation_model_routing=True,
             _create_lifecycle_background_task=lambda coro, **kwargs: coro.close(),
         )
-        for estimate, expected in ((0, 0), (10, 10), (30, 30), (60, 60), (120, 120), (300, 120)):
+        for estimate in (0, 5, 10, 30, 60, 90, 120, 300):
             with self.subTest(estimate=estimate):
                 event = SimpleNamespace(
                     _private_companion_capability_decision=SimpleNamespace(reply=True),
@@ -479,15 +594,26 @@ class ConversationHookTests(unittest.IsolatedAsyncioTestCase):
                     patch("astrbot_plugin_private_companion.main.delayed_task_progress", new_callable=AsyncMock) as progress,
                 ):
                     await PrivateCompanionPlugin.route_conversation_models.__wrapped__(plugin, event, ProviderRequest())
-                    progress.assert_called_once_with(plugin, event, expected)
+                    progress.assert_called_once_with(plugin, event, 90.0)
 
-    async def test_progress_timer_does_not_add_a_minimum_wait(self):
+    async def test_progress_timer_queries_only_after_90_seconds(self):
+        waiting = asyncio.Event()
+        elapsed = asyncio.Event()
+
+        async def wait_for_threshold(seconds):
+            self.assertEqual(90.0, seconds)
+            waiting.set()
+            await elapsed.wait()
+
         with (
-            patch.object(route.asyncio, "sleep", new_callable=AsyncMock) as sleep,
+            patch.object(route.asyncio, "sleep", side_effect=wait_for_threshold),
             patch.object(route, "send_task_progress", new_callable=AsyncMock) as progress,
         ):
-            await route.delayed_task_progress("plugin", "event", 0)
-            sleep.assert_awaited_once_with(0.0)
+            timer = asyncio.create_task(route.delayed_task_progress("plugin", "event", 90.0))
+            await asyncio.wait_for(waiting.wait(), 1)
+            progress.assert_not_awaited()
+            elapsed.set()
+            await asyncio.wait_for(timer, 1)
             progress.assert_awaited_once_with("plugin", "event")
 
     async def test_request_hook_sends_ack_and_schedules_progress_for_task(self):

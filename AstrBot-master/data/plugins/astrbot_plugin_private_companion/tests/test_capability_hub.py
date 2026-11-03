@@ -116,6 +116,33 @@ class CapabilityHubTests(unittest.TestCase):
             )
         )
 
+    def test_reference_intent_is_retained_only_for_approved_image_actions(self) -> None:
+        for reply, actions, intent, expected in (
+            (True, ["image_generate"], True, True),
+            (True, ["image_edit"], True, True),
+            (True, ["vision"], True, False),
+            (True, [], True, False),
+            (False, ["image_generate"], True, False),
+            (True, ["image_generate"], "true", False),
+            (True, ["image_generate"], 1, False),
+            (True, ["image_generate"], False, False),
+        ):
+            with self.subTest(reply=reply, actions=actions, intent=intent):
+                decision = parse_model_capability_decision(
+                    json.dumps({"reply": reply, "actions": actions,
+                                "image_edit_requested": intent}),
+                    available_capabilities={"image_generate", "image_edit", "vision"},
+                    context=self._context("按刚刚要求重新生图", scope="private:u1"),
+                )
+                self.assertIsNotNone(decision)
+                self.assertIs(expected, getattr(decision, "image_edit_requested", False))
+
+        unavailable = parse_model_capability_decision(
+            '{"reply":true,"actions":["image_generate"],"image_edit_requested":true}',
+            available_capabilities={"vision"}, context=self._context("再试试"),
+        )
+        self.assertFalse(getattr(unavailable, "image_edit_requested", False))
+
     def test_request_scoped_decision_is_authoritative_for_external_actions(self) -> None:
         decision = decide_capabilities(
             self._context("请发一个表情包"),
@@ -399,12 +426,123 @@ class CapabilityHubTests(unittest.TestCase):
 
 
 class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
+    def test_scheduling_a_future_media_reminder_does_not_perform_media_now(self):
+        for text in ("十分钟后提醒我唱歌", "明天七点提醒我播放音乐"):
+            with self.subTest(text=text):
+                context = build_capability_context(
+                    scope="private:u1", current_text=text, sender_id="u1",
+                    sender_name="甲", now=datetime.now(timezone.utc),
+                )
+                decision = parse_model_capability_decision(
+                    '{"reply":true,"actions":["schedule"],"route":"task"}',
+                    available_capabilities=("schedule", "voice", "music"), context=context,
+                )
+                self.assertEqual(("schedule",), decision.actions)
+
+    def test_schedule_action_requires_task_route_and_real_state_query(self):
+        context = build_capability_context(
+            scope="private:u1", current_text="定时任务启动了吗", sender_id="u1",
+            sender_name="甲", now=datetime.now(timezone.utc),
+        )
+        decision = parse_model_capability_decision(
+            json.dumps({"reply": True, "actions": ["schedule"],
+                        "route": "chat", "task_query": True}),
+            available_capabilities=("schedule",), context=context,
+        )
+        self.assertEqual(("schedule",), decision.actions)
+        self.assertEqual("task", decision.route)
+        self.assertFalse(decision.task_query)
+
+    async def test_schedule_preflight_and_request_share_one_task_decision(self):
+        from unittest.mock import MagicMock
+
+        getter = MagicMock(return_value={
+            "provider_settings": {"proactive_capability": {"add_cron_tools": True}},
+        })
+        plugin = SimpleNamespace(
+            context=SimpleNamespace(get_config=getter, cron_manager=object()),
+            _event_scope_key=lambda event: "private:u1", _recall_message_cache={},
+            enable_hub_decision_reuse=True,
+            _llm_call=AsyncMock(return_value=json.dumps({
+                "reply": True, "actions": ["schedule"], "route": "chat",
+            })),
+        )
+        event = SimpleNamespace(
+            unified_msg_origin="bot1:FriendMessage:u1",
+            message_str="小七，你定个闹钟，明天早上7:30叫我起床上早八",
+            message_obj=SimpleNamespace(message_id="timer-preflight"),
+            is_private_chat=lambda: True, get_sender_id=lambda: "u1",
+            get_sender_name=lambda: "甲",
+        )
+        await append_capability_guidance(plugin, event, None)
+        decision = event._private_companion_capability_decision
+        prompt = plugin._llm_call.await_args.args[0]
+        payload = json.loads(prompt.split("输入数据：\n", 1)[1])
+        self.assertIn("schedule", payload["available_actions"])
+        self.assertIn("future_task", prompt)
+        self.assertEqual(("schedule",), decision.actions)
+        self.assertEqual("task", decision.route)
+        getter.assert_called_with(umo="bot1:FriendMessage:u1")
+        request = SimpleNamespace(system_prompt="当前人格：小七", func_tool=SimpleNamespace(
+            tools=[SimpleNamespace(name="future_task")],
+        ))
+        await append_capability_guidance(plugin, event, request)
+        self.assertIs(decision, request._private_companion_capability_decision)
+        self.assertIn("future_task", request.system_prompt)
+        plugin._llm_call.assert_awaited_once()
+
+    async def test_schedule_preflight_respects_config_and_scheduler_availability(self):
+        for enabled, manager in ((False, object()), (True, None), (True, object())):
+            with self.subTest(enabled=enabled, scheduler=manager is not None):
+                plugin = SimpleNamespace(
+                    context=SimpleNamespace(
+                        get_config=lambda **kwargs: {"provider_settings": {
+                            "proactive_capability": {"add_cron_tools": enabled},
+                        }}, cron_manager=manager,
+                    ),
+                    _event_scope_key=lambda event: "private:u1", _recall_message_cache={},
+                    _llm_call=AsyncMock(return_value='{"reply":true,"actions":["schedule"]}'),
+                )
+                event = SimpleNamespace(
+                    unified_msg_origin="bot1:FriendMessage:u1", message_str="十分钟后提醒我喝水",
+                    message_obj=SimpleNamespace(message_id="timer-availability"),
+                    is_private_chat=lambda: True, get_sender_id=lambda: "u1",
+                    get_sender_name=lambda: "甲",
+                )
+                await append_capability_guidance(plugin, event, None)
+                self.assertEqual(enabled and manager is not None,
+                                 "schedule" in event._private_companion_capability_decision.actions)
+                request = SimpleNamespace(system_prompt="", func_tool=None)
+                await append_capability_guidance(plugin, event, request)
+                self.assertNotIn("schedule", request._private_companion_capability_decision.actions)
+                plugin._llm_call.assert_awaited_once()
+
+    async def test_schedule_list_uses_real_tool_instead_of_background_progress(self):
+        plugin = SimpleNamespace(
+            enable_conversation_model_routing=True,
+            _llm_call=AsyncMock(return_value=json.dumps({
+                "reply": True, "actions": ["schedule"], "route": "chat", "task_query": True,
+            })),
+        )
+        context = build_capability_context(
+            scope="private:u1", current_text="看看我明天的提醒有没有设置成功",
+            sender_id="u1", sender_name="甲", now=datetime.now(timezone.utc),
+        )
+        decision = await judge_capabilities(plugin, context, available_capabilities=("schedule",))
+        self.assertEqual("task", decision.route)
+        self.assertFalse(decision.task_query)
+        prompt = plugin._llm_call.await_args.args[0]
+        self.assertIn("future_task", prompt)
+        self.assertIn("action=list", prompt)
+        self.assertIn("持久", prompt)
+
     async def test_group_ambiguous_tool_followup_requires_own_context_or_task(self):
         now = datetime.now(timezone.utc)
         for owner in ("u1", "u2"):
             with self.subTest(owner=owner):
                 plugin = SimpleNamespace(_llm_call=AsyncMock(return_value=json.dumps({
                     "reply": True, "actions": ["image_generate"], "route": "task",
+                    "image_edit_requested": True,
                     "segments": [{"kind": "task", "text": "生成头像"}],
                 })))
                 context = build_capability_context(
@@ -414,6 +552,7 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
                 )
                 decision = await judge_capabilities(plugin, context, available_capabilities=("image_generate",))
                 self.assertEqual(owner == "u1", "image_generate" in decision.actions)
+                self.assertEqual(owner == "u1", decision.image_edit_requested)
                 if owner != "u1":
                     self.assertTrue(decision.reply)
                     self.assertEqual("chat", decision.route)
@@ -1012,7 +1151,7 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
         class Tools:
             def __init__(self) -> None:
                 self.tools = [SimpleNamespace(name=name) for name in (
-                    "web_search_tavily", "AIsearch", "find_music", "deliver_music", "safe_tool"
+                    "web_search_tavily", "AIsearch", "find_music", "deliver_music", "future_task", "safe_tool"
                 )]
 
             def remove_tool(self, name: str) -> None:
@@ -1032,6 +1171,11 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
         music_approved._private_companion_capability_decision = SimpleNamespace(actions=("music",))
         gate_request_search_tools(music_approved)
         self.assertEqual(["find_music", "deliver_music", "safe_tool"], [tool.name for tool in music_approved.func_tool.tools])
+
+        schedule_approved = SimpleNamespace(func_tool=Tools())
+        schedule_approved._private_companion_capability_decision = SimpleNamespace(actions=("schedule",))
+        gate_request_search_tools(schedule_approved)
+        self.assertEqual(["future_task", "safe_tool"], [tool.name for tool in schedule_approved.func_tool.tools])
 
     async def test_injects_same_group_recent_messages_and_image_summary(self) -> None:
         previous_ts = datetime.now(timezone.utc).timestamp() - 30

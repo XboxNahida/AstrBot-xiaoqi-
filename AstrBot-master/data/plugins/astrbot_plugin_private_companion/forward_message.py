@@ -123,9 +123,8 @@ class ForwardMessageMixin:
         return "", {}
 
     def _component_type_name(self, item: Any) -> str:
-        if isinstance(item, dict):
-            return str(item.get("type") or "").strip().lower()
-        return str(getattr(item, "type", "") or item.__class__.__name__).strip().lower()
+        kind = item.get("type", "") if isinstance(item, dict) else getattr(item, "type", "") or item.__class__.__name__
+        return str(getattr(kind, "value", kind) or "").strip().lower()
 
     def _component_data(self, item: Any) -> dict[str, Any]:
         if isinstance(item, dict):

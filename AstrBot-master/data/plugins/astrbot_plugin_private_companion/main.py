@@ -10257,7 +10257,7 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         Args:
             prompt(string): 画面描述、自拍要求或改图要求。若用户在前几轮文字剧情中已经明确换装，而本轮只说继续/再拍一张，必须把仍生效的具体服装展开写进 prompt（例如“角色当前仍穿 JK 校服，继续拍摄”），不能只写“继续”让下游猜测。
             kind(string): text2img/selfie/sticker/edit。角色本人以自拍、背影、侧脸或环境人像等任何形式出镜时用 selfie；角色表情包/贴纸用 sticker；不含角色本人的普通场景、物件、风景用 text2img；改图用 edit。
-            reference_image_path(string): 可选，本地图片路径或图片 URL；edit 必填，selfie 可留空自动使用人设参考图/当天基础穿搭图。本轮引用图片会由工具自动解析，无需猜测路径；没有引用图片且没有明确“刚才/上一张/那张图”指代时不会自动复用历史图片，明确历史指代的改图请求会由插件从同会话图库安全取图。合影需要本轮用户消息/引用消息中的其他人物参考图，或在 prompt 中明确点名已绑定可用参考图的关系网角色；后者由工具自动选图，单独填写或猜测此参数不能授权合影。当天基础穿搭只是默认基线，近期对话已发生的换装优先。
+            reference_image_path(string): 可选，本地图片路径或图片 URL；edit 可留空，由工具自动读取本轮图片、引用图片或明确指代的同会话历史图片，不要猜测路径；selfie 可留空自动使用人设参考图/当天基础穿搭图。没有引用图片且没有明确“刚才/上一张/那张图”指代时不会自动复用历史图片。合影需要本轮用户消息/引用消息中的其他人物参考图，或在 prompt 中明确点名已绑定可用参考图的关系网角色；后者由工具自动选图，单独填写或猜测此参数不能授权合影。当天基础穿搭只是默认基线，近期对话已发生的换装优先。
             image_size(string): 可选，在线图片 API 尺寸，如 1024x1024。
             send(boolean): 是否生成后直接发送到当前会话，默认 true。
             caption(string): 发送图片时附带的短文字。
@@ -10270,21 +10270,33 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         if requested_kind in {"image_edit", "image-edit", "改图", "修图", "重绘", "p图"}:
             kind = "edit"
             requested_kind = "edit"
+        inbound_text = str(getattr(event, "message_str", "") or "")
+        reference_generation = bool(
+            requested_kind == "edit"
+            and decision_action_allowed(decision, "image_generate")
+            and (
+                getattr(decision, "image_edit_requested", False) is True
+                or (
+                    re.search(r"参考(?:图|图片)?|引用(?:图|图片)", inbound_text)
+                    and re.search(r"生成|画(?:一|个|张)|绘制|制作|做(?:一|个|张)", inbound_text)
+                )
+            )
+        )
         if requested_kind == "edit" and not decision_action_allowed(
             decision, "image_edit"
-        ):
+        ) and not reference_generation:
             return json.dumps(
                 {
                     "status": "skipped",
                     "generated": False,
                     "sent": False,
                     "skip_reason": "hub_denied_image_edit",
-                    "message": "中枢判断本轮未形成明确的图片修改请求，未调用改图工具。",
+                    "message": "本轮改图操作未获授权，尚未读取参考图或调用生图。",
                     "must_not_claim_sent": True,
+                    "final_response_instruction": "只说明本次未执行改图，不能据此声称参考图读取失败或图片无法访问。",
                 },
                 ensure_ascii=False,
             )
-        inbound_text = str(getattr(event, "message_str", "") or "")
         reaction_kind = _single_line(kind, 24).casefold() in {
             "sticker",
             "emoji",
@@ -10294,7 +10306,7 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         } or bool(re.search(r"(?:表情包|反应图|贴纸|梗图|斗图)", str(prompt or ""), flags=re.I))
         required_action = (
             "image_edit"
-            if requested_kind == "edit"
+            if requested_kind == "edit" and not reference_generation
             else ("emoji" if reaction_kind else "image_generate")
         )
         if not decision_action_allowed(decision, required_action):
@@ -15876,12 +15888,8 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 self._message_debounce_mark_llm_pending(event)
             if getattr(event, "_private_companion_task_id", ""):
                 await send_task_ack(self, event)
-                estimate = float(
-                    getattr(event, "_private_companion_task_estimated_seconds", 0) or 0
-                )
-                delay = max(0.0, min(120.0, estimate))
                 self._create_lifecycle_background_task(
-                    delayed_task_progress(self, event, delay),
+                    delayed_task_progress(self, event, 90.0),
                     label="conversation_task_progress",
                 )
         except Exception as exc:
@@ -15891,7 +15899,7 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
             text = (
                 str(exc)
                 if isinstance(exc, ValueError)
-                else "聊天模型配置暂时不可用，请检查模型分工设置。"
+                else "模型分工配置暂时不可用，请检查本次请求对应的模型设置。"
             )
             event.stop_event()
             scope = str(getattr(event, "unified_msg_origin", "") or "")

@@ -7,6 +7,10 @@ from unittest.mock import AsyncMock
 
 from PIL import Image
 
+from astrbot_plugin_private_companion.capability_hub import (
+    build_capability_context,
+    parse_model_capability_decision,
+)
 from astrbot_plugin_private_companion.command_handlers import CommandHandlersMixin
 from astrbot_plugin_private_companion.image_history import ImageHistoryStore
 from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
@@ -45,6 +49,97 @@ class ImageEditAliasTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual("hub_denied_image_edit", json.loads(result)["skip_reason"])
         plugin._pc_generate_photo_impl.assert_not_awaited()
+
+    async def test_reference_generation_can_use_edit_workflow(self):
+        for text in (
+            "那我要让你以这个为参考图，生成q版头像，能读到引用图吗",
+            "参考这张图生成一个头像",
+            "以引用图片为参考画一张Q版头像",
+        ):
+            with self.subTest(text=text):
+                plugin = self.make_plugin()
+                event = SimpleNamespace(
+                    message_str=text,
+                    _private_companion_capability_decision=SimpleNamespace(actions=("image_generate",)),
+                )
+                result = await PrivateCompanionPlugin.pc_generate_photo.__wrapped__(
+                    plugin, event, prompt="chibi avatar based on reference", kind="edit"
+                )
+                self.assertEqual("success", json.loads(result)["status"])
+                self.assertEqual("edit", plugin._pc_generate_photo_impl.await_args.kwargs["kind"])
+
+    async def test_model_prompt_cannot_authorize_reference_edit(self):
+        for text, actions in (
+            ("生成一张星空", ("image_generate",)),
+            ("这个参考图你能看到吗", ("image_generate",)),
+            ("参考这张图生成头像", ("vision",)),
+            ("参考这张图生成头像", ()),
+        ):
+            with self.subTest(text=text, actions=actions):
+                plugin = self.make_plugin()
+                event = SimpleNamespace(
+                    message_str=text,
+                    _private_companion_capability_decision=SimpleNamespace(actions=actions),
+                )
+                result = await PrivateCompanionPlugin.pc_generate_photo.__wrapped__(
+                    plugin, event, prompt="参考这张图生成头像", kind="edit"
+                )
+                self.assertEqual("hub_denied_image_edit", json.loads(result)["skip_reason"])
+                plugin._pc_generate_photo_impl.assert_not_awaited()
+
+    async def test_hub_approved_reference_retry_reaches_edit_workflow(self):
+        for text in ("充了，你再试试看", "按刚刚要求重新生图"):
+            with self.subTest(text=text):
+                plugin = self.make_plugin()
+                context = build_capability_context(
+                    scope="bot-a:private:user-a", current_text=text,
+                    sender_id="user-a", sender_name="用户", now=None,
+                )
+                decision = parse_model_capability_decision(
+                    json.dumps({"reply": True, "actions": ["image_generate"],
+                                "image_edit_requested": True, "route": "task"}),
+                    available_capabilities={"image_generate", "image_edit"},
+                    context=context,
+                )
+                event = SimpleNamespace(
+                    message_str=text, _private_companion_capability_decision=decision,
+                )
+                result = await PrivateCompanionPlugin.pc_generate_photo.__wrapped__(
+                    plugin, event, prompt="按此前要求使用刚才引用的原图生成Q版头像", kind="edit"
+                )
+                self.assertEqual("success", json.loads(result)["status"])
+                self.assertEqual("edit", plugin._pc_generate_photo_impl.await_args.kwargs["kind"])
+
+    async def test_reference_retry_requires_hub_action_and_boolean_intent(self):
+        for reply, actions, intent in (
+            (True, ["image_generate"], False),
+            (True, ["image_generate"], "true"),
+            (True, ["image_generate"], 1),
+            (True, ["vision"], True),
+            (True, [], True),
+            (False, ["image_generate"], True),
+        ):
+            with self.subTest(reply=reply, actions=actions, intent=intent):
+                plugin = self.make_plugin()
+                context = build_capability_context(
+                    scope="bot-a:private:user-a", current_text="充了，你再试试看",
+                    sender_id="user-a", sender_name="用户", now=None,
+                )
+                decision = parse_model_capability_decision(
+                    json.dumps({"reply": reply, "actions": actions,
+                                "image_edit_requested": intent}),
+                    available_capabilities={"image_generate", "image_edit", "vision"},
+                    context=context,
+                )
+                event = SimpleNamespace(
+                    message_str=context.current_text,
+                    _private_companion_capability_decision=decision,
+                )
+                result = await PrivateCompanionPlugin.pc_generate_photo.__wrapped__(
+                    plugin, event, prompt="参考原图生成头像", kind="edit"
+                )
+                self.assertEqual("hub_denied_image_edit", json.loads(result)["skip_reason"])
+                plugin._pc_generate_photo_impl.assert_not_awaited()
 
 
 class ImageHistoryReferenceTests(unittest.TestCase):

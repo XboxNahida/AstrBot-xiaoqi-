@@ -26,7 +26,7 @@ from .short_term_emotion import advance_emotion
 
 
 def gate_request_search_tools(req: Any) -> None:
-    """Hide web or music tools when the hub did not select that capability."""
+    """Hide web, music, or scheduling tools unless approved by the hub."""
     decision = getattr(req, "_private_companion_capability_decision", None)
     tool_set = getattr(req, "func_tool", None)
     remove_tool = getattr(tool_set, "remove_tool", None)
@@ -34,13 +34,15 @@ def gate_request_search_tools(req: Any) -> None:
         return
     search_allowed = decision_action_allowed(decision, "search")
     music_allowed = decision_action_allowed(decision, "music")
+    schedule_allowed = decision_action_allowed(decision, "schedule")
     for tool in tuple(getattr(tool_set, "tools", ()) or ()):
         name = str(getattr(tool, "name", "") or "")
         is_search_tool = name == "AIsearch" or name.startswith("web_search_") or name in {
             "tavily_extract_web_page", "firecrawl_extract_web_page", "exa_get_contents"
         }
         is_music_tool = name in {"find_music", "deliver_music", "search_music"}
-        if (is_search_tool and not search_allowed) or (is_music_tool and not music_allowed):
+        if ((is_search_tool and not search_allowed) or (is_music_tool and not music_allowed)
+                or (name == "future_task" and not schedule_allowed)):
             remove_tool(name)
 
 
@@ -536,6 +538,20 @@ async def append_capability_guidance(
         )
         if req is None or request_has_music:
             available_actions.append("music")
+        schedule_available = "future_task" in tool_names
+        if req is None:
+            context_owner = getattr(self, "context", None)
+            config_getter = getattr(context_owner, "get_config", None)
+            if callable(config_getter) and getattr(context_owner, "cron_manager", None) is not None:
+                try:
+                    config = config_getter(umo=str(getattr(event, "unified_msg_origin", "") or ""))
+                    schedule_available = bool(config.get("provider_settings", {}).get(
+                        "proactive_capability", {},
+                    ).get("add_cron_tools", True))
+                except Exception as exc:
+                    logger.warning("Scheduling capability lookup failed: error=%s", type(exc).__name__)
+        if schedule_available:
+            available_actions.append("schedule")
         setattr(event, "_private_companion_singing_requested", explicit_singing_request(current_text))
         context = build_capability_context(
             scope=scope,

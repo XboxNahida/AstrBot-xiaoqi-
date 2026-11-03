@@ -3872,8 +3872,21 @@ class CommandHandlersMixin:
         if isinstance(cached, list):
             return [str(item).strip() for item in cached if str(item or "").strip()]
         sources: list[str] = []
+        # QQ can supply an inline Reply.chain without a retrievable message ID.
+        components = getattr(self, "_event_components", None)
+        extractor = getattr(self, "_extract_image_sources_from_message_obj", None)
+        if callable(components) and callable(extractor):
+            for component in components(event):
+                kind = self._component_type_name(component)
+                if kind != "reply":
+                    continue
+                chain = component.get("chain") if isinstance(component, dict) else getattr(component, "chain", None)
+                for source in extractor(chain):
+                    text = str(source or "").strip()
+                    if text and text not in sources:
+                        sources.append(text)
         finder = getattr(self, "_find_reply_image_sources_for_event", None)
-        if callable(finder):
+        if not sources and callable(finder):
             try:
                 for source in await finder(event):
                     text = str(source or "").strip()
@@ -3898,6 +3911,8 @@ class CommandHandlersMixin:
             compact,
             flags=re.I,
         ):
+            return True
+        if re.search(r"(?:以|用|拿|按)(?:这个|这张|刚才的|刚刚的)(?:图(?:片)?)?(?:来|作为|为)?参考", compact):
             return True
         # An edit request is itself an explicit request for the most recent
         # same-session image; ordinary text must not silently attach an image.
@@ -4109,8 +4124,8 @@ class CommandHandlersMixin:
         if len(images) < max(1, limit):
             await collect(self._photo_reference_sources_from_reply_cache(event), "引用消息里的图片", "reply_library")
         if len(images) < max(1, limit):
-            await collect(await self._photo_reference_sources_from_reply_event(event), "引用消息里的图片", "reply_library")
-        if len(images) < max(1, limit):
+            await collect(await self._photo_reference_sources_from_reply_event(event), "引用消息里的图片", "reply_library", trusted=True)
+        if len(images) < max(1, limit) and not saw_image:
             history_sources = self._photo_reference_sources_from_history(event, user_id, prompt)
             await collect(history_sources, "会话历史图片", "history_library", trusted=True)
         return images, saw_image

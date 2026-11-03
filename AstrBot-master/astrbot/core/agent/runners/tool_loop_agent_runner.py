@@ -202,12 +202,20 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         )
 
     @staticmethod
-    def _all_chat_models_failed_message(last_error: str = "") -> str:
+    def _all_chat_models_failed_message(
+        last_error: str = "", *, is_task: bool = False
+    ) -> str:
         """Build the stable user-facing error for an exhausted provider chain."""
         detail = str(last_error or "").strip()
+        label = "后台任务模型" if is_task else "聊天模型"
+        timed_out = any(
+            marker in detail.lower() for marker in ("timeout", "timed out", "超时")
+        )
+        reason = "请求超时" if timed_out else "暂时不可用"
+        unfinished = "本次任务未完成，" if is_task else ""
         suffix = f" 最后错误：{detail[:240]}" if detail else ""
         return (
-            f"[E_LLM_ALL_PROVIDERS_FAILED] 当前模型暂时无法响应，请稍后重试。{suffix}"
+            f"[E_LLM_ALL_PROVIDERS_FAILED] {label}{reason}，{unfinished}请稍后重试。{suffix}"
         )
 
     async def _complete_with_assistant_response(self, llm_resp: LLMResponse) -> None:
@@ -266,7 +274,14 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         **kwargs: T.Any,
     ) -> None:
         self.req = request
-        self.streaming = streaming
+        event = getattr(run_context.context, "event", None)
+        get_extra = getattr(event, "get_extra", None)
+        self._is_task_request = bool(
+            request.final_response_only
+            or (callable(get_extra) and get_extra("cron_job"))
+        )
+        self._pending_required_tools = set(request.required_tool_names)
+        self.streaming = streaming and not self._pending_required_tools
         self.enforce_max_turns = enforce_max_turns
         self.llm_compress_instruction = llm_compress_instruction
         self.llm_compress_keep_recent_ratio = llm_compress_keep_recent_ratio
@@ -580,6 +595,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
     ) -> T.AsyncGenerator[LLMResponse, None]:
         """Wrap _iter_llm_responses with provider fallback handling."""
         candidates = [self.provider, *self.fallback_providers]
+        model_kind = "Task Model" if self._is_task_request else "Chat Model"
         total_candidates = len(candidates)
         last_exception: Exception | None = None
         last_err_response: LLMResponse | None = None
@@ -594,7 +610,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                     self.provider.provider_config.get("id", "<unknown>")
                 )
                 logger.warning(
-                    "Switched from %s to fallback chat provider: %s",
+                    "%s switched from %s to fallback provider: %s",
+                    model_kind,
                     self._fallback_from_provider_id,
                     candidate_id,
                 )
@@ -628,18 +645,29 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                                     continue
 
                                 if (
-                                    resp.role == "err"
-                                    and not has_stream_output
-                                    and (not is_last_candidate)
+                                    resp.role == "err" and not has_stream_output
                                 ):
                                     last_err_response = resp
                                     logger.warning(
-                                        "Chat Model %s returns error response, trying fallback to next provider.",
+                                        "%s %s returned an error response; fallback_available=%s",
+                                        model_kind,
                                         candidate_id,
+                                        not is_last_candidate,
                                     )
                                     break
 
                                 self._sanitize_malformed_tool_calls(resp)
+                                if (
+                                    self._pending_required_tools
+                                    and not resp.tools_call_name
+                                ):
+                                    raise RuntimeError(
+                                        "Required tool was not called: "
+                                        + ", ".join(sorted(self._pending_required_tools))
+                                    )
+                                self._pending_required_tools.difference_update(
+                                    resp.tools_call_name or ()
+                                )
                                 yield resp
                                 return
 
@@ -648,12 +676,14 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                         except EmptyModelOutputError:
                             if has_stream_output:
                                 logger.warning(
-                                    "Chat Model %s returned empty output after streaming started; skipping empty-output retry.",
+                                    "%s %s returned empty output after streaming started; skipping empty-output retry.",
+                                    model_kind,
                                     candidate_id,
                                 )
                             else:
                                 logger.warning(
-                                    "Chat Model %s returned empty output on attempt %s/%s.",
+                                    "%s %s returned empty output on attempt %s/%s.",
+                                    model_kind,
                                     candidate_id,
                                     attempt.retry_state.attempt_number,
                                     self.EMPTY_OUTPUT_RETRY_ATTEMPTS,
@@ -664,7 +694,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             except Exception as exc:  # noqa: BLE001
                 last_exception = exc
                 logger.warning(
-                    "Chat Model %s request error: %s",
+                    "%s %s request error: %s",
+                    model_kind,
                     candidate_id,
                     exc,
                     exc_info=True,
@@ -679,7 +710,9 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             detail = "no provider response"
         yield LLMResponse(
             role="err",
-            completion_text=self._all_chat_models_failed_message(detail),
+            completion_text=self._all_chat_models_failed_message(
+                detail, is_task=self._is_task_request
+            ),
         )
 
     def _sanitize_contexts_for_provider(

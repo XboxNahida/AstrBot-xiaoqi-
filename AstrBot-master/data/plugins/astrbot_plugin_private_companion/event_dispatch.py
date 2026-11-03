@@ -1738,6 +1738,12 @@ class EventDispatchMixin:
             class_name = comp.__class__.__name__.lower()
             if isinstance(comp, dict):
                 class_name = str(comp.get("type") or "").lower()
+            if class_name == "reply":
+                chain = comp.get("chain") if isinstance(comp, dict) else getattr(comp, "chain", None)
+                extractor = getattr(self, "_extract_image_sources_from_message_obj", None)
+                if callable(extractor):
+                    for source in extractor(chain):
+                        add(source)
             if class_name != "image":
                 continue
             add(await resolve_component_source(comp))
@@ -2048,6 +2054,12 @@ class EventDispatchMixin:
                 if class_name == "image":
                     has_image = True
                     break
+                if class_name == "reply":
+                    chain = comp.get("chain") if isinstance(comp, dict) else getattr(comp, "chain", None)
+                    extractor = getattr(self, "_extract_image_sources_from_message_obj", None)
+                    if callable(extractor) and extractor(chain):
+                        has_image = True
+                        break
         image_items = await self._event_image_sources_for_recall_cache(event, limit=5) if has_image else []
         if has_image and not image_items:
             image_items = [{"source": "", "tier": "placeholder"}]

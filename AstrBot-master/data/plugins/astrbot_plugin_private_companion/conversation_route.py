@@ -97,6 +97,12 @@ async def _send_task_notice(plugin: Any, event: Any, kind: str) -> bool:
             "failure": "这次任务没能完成，错误和未完成内容已经保留。",
             "query": "还在等待任务模型的结果，目前没有新的工具进展。",
         }
+        task_model_timeout = any(
+            marker in str(state.error or "").lower()
+            for marker in ("apitimeouterror", "readtimeout", "connecttimeout", "request timed out", "后台任务模型请求超时")
+        )
+        if kind == "failure" and task_model_timeout:
+            defaults[kind] = "后台任务模型请求超时，这次任务未完成，未完成内容已保留，可以稍后重试。"
         phase_sentences = {
             "tool_running": "后台工具正在执行，这一步还没返回结果。",
             "background_running": "后台进程还在运行，最近的输出已经记录。",
@@ -122,6 +128,7 @@ async def _send_task_notice(plugin: Any, event: Any, kind: str) -> bool:
             "区分用户正在观察或排查的事情和你负责执行的任务；不要凭空要求用户先修好环境才继续。"
             "running 只说明任务请求尚未结束，不代表测试或工具已经启动；没有工具记录时只说等待任务模型结果。"
             "不得虚构执行阶段、百分比、耗时、结果、成功或已完成的动作。failure 必须明确未完成。"
+            "后台任务执行报错不能归因于聊天模型不可用；错误记录明确超时时，失败通知必须说明后台任务请求超时。"
             "query 是用户的即时状态追问，直接回答当前任务状态；complete 只代表任务已有返回，不能自动宣称全部验收通过。"
             "ack/progress/failure 是你主动报告当前任务，不是用户再次催促；不要说别催、又催、别急，也不要假设用户发来了新消息。"
             "优先围绕 original_user_message 和 task 的同一项请求说话，忽略与该任务无关的后来聊天。"
@@ -144,6 +151,10 @@ async def _send_task_notice(plugin: Any, event: Any, kind: str) -> bool:
                 )
                 candidate = _task_chat_text(getattr(response, "completion_text", ""))
                 invalid_claim = bool(re.search(r"(?:已经|全部|顺利).{0,8}(?:完成|成功|搞定|跑完)|(?:完成|成功|搞定|跑完)了|\d+\s*[%％]|百分之", candidate)) if kind in {"ack", "progress", "failure"} or state.status in {"running", "progress", "queued", "failed", "timeout"} else False
+                if kind == "failure":
+                    invalid_claim = invalid_claim or bool(
+                        re.search(r"聊天模型.{0,12}(?:不可用|超时|失败|无法|无响应)", candidate)
+                    ) or (task_model_timeout and "超时" not in candidate)
                 if not state.tool_name and state.status in {"running", "queued"}:
                     invalid_claim = invalid_claim or bool(re.search(r"(?:测试|脚本|程序|工具|进程).{0,6}(?:跑|运行|执行|启动|读写|检查)", candidate))
                 if getattr(response, "role", "") == "assistant" and not getattr(response, "tools_call_name", None) and candidate and len(candidate) <= 100 and not invalid_claim:
@@ -411,6 +422,9 @@ def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
             ids.append(identity)
     req.model = None
     req.disable_streaming = True
+    req.required_tool_names = (
+        ("future_task",) if "schedule" in decision.actions else ()
+    )
     setattr(event, "_private_companion_chat_provider_ids", ids)
     setattr(event, "_private_companion_conversation_route", route)
     setattr(
@@ -524,6 +538,22 @@ async def present_task_response(plugin: Any, event: Any, resp: Any) -> None:
     original = "".join(parts)
     store = _task_store(plugin)
     task_id = getattr(event, "_private_companion_task_id", "")
+    decision = getattr(event, "_private_companion_capability_decision", None)
+    if "schedule" in getattr(decision, "actions", ()) and not (
+        getattr(event, "private_companion_future_task_succeeded", False)
+        or (
+            getattr(event, "private_companion_future_task_result_observed", False)
+            and getattr(event, "private_companion_future_task_action", "") == "list"
+        )
+    ):
+        original = "没有取得定时工具的成功回执，这次提醒操作尚未确认成功，请重试；不能依赖本次提醒生效。"
+        if store is not None and store.get(task_id) is not None:
+            store.fail_task(task_id, original)
+        resp.completion_text = original
+        setattr(resp, "_private_companion_task_presented", True)
+        setattr(event, "_private_companion_presented_task_text", original)
+        logger.warning("Scheduled task response rejected without a tool receipt")
+        return
     if not original.strip():
         state = store.get(task_id) if store is not None else None
         if state is not None and state.reply_context.get("visible_delivery"):
@@ -623,7 +653,7 @@ async def present_task_response(plugin: Any, event: Any, resp: Any) -> None:
             opening = candidate
             break
     if not opening:
-        opening = "聊天模型暂时不可用，下面保留任务结果原文："
+        opening = "回复整理暂时失败，下面保留任务执行结果原文："
     resp.completion_text = opening + "\n\n" + original
     resp.reasoning_content = None
     setattr(event, "_private_companion_presented_task_text", resp.completion_text)
