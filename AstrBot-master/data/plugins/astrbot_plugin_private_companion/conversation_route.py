@@ -143,7 +143,7 @@ async def _send_task_notice(plugin: Any, event: Any, kind: str) -> bool:
                 if any(host in str(provider.provider_config.get("api_base", "")) for host in decoded_blocked):
                     continue
                 family = f"{identity} {provider.get_model()} {provider.provider_config.get('model', '')}".casefold()
-                if any(name in family for name in ("gpt", "claude", "deepseek")):
+                if any(name in family for name in ("gpt", "claude")):
                     continue
                 response = await asyncio.wait_for(
                     provider.text_chat(prompt=json.dumps(payload, ensure_ascii=False), system_prompt=system, contexts=contexts, func_tool=None, max_tokens=180),
@@ -416,8 +416,8 @@ def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
                 str(provider.provider_config.get("model") or ""),
             )
         ).casefold()
-        if any(name in family for name in ("gpt", "claude", "deepseek")):
-            raise ValueError("聊天及聊天备用模型不能选择 GPT、Claude 或 DeepSeek。")
+        if any(name in family for name in ("gpt", "claude")):
+            raise ValueError("聊天及聊天备用模型不能选择 GPT 或 Claude。")
         if identity not in ids:
             ids.append(identity)
     req.model = None
@@ -601,7 +601,7 @@ async def present_task_response(plugin: Any, event: Any, resp: Any) -> None:
             ):
                 continue
             family = f"{identity} {provider.get_model()} {provider.provider_config.get('model', '')}".casefold()
-            if any(name in family for name in ("gpt", "claude", "deepseek")):
+            if any(name in family for name in ("gpt", "claude")):
                 continue
             response = await asyncio.wait_for(
                 provider.text_chat(

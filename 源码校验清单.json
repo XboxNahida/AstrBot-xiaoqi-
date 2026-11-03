@@ -6593,7 +6593,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_route.py",
-    "SHA256": "806cf74a9be16c71c9bc6b4eb4b8256948e31ec0e74a37644d2e1e8f6985781f"
+    "SHA256": "8886ccb29236926ac898f5f50a3b20cbc4e4ec43305bb0968a8f8cd818f80549"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_task_state.py",
@@ -7505,7 +7505,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_conversation_route.py",
-    "SHA256": "33dc1f2f3dd06c605021a61313613733e8cac1f1c0a5293b16055e64fe046a2b"
+    "SHA256": "64152da1ce3a9e3fec350bab61fa6295d674ee05201f5a6212fa9e3bf9a461a7"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_conversation_task_progress.py",
@@ -13225,7 +13225,7 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "f247d969c9ed90e3751aba562a45107f4f8965768437f6beb7a7760ce771ac8b"
+    "SHA256": "869b16633aed0ae95dcf43dd435c2d0c3228a9455da427f2af69abd482f98add"
   },
   {
     "路径": "launcher/AstrBotLauncher.csproj",
@@ -13353,7 +13353,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "057f0336b73f999eb12489a1d1f0b6d18e4f3eb6abb5f488643655ff58d1ac51"
+    "SHA256": "5249e8fc80c2f1d79afc27bab2bb045643b35bec6403eb6fbd34d2865195aab5"
   },
   {
     "路径": "第三方与发布说明.md",

@@ -106,7 +106,7 @@ class ConversationRouteTests(unittest.TestCase):
             "conversation_chat_provider_id",
             "conversation_chat_fallback_provider_id",
         ):
-            for identity in ("gpt", "deepseek", "claude"):
+            for identity in ("gpt", "claude"):
                 with self.subTest(field=field, identity=identity):
                     setattr(self.plugin, field, identity)
                     with self.assertRaises(ValueError):
@@ -116,6 +116,15 @@ class ConversationRouteTests(unittest.TestCase):
                 field,
                 "gemini" if field.endswith("chat_provider_id") else "grok",
             )
+
+    def test_deepseek_chat_backup_does_not_block_primary_or_task_route(self):
+        self.plugin.conversation_chat_fallback_provider_id = "deepseek"
+        for kind in ("chat", "task", "mixed"):
+            with self.subTest(route=kind):
+                req = self.request(kind)
+                self.assertEqual(["gemini", "deepseek"], self.event._private_companion_chat_provider_ids)
+                self.assertEqual("gemini" if kind == "chat" else "gpt", req.provider_id)
+                self.assertEqual(["deepseek"] if kind == "chat" else ["gpt-fallback"], req.fallback_provider_ids)
 
     def test_missing_api_configuration_does_not_fall_through_to_gpt(self):
         self.plugin.conversation_chat_provider_id = ""
@@ -203,6 +212,17 @@ class TaskPresentationTests(unittest.IsolatedAsyncioTestCase):
         await route.present_task_response(self.plugin, self.event, resp)
         self.grok.text_chat.assert_awaited_once()
         self.assertTrue(resp.completion_text.endswith("任务未完成：网络失败"))
+
+    async def test_deepseek_backup_presents_result_after_primary_failure(self):
+        deepseek = fake_provider("deepseek/deepseek-flash")
+        deepseek.text_chat.return_value = LLMResponse(role="assistant", completion_text="结果在这儿。")
+        self.plugin.context.get_provider_by_id = {"gemini": self.gemini, "deepseek/deepseek-flash": deepseek}.get
+        self.event._private_companion_chat_provider_ids = ["gemini", "deepseek/deepseek-flash"]
+        self.gemini.text_chat.side_effect = TimeoutError("primary timeout")
+        resp = LLMResponse(role="assistant", completion_text="原始任务结果")
+        await route.present_task_response(self.plugin, self.event, resp)
+        deepseek.text_chat.assert_awaited_once()
+        self.assertEqual("结果在这儿。\n\n原始任务结果", resp.completion_text)
 
     async def test_both_chat_failures_keep_result_with_honest_fixed_message(self):
         self.gemini.text_chat.side_effect = RuntimeError("offline")
@@ -294,6 +314,18 @@ class TaskPresentationTests(unittest.IsolatedAsyncioTestCase):
 
 class TaskNoticeContextTests(unittest.IsolatedAsyncioTestCase):
     setUp = TaskPresentationTests.setUp
+
+    async def test_deepseek_backup_reports_progress_after_primary_failure(self):
+        self.prepare_task("帮我查询资料")
+        deepseek = fake_provider("deepseek/deepseek-flash")
+        deepseek.text_chat.return_value = LLMResponse(role="assistant", completion_text="还在等任务模型返回。")
+        self.plugin.context.get_provider_by_id = {"gemini": self.gemini, "deepseek/deepseek-flash": deepseek}.get
+        self.event._private_companion_chat_provider_ids = ["gemini", "deepseek/deepseek-flash"]
+        self.gemini.text_chat.side_effect = TimeoutError("primary timeout")
+        await route._send_task_notice(self.plugin, self.event, "progress")
+        deepseek.text_chat.assert_awaited_once()
+        self.event.send.assert_awaited_once_with("还在等任务模型返回。")
+
     def prepare_task(self, text="后端还是有问题，再写一个测试，我观察后端"):
         from astrbot_plugin_private_companion.conversation_task_state import ConversationTaskStateStore
 
