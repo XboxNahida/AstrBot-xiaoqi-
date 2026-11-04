@@ -108,6 +108,8 @@ class ProviderRequest:
     """
     system_prompt: str = ""
     """系统提示词"""
+    subagent_router_prompt: str = ""
+    """Host-injected chat routing fragment; excluded from delegated execution."""
     conversation: Conversation | None = None
     """关联的对话对象"""
     tool_calls_result: list[ToolCallsResult] | ToolCallsResult | None = None

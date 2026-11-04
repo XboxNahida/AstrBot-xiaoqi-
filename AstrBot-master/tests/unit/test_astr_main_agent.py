@@ -1208,6 +1208,33 @@ class TestEnsurePersonaAndSkills:
                 result.reset_coro.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("agents", [[], [{"name": "offline", "enabled": False, "tools": ["tool_a"]}]])
+    async def test_empty_subagent_handoffs_preserve_tools_without_router_prompt(
+        self, mock_event, mock_context, agents
+    ):
+        tool = FunctionTool(name="tool_a", description="read", parameters={"type": "object"})
+        tmgr = mock_context.get_llm_tool_manager.return_value
+        tmgr.get_full_tool_set.return_value = ToolSet([tool])
+        mock_context.subagent_orchestrator = MagicMock(handoffs=[])
+        mock_context.get_config.return_value = {
+            "subagent_orchestrator": {
+                "main_enable": True,
+                "remove_main_duplicate_tools": True,
+                "agents": agents,
+                "router_system_prompt": "Delegate only. Do not use tools yourself.",
+            }
+        }
+        req = ProviderRequest(system_prompt="Original persona")
+        req.conversation = MagicMock(persona_id=None)
+
+        await ama._ensure_persona_and_skills(req, {}, mock_context, mock_event)
+
+        assert "Delegate only" not in req.system_prompt
+        assert "Original persona" in req.system_prompt
+        assert "tool_a" in req.func_tool.names()
+        assert not getattr(req, "subagent_router_prompt", "")
+
+    @pytest.mark.asyncio
     async def test_subagent_dedupe_uses_default_persona_tools(
         self, mock_event, mock_context
     ):
@@ -1245,6 +1272,7 @@ class TestEnsurePersonaAndSkills:
             "subagent_orchestrator": {
                 "main_enable": True,
                 "remove_main_duplicate_tools": True,
+                "router_system_prompt": "Route through transfer_to_planner.",
                 "agents": [
                     {
                         "name": "planner",
@@ -1264,6 +1292,8 @@ class TestEnsurePersonaAndSkills:
         assert "transfer_to_planner" in req.func_tool.names()
         assert "tool_a" not in req.func_tool.names()
         assert "tool_b" in req.func_tool.names()
+        assert "Route through transfer_to_planner." in req.system_prompt
+        assert getattr(req, "subagent_router_prompt", "") == "\nRoute through transfer_to_planner.\n"
 
 
 class TestDecorateLlmRequest:

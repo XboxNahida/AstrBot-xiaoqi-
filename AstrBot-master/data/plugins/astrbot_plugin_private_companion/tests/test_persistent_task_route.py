@@ -6,6 +6,7 @@ from jsonschema.exceptions import ValidationError
 
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 from astrbot.core.provider.entities import ProviderRequest
+from astrbot.core.provider import Provider
 from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
 
 
@@ -15,6 +16,9 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
             register=MagicMock(return_value=True),
             submit=AsyncMock(return_value={"accepted": True, "task_id": "persisted"}),
             snapshot=MagicMock(return_value="持久任务：排队中"),
+            make_read_tool=MagicMock(return_value=FunctionTool(
+                name="pc_read_background", description="Read background", parameters={"type": "object"},
+            )),
             make_intent_tool=MagicMock(return_value=FunctionTool(
                 name="pc_submit_task_intent", description="Submit intent", parameters={"type": "object"},
             )),
@@ -56,7 +60,37 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         req.func_tool = ToolSet()
         await self.invoke(plugin, event, req)
         self.assertIn("持久任务", req.system_prompt)
-        self.assertEqual(["pc_submit_task_intent"], [tool.name for tool in req.func_tool.tools])
+        self.assertEqual(["pc_read_background", "pc_submit_task_intent"], [tool.name for tool in req.func_tool.tools])
+        runtime.submit.assert_not_awaited()
+
+    async def test_read_tool_is_permanent_even_when_task_supplement_is_disabled(self):
+        plugin, event, req, runtime = self.setup_route("chat")
+        plugin.enable_reply_task_intents = False
+        await self.invoke(plugin, event, req)
+        self.assertEqual(["pc_read_background"], [tool.name for tool in req.func_tool.tools])
+        runtime.submit.assert_not_awaited()
+
+    async def test_actual_chat_provider_route_keeps_reader_and_persona_with_backup(self):
+        plugin, event, req, runtime = self.setup_route("chat")
+        providers = {}
+        for identity in ("gemini", "deepseek"):
+            provider = MagicMock(spec=Provider)
+            provider.provider_config = {"enable": True, "model": identity}
+            provider.get_model.return_value = identity
+            providers[identity] = provider
+        plugin.context = SimpleNamespace(get_provider_by_id=providers.get)
+        plugin.conversation_chat_provider_id = "gemini"
+        plugin.conversation_chat_fallback_provider_id = "deepseek"
+        plugin.enable_reply_task_intents = False
+        req.system_prompt = "当前人格和原有记忆"
+        req.contexts = [{"role": "user", "content": "刚才的原始对话"}]
+        handler = PrivateCompanionPlugin.route_conversation_models.__wrapped__
+        await handler(plugin, event, req)
+        self.assertEqual("gemini", req.provider_id)
+        self.assertEqual(["deepseek"], req.fallback_provider_ids)
+        self.assertEqual(["pc_read_background"], [tool.name for tool in req.func_tool.tools])
+        self.assertIn("当前人格和原有记忆", req.system_prompt)
+        self.assertEqual("刚才的原始对话", req.contexts[0]["content"])
         runtime.submit.assert_not_awaited()
 
     async def test_silent_event_never_gets_supplemental_entry(self):
@@ -80,6 +114,7 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("查到了吗", req.prompt)
         self.assertIn("原聊天人格和记忆", req.system_prompt)
         self.assertNotIn("pc_submit_task_intent", [t.name for t in (req.func_tool.tools if req.func_tool else [])])
+        self.assertIn("pc_read_background", [t.name for t in req.func_tool.tools])
 
     async def test_failed_persistence_does_not_run_old_task(self):
         plugin, event, req, runtime = self.setup_route()

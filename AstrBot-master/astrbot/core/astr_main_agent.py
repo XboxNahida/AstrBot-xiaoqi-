@@ -597,7 +597,7 @@ async def _ensure_persona_and_skills(
     # sub agents integration
     orch_cfg = plugin_context.get_config().get("subagent_orchestrator", {})
     so = plugin_context.subagent_orchestrator
-    if orch_cfg.get("main_enable", False) and so:
+    if orch_cfg.get("main_enable", False) and so and so.handoffs:
         remove_dup = bool(orch_cfg.get("remove_main_duplicate_tools", False))
 
         assigned_tools: set[str] = set()
@@ -654,7 +654,8 @@ async def _ensure_persona_and_skills(
             .get("router_system_prompt", "")
         ).strip()
         if router_prompt:
-            req.system_prompt += f"\n{router_prompt}\n"
+            req.subagent_router_prompt = f"\n{router_prompt}\n"
+            req.system_prompt += req.subagent_router_prompt
     try:
         event.trace.record(
             "sel_persona",

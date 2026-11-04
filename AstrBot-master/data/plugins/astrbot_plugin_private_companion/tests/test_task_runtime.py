@@ -94,6 +94,161 @@ def register(rt, e, **kwargs):
 
 
 @pytest.mark.asyncio
+async def test_background_reader_is_live_readonly_scoped_and_paginated(runtime):
+    e = event()
+    register(runtime, e)
+    task = runtime.service.submit(runtime.scope(e), "first", "main", "提醒", workdir=runtime.workspace)
+    channel = runtime.interaction_api.channels.open(runtime.scope(e), "existing", {}, ttl_seconds=600)
+    tool = runtime.make_read_tool(e)
+    job = runtime.service.claim("worker")
+    contexts = [{"role": "assistant", "content": "先检查文件", "reasoning_content": "private reasoning",
+                 "tool_calls": [{"id": "call1", "function": {"name": "pc_task_run_command", "arguments": '{"command":"python wake_up.py","api_key":"topsecret"}'}}]}]
+    assert runtime.service.record_step(job, job.step_key, {"kind": "tool", "number": 1,
+        "tool": "pc_task_run_command", "contexts": contexts,
+        "outcome": {"status": "error", "content": "文件不存在 " + channel["token"], "receipt": {"tool": "pc_task_run_command"}}}, next_step="tool:2")
+    before = sqlite3.connect(runtime.service.path).iterdump()
+    before = list(before)
+    result = json.loads(await tool.call(None, task_id=task.task_id))
+    assert result["task"]["status"] == "running"
+    assert "current_provider" in result["task"]
+    assert "python wake_up.py" in result["detail_text"]
+    assert "先检查文件" in result["detail_text"]
+    assert "文件不存在" in result["detail_text"]
+    assert "topsecret" not in json.dumps(result)
+    assert channel["token"] not in json.dumps(result)
+    assert "private reasoning" not in json.dumps(result)
+    assert result["next_text_offset"] is None
+    page = json.loads(await tool.call(None, task_id=task.task_id, text_limit=80))
+    assert page["next_text_offset"] == 80
+    next_page = json.loads(await tool.call(None, task_id=task.task_id, text_offset=80, text_limit=80))
+    assert next_page["text_offset"] == 80
+    assert page["detail_text"] != next_page["detail_text"]
+    assert list(sqlite3.connect(runtime.service.path).iterdump()) == before
+    other = event(user="other")
+    register(runtime, other)
+    denied = json.loads(await runtime.make_read_tool(other).call(None, task_id=task.task_id))
+    assert denied["code"] == "not_found"
+    assert len(runtime.service.list(runtime.scope(e))) == 1
+
+    # Bound tools reject a later change to the host event's conversation scope.
+    e.session_id = "different-group"
+    assert json.loads(await tool.call(None, task_id=task.task_id))["code"] == "untrusted_event"
+
+
+@pytest.mark.asyncio
+async def test_background_reader_lists_empty_and_rejects_mutation(runtime):
+    e = event()
+    register(runtime, e)
+    tool = runtime.make_read_tool(e)
+    assert json.loads(await tool.call(None))["tasks"] == []
+    result = json.loads(await tool.call(None, action="cancel"))
+    assert result["code"] == "invalid_arguments"
+    result = json.loads(await tool.call(None, sender_id="other"))
+    assert result["code"] == "invalid_arguments"
+    for i in range(3):
+        runtime.service.submit(runtime.scope(e), str(i), "main", f"任务{i}", workdir=runtime.workspace)
+    first = json.loads(await tool.call(None, limit=1))
+    second = json.loads(await tool.call(None, offset=first["next_offset"], limit=1))
+    assert first["tasks"][0]["task_id"] != second["tasks"][0]["task_id"]
+    del runtime._events[e]
+    assert json.loads(await tool.call(None))["code"] == "untrusted_event"
+
+
+@pytest.mark.asyncio
+async def test_background_reader_releases_sqlite_handle_after_each_query(runtime, monkeypatch):
+    e = event()
+    register(runtime, e)
+    original_connect = sqlite3.connect
+    opened = []
+
+    class TrackedConnection(sqlite3.Connection):
+        closed = False
+
+        def close(self):
+            self.closed = True
+            super().close()
+
+    def connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs, factory=TrackedConnection)
+        opened.append(connection)
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    assert json.loads(await runtime.make_read_tool(e).call(None))["ok"]
+    assert opened and all(connection.closed for connection in opened)
+
+
+@pytest.mark.asyncio
+async def test_background_reader_discovers_scripts_without_opening_channel(runtime):
+    e = event()
+    register(runtime, e)
+    channel = runtime.interaction_api.channels.open(runtime.scope(e), "existing", {}, ttl_seconds=600)
+    # Inspection must also cover closed/expired channels, without renewing them.
+    with runtime.interaction_api.channels.transaction() as db:
+        db.execute("UPDATE ic_channels SET status='closed' WHERE id=?", (channel["id"],))
+    tool = runtime.make_read_tool(e)
+    listed = json.loads(await tool.call(None, resource="scripts"))
+    assert listed["channels"][0]["id"] == channel["id"]
+    assert channel["token"] not in json.dumps(listed)
+    detail = json.loads(await tool.call(None, resource="scripts", channel_id=channel["id"]))
+    assert json.loads(detail["detail_text"]) == []
+    assert detail["channel"]["status"] == "closed"
+    other = event(user="other")
+    register(runtime, other)
+    assert json.loads(await runtime.make_read_tool(other).call(None, resource="scripts", channel_id=channel["id"]))["code"] == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_background_reader_lists_only_owned_schedules_without_execution(runtime):
+    e = event()
+    register(runtime, e)
+    manager = SimpleNamespace(list_jobs=AsyncMock(return_value=[
+        SimpleNamespace(job_id="ours", name="早安", enabled=True, next_run_time=datetime.now(timezone.utc),
+            payload={"session": e.unified_msg_origin, "sender_id": "owner", "note": "提醒起床"}),
+        SimpleNamespace(job_id="other", payload={"session": e.unified_msg_origin, "sender_id": "other"}),
+    ]))
+    runtime.cron_manager = manager
+    result = json.loads(await runtime.make_read_tool(e).call(None, resource="schedules"))
+    assert result["ok"]
+    assert "ours" in result["detail_text"]
+    assert "提醒起床" in result["detail_text"]
+    assert "other" not in result["detail_text"]
+    manager.list_jobs.assert_awaited_once()
+    assert runtime.service.list(runtime.scope(e)) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trimmed", [False, True])
+async def test_task_capture_excludes_only_host_tagged_chat_router(runtime, trimmed):
+    router = "\nOnly transfer tasks to another agent.\n"
+    persona = "persona says transfer_to_planner is a tool name"
+    runtime.test_request.system_prompt = persona + "\nlong-term memory" + router
+    if trimmed:
+        runtime.test_request.system_prompt = runtime.test_request.system_prompt.strip()
+    runtime.test_request.subagent_router_prompt = router
+    original = runtime.test_request.system_prompt
+    e = event()
+    assert register(runtime, e)
+    receipt = await runtime.submit(e, {"action": "submit", "goal": "inspect"}, source="hub")
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert router.strip() not in job.metadata["request"]["system_prompt"]
+    assert persona in job.metadata["request"]["system_prompt"]
+    assert "long-term memory" in job.metadata["request"]["system_prompt"]
+    assert job.metadata["chat_context"]["system_prompt"] == original
+    assert runtime.test_request.system_prompt == original
+
+
+@pytest.mark.asyncio
+async def test_task_capture_keeps_untagged_persona_router_text(runtime):
+    runtime.test_request.system_prompt = "persona: do not try to use domain tools yourself"
+    e = event()
+    assert register(runtime, e)
+    receipt = await runtime.submit(e, {"action": "submit", "goal": "inspect"}, source="hub")
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert runtime.test_request.system_prompt in job.metadata["request"]["system_prompt"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "route,actions", [("chat", ()), ("task", ()), ("task", ("schedule",))]
 )
@@ -929,6 +1084,7 @@ async def test_worker_and_sender_lifecycle_and_bounded_snapshot(runtime):
             runtime.scope(e), str(i), "main", "goal" * 500, runtime.workspace
         )
     snapshot = runtime.snapshot(e)
+    assert isinstance(json.loads(snapshot), list)
     assert len(snapshot) <= 1600
     assert snapshot.count("task_id") <= 6
     latest = runtime.service.submit(
@@ -1413,6 +1569,24 @@ def test_progress_questions_read_existing_task_even_if_hub_suggests_schedule(
     assert "queued" in runtime.test_request.system_prompt
 
 
+@pytest.mark.parametrize("text,semantic", [
+    ("你可以看到更具体点的吗，比如正在运行什么指令，编辑了什么文件，模型说了些什么", False),
+    ("后台为什么一直重试，可以看一下报错详情吗", True),
+    ("看看这项工作到底走到了哪一步，具体参数和输出是什么", True),
+])
+def test_background_detail_question_never_creates_a_query_job(runtime, text, semantic):
+    e = event()
+    register(runtime, e)
+    job = runtime.service.submit(runtime.scope(e), "old", "main", "原后台工作", workdir=runtime.workspace)
+    e.message_str = text
+    req = SimpleNamespace(system_prompt="小七人格；原聊天记忆")
+    assert runtime.prepare_task_query(e, req, SimpleNamespace(reply=True, task_query=semantic, route="task", actions=("workspace",)))
+    assert job.task_id in req.system_prompt
+    assert "pc_read_background" in req.system_prompt
+    assert "小七人格；原聊天记忆" in req.system_prompt
+    assert len(runtime.service.list(runtime.scope(e))) == 1
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -1453,9 +1627,11 @@ def test_progress_query_does_not_cross_sender_or_bot(runtime):
     other = event(user="other-user")
     register(runtime, other)
     other.message_str = "查到了吗"
-    assert not runtime.prepare_task_query(
+    assert runtime.prepare_task_query(
         other, runtime.test_request, SimpleNamespace(reply=True, task_query=True)
     )
+    assert "earlier-message" not in runtime.test_request.system_prompt
+    assert runtime.service.list(runtime.scope(other)) == []
 
 
 @pytest.mark.asyncio

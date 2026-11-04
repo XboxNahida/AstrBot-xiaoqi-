@@ -615,23 +615,26 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("schedule", request._private_companion_capability_decision.actions)
                 plugin._llm_call.assert_awaited_once()
 
-    async def test_schedule_list_uses_real_tool_instead_of_background_progress(self):
+    async def test_schedule_status_uses_direct_background_reader(self):
         plugin = SimpleNamespace(
             enable_conversation_model_routing=True,
             _llm_call=AsyncMock(return_value=json.dumps({
-                "reply": True, "actions": ["schedule"], "route": "chat", "task_query": True,
+                "reply": True, "actions": [], "route": "chat", "task_query": True,
             })),
         )
         context = build_capability_context(
             scope="private:u1", current_text="看看我明天的提醒有没有设置成功",
             sender_id="u1", sender_name="甲", now=datetime.now(timezone.utc),
+            available_capabilities=("schedule",),
         )
         decision = await judge_capabilities(plugin, context, available_capabilities=("schedule",))
-        self.assertEqual("task", decision.route)
-        self.assertFalse(decision.task_query)
+        self.assertEqual("chat", decision.route)
+        self.assertTrue(decision.task_query)
         prompt = plugin._llm_call.await_args.args[0]
-        self.assertIn("future_task", prompt)
-        self.assertIn("action=list", prompt)
+        self.assertIn("pc_read_background", prompt)
+        self.assertIn("命令", prompt)
+        self.assertNotIn("这些都选择 schedule", prompt)
+        self.assertIn("pc_read_background", format_capability_guidance(context))
         self.assertIn("持久", prompt)
 
     async def test_group_ambiguous_tool_followup_requires_own_context_or_task(self):

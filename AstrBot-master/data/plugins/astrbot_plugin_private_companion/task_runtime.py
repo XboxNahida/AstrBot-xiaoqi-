@@ -35,6 +35,7 @@ from astrbot.core.platform.platform_metadata import PlatformMetadata
 from astrbot.core.tools.registry import get_builtin_tool_config_statuses
 
 from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
+from .background_reader import BackgroundReadTool
 from .capability_hub import CapabilityDecision
 from .conversation_route import _task_chat_text
 from .helpers import _redact_outbound_secrets
@@ -445,9 +446,14 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                         "content": self._safe_text(item.get("content"), 2000),
                     }
                 )
+        task_system = str(getattr(req, "system_prompt", "") or "")
+        router_fragment = getattr(req, "subagent_router_prompt", "")
+        if isinstance(router_fragment, str) and router_fragment:
+            # Only remove the host-tagged routing fragment, never persona keywords.
+            task_system = "".join(task_system.rsplit(router_fragment.strip(), 1))
         request = {
             "prompt": self._safe_text(getattr(req, "prompt", "") or event.message_str),
-            "system_prompt": self._safe_text(getattr(req, "system_prompt", ""), 24000),
+            "system_prompt": self._safe_text(task_system, 24000),
             "contexts": contexts,
             "tool_names": list(dict.fromkeys(names)),
             "primary": str(
@@ -930,6 +936,17 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         finally:
             self._events[event] = original_capture
 
+    def make_read_tool(self, event):
+        """Bind background inspection to the current trusted chat identity.
+
+        Args:
+            event: Normally eligible event registered by the host.
+
+        Returns:
+            A read-only tool independent of task execution grants.
+        """
+        return BackgroundReadTool(self, event)
+
     def make_intent_tool(self, event):
         runtime = self
 
@@ -996,14 +1013,21 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             r"[?？。!！~～\s]*",
             text,
         )
-        if not status_only and not getattr(decision, "task_query", False):
+        detail_query = re.fullmatch(
+            r"(?:你)?(?:可以|能|能不能|是否能)?(?:看到|查看|看一下|看看|查询)"
+            r"(?:更具体.*(?:指令|命令|文件|模型).*|.*(?:正在运行什么|编辑了什么|模型说了什么).*)[?？。\s]*",
+            text,
+        )
+        if not status_only and not detail_query and not getattr(decision, "task_query", False):
             return False
         if re.search(
-            r"重新|重试|继续|取消|停止|暂停|新增|顺便|再帮|另外|修改|改成", text
+            r"顺便|再帮|另外|(?:^|[，,。；;]|并且|然后|请|帮我|把|将)\s*"
+            r"(?:重新|重试|继续|取消|停止|暂停|新增|修改|改成|执行|运行|删除|写入|创建|安排|设置|启动|重启)",
+            text,
         ):
             return False
         tasks = self.service.list(self.scope(event), limit=6, latest=True)
-        if not tasks:
+        if not tasks and not getattr(decision, "task_query", False):
             return False
         facts = [
             {
@@ -1019,7 +1043,9 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         req.system_prompt += (
             "\n【本轮为已有任务的进度追问】\n"
             + self._safe_text(json.dumps(facts, ensure_ascii=False), 16000)
-            + "\n沿用原聊天人格、记忆和语气回答，不新增任务，不调用任务执行工具。"
+            + "\n沿用原聊天人格、记忆和语气回答。查询直接使用 pc_read_background 读取详情、"
+            "工具参数、文件路径、回执和模型已输出说明，不提交新任务。"
+            "已记录的工具调用提案不等于实际成功；记录未覆盖的执行细节应说明未知，不猜测。"
             "任务状态只能按以上程序事实解释：只有succeeded表示完成，queued/running/waiting_retry"
             "均未完成；历史中的‘查到了’不算本任务的结果。多个任务指代不明时先澄清。"
             "失败是后台任务失败，不是聊天模型不可用；默认不展示ID和内部错误码。"
@@ -1037,22 +1063,16 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             return ""
         scope = TaskScope(bot_id, session_key, sender_id)
         tasks = self.service.list(scope, limit=6, latest=True)
-        return self._safe_text(
-            json.dumps(
-                [
-                    {
-                        "task_id": t.task_id,
-                        "status": t.status,
-                        "goal": t.goal[:120],
-                        "error_kind": t.error_kind,
-                        "revision": t.revision,
-                    }
-                    for t in tasks
-                ],
-                ensure_ascii=False,
-            ),
-            1600,
-        )
+        facts = [
+            {"task_id": t.task_id, "status": t.status, "goal": self._safe_text(t.goal, 120),
+             "error_kind": t.error_kind, "revision": t.revision, "step_key": t.step_key}
+            for t in tasks
+        ]
+        encoded = json.dumps(facts, ensure_ascii=False)
+        while len(encoded) > 1600 and facts:
+            facts.pop()
+            encoded = json.dumps(facts, ensure_ascii=False)
+        return encoded
 
     def restore_event(self, job):
         session = MessageSession.from_str(job.scope.session_key)
