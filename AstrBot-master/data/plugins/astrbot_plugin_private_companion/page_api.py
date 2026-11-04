@@ -23142,6 +23142,12 @@ class PrivateCompanionPageApi(
             )
 
     def _apply_config_value(self, key: str, value: Any, overrides: dict[str, Any] | None = None) -> None:
+        if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
+            setattr(self.plugin, key, max(1, int(value)))
+            return
+        if key == "CONVERSATION_TASK_FALLBACK_PROVIDER_ID":
+            self.plugin.conversation_task_fallback_provider_id = ""
+            return
         if key == "relationship_stage_policy":
             normalized = normalize_relationship_stage_policy(value)
             self._set_config_value(key, relationship_stage_policy_json(normalized))

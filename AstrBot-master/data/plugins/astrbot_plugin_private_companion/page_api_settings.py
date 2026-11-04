@@ -43,6 +43,10 @@ class PageSettingNormalizerMixin:
                 return normalized
         return self._normalize_page_schema_fallback(key, value)
     def _normalize_page_core_setting(self, key: str, value: Any) -> Any:
+        if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
+            if type(value) is not int or value < 1:
+                raise ValueError("后台模型超时和最多请求次数必须是至少1的整数")
+            return value
         if key == "hub_group_batch_seconds":
             try:
                 number = float(value)

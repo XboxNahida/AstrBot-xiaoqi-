@@ -998,6 +998,10 @@ class ProviderOpenAIOfficial(Provider):
 
         self._finally_convert_payload(payloads)
 
+        # SDK请求选项，不属于模型提示或extra_body；保持共享client默认值不变。
+        if "timeout" in kwargs:
+            payloads["timeout"] = kwargs["timeout"]
+
         return payloads, context_query
 
     def _finally_convert_payload(self, payloads: dict) -> None:

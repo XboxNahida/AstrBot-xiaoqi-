@@ -1249,7 +1249,7 @@ const providerGroups = [
   {
     id: "conversation",
     title: "聊天与办事分工",
-    desc: "中枢判断本轮语境与任务，聊天模型结合人格和短期情绪回复，复杂任务交给你选择的后台模型。独立分工在快速、精准模式下均保留；功能开关在插件配置的“模型分配”中管理。",
+    desc: "Gemini负责聊天和派发任务，后台固定使用本任务选定模型；默认GPT6，单次120秒，最多3次请求，不启用备用。",
     keys: ["CONVERSATION_CHAT_PROVIDER_ID", "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "CONVERSATION_TASK_PROVIDER_ID", "CONVERSATION_TASK_FALLBACK_PROVIDER_ID", "CONVERSATION_HUB_PROVIDER_ID"],
   },
   {
@@ -5866,9 +5866,9 @@ function loadOptionalClassicScript(relativePath, retry = 0) {
 
 const optionalModuleLoaders = {
   providerTree: [
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 0),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 1),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 2),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 0),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 1),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 2),
   ],
   qzonePanel: [
     () => loadOptionalClassicScript("./js/panels/qzone-panel.js?v=20260810-qzone-classic-loader-v1", 0),
@@ -38538,6 +38538,9 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   }
   const values = currentProviderValues();
   const timeoutOverrides = currentProviderTimeoutValues();
+  let taskModelValues;
+  try { taskModelValues = window.PrivateCompanionProviderTree.currentTaskModelValues({ document, state }); }
+  catch (error) { showToast(error.message, "error"); return; }
   const tokenLimitOverrides = currentProviderTokenLimitValues();
   const fallbackOverrides = currentProviderFallbackValues();
   const deepseekPeak = window.PrivateCompanionProviderTree.currentDeepseekPeakValues({ document, state });
@@ -38551,6 +38554,7 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
     () => postJson("/settings/update", { settings: {
       provider_config_mode,
       model_timeout_overrides: timeoutOverrides,
+      ...taskModelValues,
       model_token_limit_overrides: tokenLimitOverrides,
       model_fallback_overrides: fallbackOverrides,
       enable_deepseek_peak_replacement: deepseekPeak.enabled,
@@ -38569,6 +38573,8 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   state.providerTokenLimitDraft = { ...tokenLimitOverrides };
   state.providerFallbackDraft = { ...fallbackOverrides };
   state.overview.settings.model_timeout_overrides = { ...timeoutOverrides };
+  Object.assign(state.overview.settings, taskModelValues);
+  state.taskModelDraft = { ...taskModelValues };
   state.overview.settings.model_token_limit_overrides = { ...tokenLimitOverrides };
   state.overview.settings.model_fallback_overrides = { ...fallbackOverrides };
   state.providerConfigMode = provider_config_mode;

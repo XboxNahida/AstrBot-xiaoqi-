@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+try:
+    from .task_model_policy import request_policy
+except ImportError:
+    from task_model_policy import request_policy
+
 
 @dataclass(frozen=True)
 class TaskScope:
@@ -425,7 +430,8 @@ class TaskService:
                 ).fetchone():
                     raise ValueError("A completed step cannot be executed again")
                 db.execute(
-                    "UPDATE pt_tasks SET step_key=?,attempts=0 WHERE task_id=?",
+                    "UPDATE pt_tasks SET step_key=?,attempts=0,"
+                    "error_kind=CASE WHEN error_kind='provider_unavailable' THEN NULL ELSE error_kind END WHERE task_id=?",
                     (next_step, job.task_id),
                 )
             db.execute(
@@ -438,7 +444,8 @@ class TaskService:
         self, job: TaskJob, text: str, *, content_fingerprint: str | None = None
     ) -> bool:
         with self._transaction() as db:
-            if not self._owned(db, job):
+            owned = self._owned(db, job)
+            if not owned or owned["error_kind"] == "provider_unavailable":
                 return False
             if (
                 content_fingerprint
@@ -467,7 +474,7 @@ class TaskService:
             if not self._owned(db, job):
                 return False
             db.execute(
-                "UPDATE pt_tasks SET status='succeeded',revision=revision+1,result=?,"
+                "UPDATE pt_tasks SET status='succeeded',revision=revision+1,result=?,error_kind=NULL,"
                 "lease_token=NULL,lease_until=NULL,worker_id=NULL WHERE task_id=?",
                 (json.dumps(dict(evidence)), job.task_id),
             )
@@ -511,6 +518,11 @@ class TaskService:
             elif retryable:
                 status = "waiting_retry"
                 next_run = self.clock() + (15 if row["attempts"] <= 1 else 60)
+                if error_kind == "provider_unavailable":
+                    request = json.loads(row["metadata"]).get("request", {})
+                    policy = request_policy({"primary": "legacy", **request})
+                    if row["attempts"] >= policy.max_attempts:
+                        status, next_run = "failed", 0
             if db.execute(
                 "SELECT 1 FROM pt_steps WHERE task_id=? AND step_key=?",
                 (job.task_id, row["step_key"]),
@@ -526,15 +538,30 @@ class TaskService:
                 (job.task_id,),
             )
             if status != "waiting_retry":
+                db.execute("UPDATE pt_outbox SET state='superseded' WHERE task_id=? AND kind='model_retry' AND state='pending'", (job.task_id,))
                 self._notify(
                     db,
                     job.task_id,
                     "result",
                     {"status": status, "error_kind": error_kind},
                 )
+            elif error_kind == "provider_unavailable":
+                fingerprint = f"model-retry:{row['cycle']}"
+                if not db.execute(
+                    "SELECT 1 FROM pt_outbox WHERE task_id=? AND kind='model_retry' AND fingerprint=?",
+                    (job.task_id, fingerprint),
+                ).fetchone():
+                    self._notify(db, job.task_id, "model_retry", {
+                        "status": status, "error_kind": error_kind,
+                        "model_id": policy.provider_id,
+                        "timeout_seconds": policy.timeout_seconds,
+                        "max_attempts": policy.max_attempts,
+                        "step_key": row["step_key"],
+                        "text": "后台模型首次请求失败，正在重连同一模型；用户未再次催促。",
+                    }, fingerprint)
             return True
 
-    def _control(self, task_id, scope, action):
+    def _control(self, task_id, scope, action, request_patch=None):
         with self._transaction() as db:
             row = db.execute(
                 "SELECT * FROM pt_tasks WHERE task_id=? AND bot_id=? AND session_key=? AND sender_id=?",
@@ -563,11 +590,16 @@ class TaskService:
                 status, attempts, cycle = "queued", 0, cycle + 1
             else:
                 return False
+            if request_patch is not None:
+                metadata = json.loads(row["metadata"])
+                metadata.setdefault("request", {}).update(request_policy(request_patch).as_request())
+                db.execute("UPDATE pt_tasks SET metadata=? WHERE task_id=?", (json.dumps(metadata), task_id))
             db.execute(
                 "UPDATE pt_tasks SET status=?,revision=revision+1,attempts=?,cycle=?,next_run=0 "
                 "WHERE task_id=?",
                 (status, attempts, cycle, task_id),
             )
+            db.execute("UPDATE pt_outbox SET state='superseded' WHERE task_id=? AND kind='model_retry' AND state='pending'", (task_id,))
             if status in {"cancelled", "unknown_result", "paused"}:
                 db.execute(
                     "UPDATE pt_outbox SET state='superseded' WHERE task_id=? AND kind='progress' AND state='pending'",
@@ -582,11 +614,11 @@ class TaskService:
     def pause(self, task_id: str, scope: TaskScope) -> bool:
         return self._control(task_id, scope, "pause")
 
-    def resume(self, task_id: str, scope: TaskScope) -> bool:
-        return self._control(task_id, scope, "resume")
+    def resume(self, task_id: str, scope: TaskScope, *, request_patch=None) -> bool:
+        return self._control(task_id, scope, "resume", request_patch)
 
-    def retry(self, task_id: str, scope: TaskScope) -> bool:
-        return self._control(task_id, scope, "retry")
+    def retry(self, task_id: str, scope: TaskScope, *, request_patch=None) -> bool:
+        return self._control(task_id, scope, "retry", request_patch)
 
     def reconcile(
         self,
@@ -667,6 +699,8 @@ class TaskService:
                 return False
             metadata = json.loads(row["metadata"])
             incoming = (input_metadata or {}).get("request", {})
+            if "request_timeout_seconds" in incoming:
+                metadata.setdefault("request", {}).update(request_policy(incoming).as_request())
             if incoming.get("current_input"):
                 saved = metadata.setdefault("request", {})
                 contexts = list(saved.get("contexts", ()))

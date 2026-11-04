@@ -15,6 +15,17 @@ window.PrivateCompanionProviderTree = (() => {
     return Number.isFinite(parsed) && parsed >= 5 && parsed <= 600 ? parsed : "";
   }
 
+  function currentTaskModelValues(context) {
+    const { document, state } = context;
+    const source = { ...(state.overview?.settings || {}), ...(state.taskModelDraft || {}) };
+    const timeout = Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 120);
+    const attempts = Number(document.querySelector("[data-task-model-attempts]")?.value ?? source.task_model_max_attempts ?? 3);
+    if (!Number.isInteger(timeout) || timeout < 1 || !Number.isInteger(attempts) || attempts < 1) {
+      throw new Error("后台模型超时和最多请求次数必须是至少1的整数；次数包含首次请求");
+    }
+    return { task_model_timeout_seconds: timeout, task_model_max_attempts: attempts };
+  }
+
   function providerTimeoutValuesForRender(context) {
     const { state } = context;
     const saved = state.overview?.settings?.model_timeout_overrides;
@@ -362,7 +373,9 @@ window.PrivateCompanionProviderTree = (() => {
     const preference = providerPreferenceMeta[guide.preference || "balanced"];
     const impact = providerPassiveImpactMeta[guide.passiveImpact || ""];
     const preview = [guide.purpose || "", guide.fit || ""].filter(Boolean).join(" ");
-    const timeoutValue = providerTimeoutValuesForRender(context)[key] || "";
+    const taskProvider = key === "CONVERSATION_TASK_PROVIDER_ID";
+    const taskValues = taskProvider ? currentTaskModelValues(context) : {};
+    const timeoutValue = taskProvider ? taskValues.task_model_timeout_seconds : (providerTimeoutValuesForRender(context)[key] || "");
     const tokenLimitValue = providerTokenLimitValuesForRender(context)[key] || "";
     const fallbackValue = providerFallbackValuesForRender(context)[key] || "";
     return `
@@ -390,7 +403,7 @@ window.PrivateCompanionProviderTree = (() => {
             <label class="provider-field provider-limit-field provider-timeout-field">
               <span>请求超时</span>
               <span class="provider-limit-control provider-timeout-control">
-                <input type="number" min="5" max="600" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="默认" aria-label="${escapeHtml(label)}请求超时秒数" />
+                ${taskProvider ? `<input type="number" min="1" step="1" data-task-model-timeout value="${escapeHtml(timeoutValue)}" aria-label="后台模型单次请求超时秒数" />` : `<input type="number" min="5" max="600" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="默认" aria-label="${escapeHtml(label)}请求超时秒数" />`}
                 <b>秒</b>
               </span>
             </label>
@@ -402,7 +415,8 @@ window.PrivateCompanionProviderTree = (() => {
               </span>
             </label>
           </div>`}
-          ${embeddingProvider ? "" : `<label class="provider-field provider-fallback-field">
+          ${taskProvider ? `<label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-task-model-attempts value="${escapeHtml(taskValues.task_model_max_attempts)}" /><small>默认3次＝首次1次＋重试2次；固定当前模型，不自动使用备用。Gemini可按任务覆盖。</small></label>` : ""}
+          ${embeddingProvider || taskProvider ? "" : `<label class="provider-field provider-fallback-field">
             <span>备用模型 <small>主模型失败、超时、Token 超限或空响应时尝试一次</small></span>
             ${providerFallbackSelect(context, key, fallbackValue)}
           </label>`}
@@ -637,6 +651,11 @@ window.PrivateCompanionProviderTree = (() => {
 
   function bindProviderTests(context) {
     const { document } = context;
+    document.querySelectorAll("[data-task-model-timeout], [data-task-model-attempts]").forEach((input) => {
+      input.addEventListener("input", () => {
+        try { context.state.taskModelDraft = currentTaskModelValues(context); } catch (_error) { /* 保存时显示校验错误。 */ }
+      });
+    });
     document.querySelectorAll("[data-provider-select]").forEach((select) => {
       syncProviderInput(context, select);
       select.addEventListener("change", () => {
@@ -694,6 +713,7 @@ window.PrivateCompanionProviderTree = (() => {
     renderDeepseekPeakCard(context);
     renderProviderFlow(context, providers);
     const entries = Object.entries(providerLabels)
+      .filter(([key]) => key !== "CONVERSATION_TASK_FALLBACK_PROVIDER_ID")
       .filter(([key]) => visibleConfigKey(key))
       .filter(([key]) => providerAllowedInCurrentMode(key))
       .filter(([key, label]) => providerMatchesFilter(context, key, label, providers));
@@ -745,6 +765,7 @@ window.PrivateCompanionProviderTree = (() => {
     bindProviderToolbar,
     currentProviderValues,
     currentProviderTimeoutValues,
+    currentTaskModelValues,
     currentProviderTokenLimitValues,
     currentProviderFallbackValues,
     currentDeepseekPeakValues,

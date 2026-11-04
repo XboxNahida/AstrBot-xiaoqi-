@@ -279,6 +279,11 @@ const featureSwitchExcludedKeys = new Set([
 ]);
 
 const providerLabels = {
+  CONVERSATION_CHAT_PROVIDER_ID: "独立聊天模型（Gemini / Grok）",
+  CONVERSATION_CHAT_FALLBACK_PROVIDER_ID: "独立聊天备用模型",
+  CONVERSATION_TASK_PROVIDER_ID: "独立后台任务模型",
+  CONVERSATION_TASK_FALLBACK_PROVIDER_ID: "后台任务备用模型",
+  CONVERSATION_HUB_PROVIDER_ID: "固定语境中枢模型",
   FAST_RESPONSE_PROVIDER_ID: "快速响应模型",
   COMPLEX_REASONING_PROVIDER_ID: "复杂推理模型",
   CREATIVE_MODEL_PROVIDER_ID: "创作模型",
@@ -406,6 +411,11 @@ const quickProviderKeys = new Set([
 ]);
 
 const alwaysVisibleProviderKeys = new Set([
+  "CONVERSATION_CHAT_PROVIDER_ID",
+  "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID",
+  "CONVERSATION_TASK_PROVIDER_ID",
+  "CONVERSATION_TASK_FALLBACK_PROVIDER_ID",
+  "CONVERSATION_HUB_PROVIDER_ID",
   "PRIVATE_READING_VISION_PROVIDER_ID",
   "EMBEDDING_PROVIDER_ID",
 ]);
@@ -1236,6 +1246,12 @@ const providerGuides = {
 };
 
 const providerGroups = [
+  {
+    id: "conversation",
+    title: "聊天与办事分工",
+    desc: "Gemini负责聊天和派发任务，后台固定使用本任务选定模型；默认GPT6，单次120秒，最多3次请求，不启用备用。",
+    keys: ["CONVERSATION_CHAT_PROVIDER_ID", "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "CONVERSATION_TASK_PROVIDER_ID", "CONVERSATION_TASK_FALLBACK_PROVIDER_ID", "CONVERSATION_HUB_PROVIDER_ID"],
+  },
   {
     id: "quick",
     title: "快速配置",
@@ -5850,9 +5866,9 @@ function loadOptionalClassicScript(relativePath, retry = 0) {
 
 const optionalModuleLoaders = {
   providerTree: [
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 0),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 1),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2", 2),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 0),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 1),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 2),
   ],
   qzonePanel: [
     () => loadOptionalClassicScript("./js/panels/qzone-panel.js?v=20260810-qzone-classic-loader-v1", 0),
@@ -7265,6 +7281,17 @@ async function loadMemoNotes(force = false) {
 }
 
 async function ensureTabData(tabName, force = false) {
+  if (tabName === "tasks") {
+    if (!window.PrivateCompanionTasksPanel) {
+      await loadOptionalClassicScript("./js/panels/tasks-panel.js?v=20261103-persistent-tasks");
+    }
+    const root = document.getElementById("persistentTasksRoot");
+    if (root && !root.dataset.mounted) {
+      window.PrivateCompanionTasksPanel.mount(root, { fetchJson, showToast });
+      root.dataset.mounted = "1";
+    }
+    return;
+  }
   if (tabName === "dashboard") {
     return;
   }
@@ -38511,6 +38538,9 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   }
   const values = currentProviderValues();
   const timeoutOverrides = currentProviderTimeoutValues();
+  let taskModelValues;
+  try { taskModelValues = window.PrivateCompanionProviderTree.currentTaskModelValues({ document, state }); }
+  catch (error) { showToast(error.message, "error"); return; }
   const tokenLimitOverrides = currentProviderTokenLimitValues();
   const fallbackOverrides = currentProviderFallbackValues();
   const deepseekPeak = window.PrivateCompanionProviderTree.currentDeepseekPeakValues({ document, state });
@@ -38524,6 +38554,7 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
     () => postJson("/settings/update", { settings: {
       provider_config_mode,
       model_timeout_overrides: timeoutOverrides,
+      ...taskModelValues,
       model_token_limit_overrides: tokenLimitOverrides,
       model_fallback_overrides: fallbackOverrides,
       enable_deepseek_peak_replacement: deepseekPeak.enabled,
@@ -38542,6 +38573,8 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   state.providerTokenLimitDraft = { ...tokenLimitOverrides };
   state.providerFallbackDraft = { ...fallbackOverrides };
   state.overview.settings.model_timeout_overrides = { ...timeoutOverrides };
+  Object.assign(state.overview.settings, taskModelValues);
+  state.taskModelDraft = { ...taskModelValues };
   state.overview.settings.model_token_limit_overrides = { ...tokenLimitOverrides };
   state.overview.settings.model_fallback_overrides = { ...fallbackOverrides };
   state.providerConfigMode = provider_config_mode;

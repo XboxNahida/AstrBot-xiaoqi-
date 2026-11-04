@@ -16000,6 +16000,9 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 if req.func_tool is None:
                     req.func_tool = ToolSet()
                 req.func_tool.add_tool(runtime.make_intent_tool(event))
+                make_model_tool = getattr(runtime, "make_model_tool", None)
+                if callable(make_model_tool):
+                    req.func_tool.add_tool(make_model_tool(event))
                 req.system_prompt += (
                     "\n你负责理解完整图文、直接回答和派发管理后台任务，中枢不再替你创建任务。"
                     "简单问题可以直接回答；需要后台推理或工具执行时用 pc_submit_task_intent 提交，"

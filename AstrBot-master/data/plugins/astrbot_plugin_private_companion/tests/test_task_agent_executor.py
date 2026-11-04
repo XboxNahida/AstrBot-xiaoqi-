@@ -133,6 +133,25 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, len(self.permissions))
         self.assertEqual(1, self.service.get(job.task_id, job.scope).attempts)
 
+    async def test_restored_pending_tool_does_not_add_fourth_model_request(self):
+        job = self.submit(request_max_attempts=3)
+        calls = Response(calls=[("read", {"path": "x"})]).to_openai_tool_calls()
+        self.assertTrue(self.service.record_step(job, job.step_key, {
+            "kind": "tool", "number": 1,
+            "contexts": [{"role": "assistant", "content": "", "tool_calls": calls}],
+            "receipts": [], "pending_calls": calls,
+        }, next_step="tool:2"))
+        self.service.fail(job, "provider_unavailable", retryable=True)
+        self.primary = Provider(*(TimeoutError("synthetic") for _ in range(4)))
+        for attempt in range(1, 4):
+            self.now += 100
+            resumed = self.service.claim("resume")
+            self.assertIsNotNone(resumed)
+            current = await self.run_failure(self.executor(), resumed, "provider_unavailable")
+            self.assertEqual("waiting_retry" if attempt < 3 else "failed", current.status)
+        self.assertEqual(3, len(self.primary.requests))
+        self.assertEqual(1, len(self.executions))
+
     async def test_current_multimodal_question_survives_tools_and_resume(self):
         key = "pc-task-image://current"
         image = "data:image/png;base64,c3ludGhldGlj"
@@ -154,10 +173,10 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(image, str(saved.steps))
         self.now += 1000
         resumed = self.service.claim("resume")
-        self.fallback = Provider(Response("done"))
+        self.primary = Provider(Response("done"))
         result = await self.executor().execute(resumed)
         self.assertEqual("done", result["text"])
-        self.assertIn(image, str(self.fallback.requests[0]["contexts"]))
+        self.assertIn(image, str(self.primary.requests[0]["contexts"]))
         self.assertEqual(1, len(self.executions))
 
     async def test_text_only_task_provider_receives_image_notice_and_can_inspect(self):
@@ -321,13 +340,13 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.now += 16
         self.service = TaskService(self.service.path, clock=lambda: self.now)
         resumed = self.service.claim("after-restart")
-        self.fallback = Provider(Response("verified"))
+        self.primary = Provider(Response("verified"))
         result = await self.executor().execute(resumed)
         self.assertEqual("verified", result["text"])
         self.assertEqual(1, len(self.executions))
-        self.assertEqual("tool", self.fallback.requests[0]["contexts"][-1]["role"])
+        self.assertEqual("tool", self.primary.requests[0]["contexts"][-1]["role"])
         self.assertIn(
-            "actual result", self.fallback.requests[0]["contexts"][-1]["content"]
+            "actual result", self.primary.requests[0]["contexts"][-1]["content"]
         )
         with closing(sqlite3.connect(self.service.path)) as db:
             self.assertNotIn(
@@ -417,21 +436,26 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("SECRET", str(state.steps))
         self.assertIsNone(self.service.claim("again"))
 
-    async def test_provider_outage_keeps_waiting_retry_beyond_three_attempts(self):
+    async def test_provider_outage_stops_after_three_requests_and_can_be_retried(self):
         job = self.submit(mode="reasoning", required_tool_names=[])
-        self.primary = Provider(RuntimeError("down"))
-        self.fallback = Provider(*(RuntimeError("down") for _ in range(4)), Response("recovered"))
-        for delay in (15, 60, 60, 60, 60):
+        self.primary = Provider(*(RuntimeError("down") for _ in range(3)), Response("recovered"))
+        for delay in (15, 60):
             state = await self.run_failure(self.executor(), job, "provider_unavailable")
             self.assertEqual("waiting_retry", state.status)
             self.assertIsNone(self.service.claim("too-early"))
             self.now += delay
             job = self.service.claim("next")
             self.assertIsNotNone(job)
+        state = await self.run_failure(self.executor(), job, "provider_unavailable")
+        self.assertEqual("failed", state.status)
+        self.now += 60
+        self.assertIsNone(self.service.claim("no-fourth-request"))
+        self.assertTrue(self.service.retry(job.task_id, job.scope))
+        job = self.service.claim("user-retry")
         result = await self.executor().execute(job)
         self.assertEqual("recovered", result["text"])
-        self.assertEqual(1, len(self.primary.requests))
-        self.assertEqual(5, len(self.fallback.requests))
+        self.assertEqual(4, len(self.primary.requests))
+        self.assertEqual(0, len(self.fallback.requests))
 
     async def test_only_explicit_reasoning_mode_allows_completion_without_tools(self):
         job = self.submit(required_tool_names=[])
@@ -497,12 +521,12 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         await self.run_failure(self.executor(), job, "protocol_error")
         self.now += 16
         job = self.service.claim("retry")
-        self.fallback = Provider(Response('{"task_status":"completed","text":"已纠正协议"}'))
+        self.primary = Provider(Response('{"task_status":"completed","text":"已纠正协议"}'))
         await self.executor().execute(job)
         self.assertIn(
-            "protocol_error", self.fallback.requests[0]["system_prompt"]
+            "protocol_error", self.primary.requests[0]["system_prompt"]
         )
-        self.assertNotIn("SECRET", str(self.fallback.requests))
+        self.assertNotIn("SECRET", str(self.primary.requests))
 
     async def test_schema_error_is_corrected_by_model_before_tool_execution(self):
         self.tools["read"].parameters = {
@@ -669,14 +693,14 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         await self.run_failure(self.executor(execute_tool=execute), job, "provider_unavailable")
         self.now += 16
         resumed = self.service.claim("resume-model")
-        self.fallback = Provider(
+        self.primary = Provider(
             Response(calls=[("read", {})]),
+            Response('{"task_status":"completed","text":"恢复后完成核验"}'),
         )
-        self.primary = Provider(Response('{"task_status":"completed","text":"恢复后完成核验"}'))
         result = await self.executor(execute_tool=execute).execute(resumed)
         self.assertEqual(["write", "read"], [x[1] for x in self.executions])
         self.assertEqual(["read"], result["successful_tool_names"])
-        self.assertIn("known failure", str(self.fallback.requests[0]["contexts"]))
+        self.assertIn("known failure", str(self.primary.requests[0]["contexts"]))
 
     async def test_long_task_keeps_running_and_compacts_complete_rounds(self):
         job = self.submit(completion_contract="status_v1")

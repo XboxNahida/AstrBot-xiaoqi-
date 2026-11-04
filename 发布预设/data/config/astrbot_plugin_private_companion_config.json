@@ -855,7 +855,7 @@
     "CONVERSATION_CHAT_PROVIDER_ID": "google_gemini_openai/gemini-3.8-flash",
     "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID": "deepseek/deepseek-flash",
     "CONVERSATION_TASK_PROVIDER_ID": "openai/gpt-6-sol",
-    "CONVERSATION_TASK_FALLBACK_PROVIDER_ID": "deepseek/deepseek-v4-pro",
+    "CONVERSATION_TASK_FALLBACK_PROVIDER_ID": "",
     "CONVERSATION_HUB_PROVIDER_ID": "deepseek/deepseek-flash",
     "provider_config_mode": "quick",
     "enable_deepseek_peak_replacement": false,
@@ -893,7 +893,9 @@
     "GROUP_MEMBER_SAFETY_PROVIDER_ID": "",
     "FORWARD_MESSAGE_PROVIDER_ID": "google_gemini_openai/gemini-3.8-flash",
     "PLUGIN_VISION_PROVIDER_ID": "google_gemini_openai/gemini-3.8-flash",
-    "PRIVATE_READING_VISION_PROVIDER_ID": "google_gemini_openai/gemini-3.8-flash"
+    "PRIVATE_READING_VISION_PROVIDER_ID": "google_gemini_openai/gemini-3.8-flash",
+    "task_model_timeout_seconds": 120,
+    "task_model_max_attempts": 3
   },
   "proactive_reach_config": {
     "proactive_intensity_preset": "high_group",
@@ -1897,7 +1899,7 @@
   "enable_short_term_emotion": false,
   "CONVERSATION_CHAT_PROVIDER_ID": "",
   "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID": "deepseek/deepseek-flash",
-  "CONVERSATION_TASK_PROVIDER_ID": "",
+  "CONVERSATION_TASK_PROVIDER_ID": "openai/gpt-6-sol",
   "CONVERSATION_TASK_FALLBACK_PROVIDER_ID": "",
   "CONVERSATION_HUB_PROVIDER_ID": "",
   "enable_deepseek_peak_replacement": false,
@@ -2088,5 +2090,7 @@
   "segmented_proactive_group_interval_method": "log",
   "segmented_proactive_group_interval_min": 1.5,
   "segmented_proactive_group_interval_max": 3.5,
-  "segmented_proactive_group_log_base": 1.8
+  "segmented_proactive_group_log_base": 1.8,
+  "task_model_timeout_seconds": 120,
+  "task_model_max_attempts": 3
 }

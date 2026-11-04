@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import inspect
 import json
@@ -14,9 +15,11 @@ import jsonschema
 from astrbot.core.agent.tool import ToolSet
 
 try:
+    from .task_model_policy import request_policy
     from .task_multimodal import materialize_images
     from .task_service import TaskFailure, TaskJob, TaskService
 except ImportError:
+    from task_model_policy import request_policy
     from task_multimodal import materialize_images
     from task_service import TaskFailure, TaskJob, TaskService
 
@@ -127,6 +130,10 @@ class TaskAgentExecutor:
         request = job.metadata.get("request", {})
         if not isinstance(request, Mapping) or not request.get("primary"):
             raise TaskFailure("missing_input")
+        try:
+            policy = request_policy(request)
+        except ValueError:
+            raise TaskFailure("missing_input") from None
         names = request.get("tool_names", [])
         required = request.get("required_tool_names", [])
         groups = request.get("required_tool_groups", [])
@@ -238,8 +245,8 @@ class TaskAgentExecutor:
             and getattr(resolved[name], "active", True) is True
         }
         toolset = ToolSet()
-        for tool in allowed.values():
-            toolset.add_tool(tool)
+        for name in sorted(allowed):
+            toolset.add_tool(allowed[name])
         reserved = True
         while True:
             if not self.service.heartbeat(job):
@@ -261,15 +268,12 @@ class TaskAgentExecutor:
                         and getattr(tool, "active", True) is True
                     }
                     toolset = ToolSet()
-                    for tool in allowed.values():
-                        toolset.add_tool(tool)
+                    for name in sorted(allowed):
+                        toolset.add_tool(allowed[name])
                 current = self.service.get(job.task_id, job.scope)
                 if current is None:
                     raise TaskFailure("lease_lost")
-                provider_id = request["primary"]
-                next_attempt = current.attempts if reserved else current.attempts + 1
-                if next_attempt > 1 and request.get("fallback"):
-                    provider_id = request["fallback"]
+                provider_id = policy.provider_id
                 if not reserved and not self.service.begin_attempt(job, provider_id):
                     raise TaskFailure("attempt_limit")
                 reserved = False
@@ -277,14 +281,16 @@ class TaskAgentExecutor:
                     provider = await self._resolve(self.resolve_provider, provider_id)
                     modalities = getattr(provider, "provider_config", {}).get("modalities")
                     outgoing = materialize_images(contexts, request, supports_image=not modalities or "image" in modalities)
-                    response = await provider.text_chat(
-                        prompt=None,
-                        system_prompt=system_prompt,
-                        contexts=outgoing,
-                        func_tool=toolset,
-                        tool_choice="auto",
-                        request_max_retries=0,
-                    )
+                    async with asyncio.timeout(policy.timeout_seconds):
+                        response = await provider.text_chat(
+                            prompt=None,
+                            system_prompt=system_prompt,
+                            contexts=outgoing,
+                            func_tool=toolset,
+                            tool_choice="auto",
+                            request_max_retries=0,
+                            timeout=policy.timeout_seconds,
+                        )
                 except Exception:
                     raise TaskFailure("provider_unavailable", retryable=True) from None
                 if not self.service.heartbeat(job):

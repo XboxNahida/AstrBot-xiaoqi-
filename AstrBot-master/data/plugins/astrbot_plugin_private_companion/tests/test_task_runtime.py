@@ -94,6 +94,110 @@ def register(rt, e, **kwargs):
 
 
 @pytest.mark.asyncio
+async def test_model_retry_notice_survives_next_attempt_but_not_completion(runtime):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    job = runtime.service.claim("worker")
+    runtime.service.fail(job, "provider_unavailable", retryable=True)
+    current = runtime.service.get(job.task_id, job.scope)
+    notice = SimpleNamespace(task_id=receipt["task_id"], scope=job.scope,
+                             revision=current.revision - 1, kind="model_retry",
+                             payload={"step_key": current.step_key})
+    assert runtime._notification_current(notice) is not None
+    runtime.service.cancel(job.task_id, job.scope)
+    assert runtime._notification_current(notice) is None
+
+
+@pytest.mark.asyncio
+async def test_request_failure_notifications_are_persona_rendered_and_offer_model_change(runtime):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    job = runtime.service.claim("worker")
+    provider = SimpleNamespace(text_chat=AsyncMock(return_value=SimpleNamespace(
+        role="assistant", completion_text="这会儿后台请求有点波动，我再连一次。", tools_call_name=[])))
+    runtime.plugin.context.get_provider_by_id = lambda _: provider
+    current = runtime.service.get(receipt["task_id"], job.scope)
+    await runtime.render_notification(SimpleNamespace(kind="model_retry", payload={}), current)
+    prompt = provider.text_chat.await_args.kwargs["system_prompt"]
+    assert "同一模型" in prompt and "主动" in prompt
+    runtime.service.fail(job, "provider_unavailable", retryable=False)
+    current = runtime.service.get(job.task_id, job.scope)
+    await runtime.render_notification(SimpleNamespace(kind="result", payload={"error_kind": "provider_unavailable"}), current)
+    assert "更换模型" in provider.text_chat.await_args.kwargs["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_task_model_selection_is_persisted_and_does_not_change_other_tasks(runtime):
+    runtime.plugin.context.get_provider_by_id = lambda pid: SimpleNamespace(
+        provider_config={"id": pid, "model": pid, "enable": True}, text_chat=AsyncMock())
+    e = event(mid="custom")
+    register(runtime, e)
+    selected = await runtime.submit(e, {"goal": "复杂计算", "model_id": "selected-model",
+                                        "timeout_seconds": 180, "max_attempts": 2})
+    assert selected["accepted"]
+    request = runtime.service.get(selected["task_id"], runtime.scope(e)).metadata["request"]
+    assert (request["primary"], request["fallback"]) == ("selected-model", "")
+    assert (request["request_timeout_seconds"], request["request_max_attempts"]) == (180, 2)
+    other = event(mid="default")
+    register(runtime, other)
+    default = await runtime.submit(other, {"goal": "另一任务"})
+    request = runtime.service.get(default["task_id"], runtime.scope(other)).metadata["request"]
+    assert request["primary"] == "task-primary" and request["fallback"] == ""
+    assert request["request_timeout_seconds"] == 120 and request["request_max_attempts"] == 3
+
+
+@pytest.mark.asyncio
+async def test_unavailable_selected_model_is_not_silently_replaced(runtime):
+    e = event()
+    register(runtime, e)
+    result = await runtime.submit(e, {"goal": "任务", "model_id": "not-configured"})
+    assert not result["accepted"] and result["code"] == "invalid_model_policy"
+    assert not runtime.service.list(runtime.scope(e))
+
+
+@pytest.mark.asyncio
+async def test_model_catalog_exposes_only_enabled_model_metadata(runtime):
+    runtime.plugin.context.get_all_providers = lambda: [SimpleNamespace(
+        provider_config={"id": "available", "model": "GPT6", "enable": True,
+                         "api_key": "SECRET-MODEL-KEY", "api_base": "https://private.example"},
+        text_chat=AsyncMock())]
+    e = event()
+    register(runtime, e)
+    assert hasattr(runtime, "make_model_tool")
+    result = json.loads(await runtime.make_model_tool(e).call(None))
+    assert [item["id"] for item in result["models"]] == ["available"]
+    from astrbot_plugin_private_companion.page_api import PrivateCompanionPageApi
+    page = PrivateCompanionPageApi.__new__(PrivateCompanionPageApi)
+    page.plugin = runtime.plugin
+    assert result["models"] == page._available_provider_items()
+    assert "SECRET" not in str(result) and "api_base" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_failed_task_can_change_model_and_retry_without_replaying_tools(runtime):
+    runtime.plugin.context.get_provider_by_id = lambda pid: SimpleNamespace(
+        provider_config={"id": pid, "enable": True}, text_chat=AsyncMock())
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "任务"})
+    job = runtime.service.claim("w")
+    runtime.service.record_step(job, job.step_key, {"kind": "tool", "number": 1, "contexts": [],
+                                "tool": "read", "outcome": {"status": "success"}}, next_step="tool:2")
+    runtime.service.fail(job, "provider_unavailable", retryable=False)
+    followup = event(mid="change")
+    register(runtime, followup)
+    result = await runtime.submit(followup, {"action": "retry", "task_id": job.task_id,
+                                           "model_id": "new-model", "max_attempts": 1})
+    assert result["accepted"]
+    saved = runtime.service.get(job.task_id, job.scope)
+    assert saved.metadata["request"]["primary"] == "new-model"
+    assert saved.metadata["request"]["request_max_attempts"] == 1
+    assert saved.step_key == "tool:2" and len(saved.steps) == 1
+
+
+@pytest.mark.asyncio
 async def test_repeated_submission_reuses_frozen_image_after_source_is_removed(runtime, tmp_path):
     from PIL import Image as PILImage
 
@@ -568,7 +672,7 @@ async def test_original_hub_and_reply_dedupe_with_durable_safe_request(runtime):
     assert not reply["created"]
     task = runtime.service.get(hub["task_id"], runtime.scope(e))
     assert task.metadata["request"]["primary"] == "task-primary"
-    assert task.metadata["request"]["fallback"] == "task-backup"
+    assert task.metadata["request"]["fallback"] == ""
     assert "localShell" not in task.metadata["request"]["tool_names"]
     assert "topsecret" not in json.dumps(task.metadata)
     assert task.metadata["group_id"] == "group"

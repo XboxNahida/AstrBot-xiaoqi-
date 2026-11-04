@@ -57,6 +57,7 @@ from .task_file_delivery import FileDeliveryTool, TaskArtifactReader, TaskFileDe
 from .task_intents import TaskIntentAdapter
 from .task_management import TaskManagementTool
 from .task_multimodal import capture_input, freeze_images, materialize_images
+from .task_model_policy import request_policy
 from .task_permissions import TaskActor, TaskPermissionStore
 from .task_proactive_policy import ProactivePolicyStore, RuleConfig
 from .task_service import TaskFailure, TaskScheduler, TaskScope, TaskService
@@ -514,6 +515,35 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             raise TaskFailure("unknown_result")
         return result
 
+    def default_model_request(self):
+        return request_policy({
+            "primary": getattr(self.plugin, "conversation_task_provider_id", "") or "openai/gpt-6-sol",
+            "request_timeout_seconds": getattr(self.plugin, "task_model_timeout_seconds", 120),
+            "request_max_attempts": getattr(self.plugin, "task_model_max_attempts", 3),
+        }).as_request()
+
+    def make_model_tool(self, event):
+        runtime = self
+
+        class ModelListTool(FunctionTool):
+            async def call(self, context, **kwargs):
+                if event not in runtime._events or not runtime._trusted_event(event):
+                    return json.dumps({"accepted": False, "code": "untrusted_event"})
+                # 与网页/providers/available复用同一取数函数，不另建模型列表。
+                page = getattr(runtime.plugin, "page_api", None)
+                if page is None:
+                    from .page_api import PrivateCompanionPageApi
+                    page = PrivateCompanionPageApi.__new__(PrivateCompanionPageApi)
+                    page.plugin = runtime.plugin
+                models = page._available_provider_items()
+                return json.dumps({"models": models,
+                                   "defaults": runtime.default_model_request(),
+                                   "attempts_meaning": "最多请求次数，包含首次；永不自动切换备用模型"}, ensure_ascii=False)
+
+        return ModelListTool(name="pc_list_task_models",
+                             description="Read the SAME model list as the web model-selection dropdown. Use items' exact id as model_id; no API keys are exposed. Before choosing a non-default task model, read this list; never invent an ID. Selection is per task, not a global setting.",
+                             parameters={"type": "object", "properties": {}, "additionalProperties": False})
+
     def register(self, event, req, decision, *, reply_eligible=False):
         """Capture only requests authorized by the normal inbound LLM hook.
 
@@ -545,13 +575,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "system_prompt": self._safe_text(task_system, 24000),
             **captured_input,
             "tool_names": list(dict.fromkeys(names)),
-            "primary": str(
-                getattr(self.plugin, "conversation_task_provider_id", "")
-                or getattr(self.plugin, "complex_reasoning_provider_id", "")
-            ),
-            "fallback": str(
-                getattr(self.plugin, "conversation_task_fallback_provider_id", "") or ""
-            ),
+            **self.default_model_request(),
             "required_tool_names": [
                 n for n in (getattr(req, "required_tool_names", ()) or ()) if n in names
             ],
@@ -886,13 +910,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 "contexts": [],
                 "tool_names": tools,
                 "required_tool_names": [],
-                "primary": str(
-                    getattr(self.plugin, "conversation_task_provider_id", "") or ""
-                ),
-                "fallback": str(
-                    getattr(self.plugin, "conversation_task_fallback_provider_id", "")
-                    or ""
-                ),
+                **self.default_model_request(),
                 "mode": "tools" if monitor else "reasoning",
             }
             scope = self.scope(event)
@@ -957,6 +975,32 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             return {"accepted": False, "created": False, "code": "untrusted_event"}
         clean_payload = dict(payload)
         original_capture = capture
+        action = clean_payload.get("action", "submit")
+        selections = {key: clean_payload.pop(key) for key in ("model_id", "timeout_seconds", "max_attempts") if key in clean_payload}
+        base_policy = dict(capture["request"])
+        if action != "submit" and clean_payload.get("task_id"):
+            saved = self.service.get(clean_payload["task_id"], self.scope(event))
+            if saved is not None:
+                old = saved.metadata.get("request", {})
+                base_policy.update({key: old[key] for key in (
+                    "primary", "request_timeout_seconds", "request_max_attempts") if key in old})
+        try:
+            if "model_id" in selections:
+                model_id = selections["model_id"]
+                if not isinstance(model_id, str) or not model_id.strip():
+                    raise ValueError("需要先查询有效模型ID")
+                provider = self.plugin.context.get_provider_by_id(model_id)
+                if (provider is None or not callable(getattr(provider, "text_chat", None))
+                        or getattr(provider, "provider_config", {}).get("enable", True) is False):
+                    raise ValueError("指定模型不可用，请先查询模型目录")
+                base_policy["primary"] = model_id
+            for key, field in (("timeout_seconds", "request_timeout_seconds"), ("max_attempts", "request_max_attempts")):
+                if key in selections:
+                    base_policy[field] = selections[key]
+            policy = request_policy(base_policy).as_request()
+        except ValueError as exc:
+            return {"accepted": False, "created": False, "code": "invalid_model_policy", "message": str(exc)}
+        capture = {**capture, "request": {**capture["request"], **policy}}
         workspace_default = capture["request"].get("use_workspace", False)
         # Semantic routing is not authorization. Both task entry points inherit
         # existing workspace grants; individual tools still check each capability.
@@ -1052,6 +1096,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 normally_awakened=True,
                 workdir=actor_workspace(self.workspace, self.actor(event)),
                 source=source,
+                model_policy=policy if selections else None,
             )
         finally:
             self._events[event] = original_capture
@@ -1107,7 +1152,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
 
         return IntentTool(
             name="pc_submit_task_intent",
-            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. Identity and current workspace capabilities are determined by the host. Mode is an approach preference, not authorization. Use pc_task_workspace to discover directories; tools follow live grants and the model may repair its own plan.",
+            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. Optional model_id, timeout_seconds and max_attempts apply only to this task; defaults are the web configuration (120 seconds, THREE TOTAL requests). Read pc_list_task_models before selecting a model and follow user selection. No fallback models. After request exhaustion ask before changing model; retry with a new model preserves successful tool checkpoints. Identity and workspace capabilities come from the host; mode never grants permission.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -1126,6 +1171,9 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                     "goal": {"type": "string"},
                     "fragment_key": {"type": "string"},
                     "task_id": {"type": "string"},
+                    "model_id": {"type": "string", "description": "Exact enabled ID from pc_list_task_models. Omit to retain task/default model."},
+                    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "description": "Timeout for each model request, default 120 seconds; separate from tool runtime."},
+                    "max_attempts": {"type": "integer", "minimum": 1, "description": "TOTAL requests for each model step including first, default 3 (first plus 2 retries)."},
                     "mode": {"type": "string", "enum": ["tools", "reasoning"]},
                     "use_workspace": {
                         "type": "boolean",
@@ -1675,9 +1723,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         metadata.pop("script_tool_call", None)
         request = metadata.setdefault("request", {})
         request.update(
-            primary=request.get("primary") or self.plugin.conversation_task_provider_id,
-            fallback=request.get("fallback")
-            or self.plugin.conversation_task_fallback_provider_id,
+            **request_policy({**self.default_model_request(), **request}).as_request(),
             completion_contract="status_v1",
             dynamic_tool_catalog=True,
         )
@@ -1752,6 +1798,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         if current.metadata.get("silent") and notification.kind in {
             "accepted",
             "progress",
+            "model_retry",
         }:
             return None
         if notification.kind == "accepted":
@@ -1762,6 +1809,12 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 if current.status in {"queued", "running", "waiting_retry"}
                 else None
             )
+        if notification.kind == "model_retry":
+            return current if (
+                current.status in {"running", "waiting_retry"}
+                and current.error_kind == "provider_unavailable"
+                and notification.payload.get("step_key") == current.step_key
+            ) else None
         if notification.revision != current.revision and not (
             notification.kind == "result"
             and notification.payload.get("status") == current.status
@@ -1873,6 +1926,8 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "payload": notification.payload,
             "current_step": current.step_key,
             "attempts": current.attempts,
+            "model_policy": {key: current.metadata.get("request", {}).get(key)
+                             for key in ("primary", "request_timeout_seconds", "request_max_attempts")},
             "completed_steps": evidence,
         }
         fallback = {
@@ -1881,6 +1936,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             ),
             "accepted": "行，我先看看，结果还没出来。",
             "progress": "还在处理，暂时没拿到完整结果。",
+            "model_retry": "后台模型请求有点波动，我正在重连同一个模型，任务记录保留着。",
             "result": {
                 "succeeded": "结果已经保存，暂时没能整理成回复。",
                 "failed": "这次后台请求没成功，任务还没完成，记录已经保留。",
@@ -1891,6 +1947,12 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             }.get(current.status, "还没拿到完整结果，处理记录保留着。"),
             "state": "处理状态有更新，记录已经保留。",
         }[notification.kind]
+        model_exhausted = (
+            notification.kind == "result" and current.status == "failed"
+            and current.error_kind == "provider_unavailable"
+        )
+        if model_exhausted:
+            fallback = "后台模型几次请求都没连上，任务还没完成，记录保留着。要换个模型继续吗？"
         provider_ids = list(
             dict.fromkeys(
                 str(getattr(self.plugin, name, "") or "")
@@ -1919,6 +1981,18 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 "\n本次是用户此前授权脚本明确请求的一次后续发言。payload.message是要表达的意思，"
                 "沿用原聊天语气自然表达，不能改成‘任务处理中’播报。只输出这次发言；"
                 "不替脚本决定下次发送时间、次数或停止条件，不虚构工具执行结果。"
+            )
+        if notification.kind == "model_retry":
+            system += (
+                "\n这是后台模型首次请求失败后的主动说明：模型请求暂时波动，正在重连同一模型。"
+                "只需自然说明一次正在重连，任务记录仍在；后续重连期间不反复催问用户，"
+                "不擅自换模型，不说聊天模型不可用或任务已完成。"
+            )
+        if model_exhausted:
+            system += (
+                "\n后台任务模型已用尽本次最多请求次数，仍未连接成功；这是最后一次失败汇报。"
+                "说明任务未完成、已保留进度，并自然询问用户是否更换模型继续；"
+                "不要擅自换模型，也不要把后台请求失败说成聊天模型不可用。"
             )
         contexts = copy.deepcopy(chat.get("contexts", []))
         manager = getattr(self.plugin.context, "conversation_manager", None)

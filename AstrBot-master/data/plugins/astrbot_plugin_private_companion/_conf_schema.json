@@ -4939,14 +4939,27 @@
       "CONVERSATION_TASK_PROVIDER_ID": {
         "description": "独立后台任务模型",
         "type": "string",
-        "hint": "负责复杂任务、工具调用和可验证结果。留空时使用原复杂推理模型；可选择任意已启用 Provider，任务不会自动回退到聊天模型。",
-        "default": "",
+        "hint": "后台默认GPT6；Gemini先查询模型目录，可按用户要求为不同任务选择不同模型。每个任务固定所选模型，不启用备用模型。",
+        "default": "openai/gpt-6-sol",
         "_special": "select_provider"
       },
+      "task_model_timeout_seconds": {
+        "description": "后台模型单次请求超时（秒）",
+        "type": "int",
+        "default": 120,
+        "hint": "新任务默认单次模型请求预算，独立于工具执行耗时；Gemini可按任务指定覆盖值，不改变其他任务。"
+      },
+      "task_model_max_attempts": {
+        "description": "后台模型最多请求次数（包含首次）",
+        "type": "int",
+        "default": 3,
+        "hint": "3代表首次1次加重试2次；始终重连同一模型。首次失败由Gemini主动说明，耗尽后再说明并询问是否换模型。Gemini可按任务覆盖。"
+      },
       "CONVERSATION_TASK_FALLBACK_PROVIDER_ID": {
-        "description": "后台任务备用模型（可留空）",
+        "description": "旧后台备用配置（已停用）",
         "type": "string",
-        "hint": "主任务模型不可用或超时时尝试的备用 Provider。可按你的预算和稳定性自由选择 Gemini、Grok、GPT 或其他已启用模型；只允许配置一个。",
+        "invisible": true,
+        "hint": "仅兼容保留旧值，不参与后台请求。需要换模型时由Gemini查询目录并按用户要求处理。",
         "default": "",
         "_special": "select_provider"
       },

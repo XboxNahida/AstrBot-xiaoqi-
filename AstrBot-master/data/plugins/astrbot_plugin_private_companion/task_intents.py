@@ -82,6 +82,7 @@ class TaskIntentAdapter:
         normally_awakened: bool,
         workdir: str | Path,
         source: str = "reply",
+        model_policy: Mapping | None = None,
     ) -> dict[str, Any]:
         """Validate one request from an already awakened original user event.
 
@@ -165,6 +166,8 @@ class TaskIntentAdapter:
                     "goal": item.goal[:1000],
                     "revision": item.revision,
                     "error_kind": item.error_kind,
+                    "model_policy": {key: item.metadata.get("request", {}).get(key)
+                                     for key in ("primary", "request_timeout_seconds", "request_max_attempts")},
                 }
                 for item in tasks
             ]
@@ -258,7 +261,10 @@ class TaskIntentAdapter:
                 supplied = await supplied
             changed = self.service.revise_goal(task_id, scope, intent.goal, input_metadata=supplied)
         else:
-            changed = getattr(self.service, action)(task_id, scope)
+            if action in {"retry", "resume"} and model_policy is not None:
+                changed = getattr(self.service, action)(task_id, scope, request_patch=model_policy)
+            else:
+                changed = getattr(self.service, action)(task_id, scope)
         current = self.service.get(task_id, scope)
         return {
             **receipt,
