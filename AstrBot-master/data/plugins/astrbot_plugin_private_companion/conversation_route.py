@@ -15,7 +15,7 @@ from astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal import
 )
 from astrbot.core.provider import Provider
 
-from .helpers import _redact_outbound_secrets, _strip_internal_message_blocks
+from .helpers import _redact_outbound_secrets, _strip_outbound_control_blocks
 
 
 def _task_chat_text(text: Any) -> str:
@@ -27,10 +27,31 @@ def _task_chat_text(text: Any) -> str:
     Returns:
         Visible text without private controls, reasoning or credentials.
     """
-    text = re.sub(r"<(?:think|reasoning)\b[^>]*>(?:(?!</(?:think|reasoning)>).)*$", "", str(text or ""), flags=re.IGNORECASE | re.DOTALL)
-    text = _strip_internal_message_blocks(text)
-    text = re.sub(r"&&[^&\r\n]{1,100}&&", "", text)
-    return _redact_outbound_secrets(text).strip()
+    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`)", str(text or ""))
+    reasoning = None
+    for index, text in enumerate(parts):
+        if reasoning:
+            closing = re.search(rf"</{reasoning}\s*>", text, flags=re.IGNORECASE) if index % 2 == 0 else None
+            if closing is None:
+                parts[index] = ""
+                continue
+            text = text[closing.end():]
+            reasoning = None
+        if index % 2:
+            continue
+        text = _strip_outbound_control_blocks(text)
+        text = re.sub(r"<tts\b[^>]*>.*?</tts\s*>", "", text, flags=re.IGNORECASE | re.DOTALL)
+        opening = re.search(r"<(think|reasoning|tts)\b[^>]*>.*$", text, flags=re.IGNORECASE | re.DOTALL)
+        if opening:
+            reasoning = opening.group(1)
+            text = text[:opening.start()]
+        text = re.sub(r"&&[^&\r\n]{1,100}&&", "", text)
+        if text and parts[index].startswith("\n"):
+            text = "\n" + text
+        if text and parts[index].endswith("\n"):
+            text += "\n"
+        parts[index] = text
+    return _redact_outbound_secrets("".join(parts)).strip()
 
 
 def _task_chat_context(event: Any, state: Any = None) -> tuple[dict, list]:

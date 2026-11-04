@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from astrbot.api import logger
+from astrbot.api.message_components import Plain, Reply
 
 from .capability_hub import (
     CapabilityDecision,
@@ -23,6 +24,27 @@ from .helpers import _now_ts, _safe_float, _single_line
 from .hub_optimizations import hub_semantic_stamp
 from .prompt_surface import PromptSurface
 from .short_term_emotion import advance_emotion
+
+
+def _inline_hub_quotes(event: Any) -> list[dict[str, str]]:
+    """保留平台当前引用文字；无消息ID也可读，引用不赋予执行权限。"""
+    quotes = []
+    for part in getattr(getattr(event, "message_obj", None), "message", ()) or ():
+        if not isinstance(part, Reply):
+            continue
+        text = part.message_str or part.text or "\n".join(
+            child.text for child in (part.chain or ()) if isinstance(child, Plain)
+        )
+        if not str(text or "").strip():
+            continue
+        quotes.append({
+            "message_id": _single_line(part.id, 160),
+            "sender_id": _single_line(part.sender_id, 160),
+            "text": _single_line(text, 2400),
+        })
+        if len(quotes) >= 3:
+            break
+    return quotes
 
 
 def gate_request_search_tools(req: Any) -> None:
@@ -129,6 +151,9 @@ async def append_capability_guidance(
                     text=str(getattr(event, "private_companion_group_text", "") or getattr(event, "message_str", "") or ""),
                 ) or {})
                 setattr(event, "private_companion_group_scene", dict(hub_scene))
+        quotes = _inline_hub_quotes(event)
+        if quotes:
+            hub_scene["quoted_messages"] = quotes
         scene_trigger = str(hub_scene.get("trigger") or "")
         other_target = scene_trigger in {"at_other", "reply_other"}
         if not is_private:
@@ -660,7 +685,7 @@ async def append_capability_guidance(
                     "at_bot", "reply_bot", "at_all",
                 } else "",
                 **{key: hub_scene.get(key) for key in (
-                    "at_targets", "reply_to_id", "sender_identity",
+                    "at_targets", "reply_to_id", "sender_identity", "quoted_messages",
                 )},
             },
             "persona": persona_key,

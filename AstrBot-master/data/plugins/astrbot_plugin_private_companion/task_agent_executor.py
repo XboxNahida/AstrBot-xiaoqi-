@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -114,10 +115,18 @@ class TaskAgentExecutor:
             raise TaskFailure("missing_input")
         names = request.get("tool_names", [])
         required = request.get("required_tool_names", [])
+        groups = request.get("required_tool_groups", [])
         if (
             not isinstance(names, list)
             or not isinstance(required, list)
             or not all(isinstance(name, str) and name for name in names + required)
+            or not isinstance(groups, list)
+            or any(
+                not isinstance(group, list)
+                or not group
+                or any(not isinstance(name, str) or not name for name in group)
+                for group in groups
+            )
         ):
             raise TaskFailure("missing_input")
         checkpoint = {}
@@ -139,6 +148,20 @@ class TaskAgentExecutor:
             )
             contexts = self._bounded(contexts)
         system_prompt = request.get("system_prompt", "")
+        completion_contract = request.get("completion_contract") == "status_v1"
+        if completion_contract:
+            system_prompt += (
+                '\nWhen no more tools are needed, return only a JSON object '
+                '{"task_status":"completed|blocked|needs_input","text":"user-facing factual summary"}. '
+                'completed means the ENTIRE requested goal has verified tool evidence; '
+                'listing existing settings does not complete a request to change them. '
+                'If tools or capabilities are missing, report blocked with the unfinished work '
+                'and actual reason; if user input is required report needs_input. '
+                'Never return completed for partial work or an explanation of how to do it. '
+                'For custom interactions, write and schedule your script through pc_interaction_channel '
+                'and verify its receipt before reporting completed. Do not ask the user to '
+                'provide internal script tools that are already available to you.'
+            )
         if job.error_kind in {
             "missing_required_tool",
             "tool_argument_error",
@@ -152,6 +175,7 @@ class TaskAgentExecutor:
         receipts = copy.deepcopy(checkpoint.get("receipts", []))
         pending = copy.deepcopy(checkpoint.get("pending_calls", []))
         completed = checkpoint.get("number", 0)
+        workspace_corrections = checkpoint.get("workspace_corrections", 0)
         succeeded = {item["name"] for item in receipts}
         if pending and job.error_kind in {"tool_argument_error", "protocol_error"}:
             for call in pending:
@@ -181,6 +205,8 @@ class TaskAgentExecutor:
         }
         if set(required) - succeeded - allowed.keys():
             raise TaskFailure("permission_denied")
+        if any(not (set(group) & (succeeded | allowed.keys())) for group in groups):
+            raise TaskFailure("permission_denied")
         toolset = ToolSet()
         for tool in allowed.values():
             toolset.add_tool(tool)
@@ -206,7 +232,10 @@ class TaskAgentExecutor:
                         system_prompt=system_prompt,
                         contexts=copy.deepcopy(contexts),
                         func_tool=toolset,
-                        tool_choice="required" if set(required) - succeeded else "auto",
+                        tool_choice="required"
+                        if set(required) - succeeded
+                        or any(not (set(group) & succeeded) for group in groups)
+                        else "auto",
                         request_max_retries=0,
                     )
                 except Exception:
@@ -238,7 +267,35 @@ class TaskAgentExecutor:
                 except Exception:
                     raise TaskFailure("protocol_error", retryable=True) from None
                 if not pending:
-                    if set(required) - succeeded:
+                    if completion_contract:
+                        try:
+                            report = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip()))
+                            if (
+                                not isinstance(report, dict)
+                                or report.get("task_status") not in {"completed", "blocked", "needs_input"}
+                                or not isinstance(report.get("text"), str)
+                                or not report["text"].strip()
+                            ):
+                                raise ValueError
+                        except (ValueError, TypeError):
+                            raise TaskFailure("protocol_error", retryable=True) from None
+                        text = report["text"]
+                        self._bounded([{"role": "assistant", "content": text}])
+                        if report["task_status"] != "completed":
+                            current = self.service.get(job.task_id, job.scope)
+                            if current is None or not self.service.record_step(
+                                job, current.step_key,
+                                {"kind": "completion_report", "text": text,
+                                 "task_status": report["task_status"], "receipts": receipts},
+                                next_step=f"incomplete:{completed + 1}",
+                            ):
+                                raise TaskFailure("lease_lost")
+                            raise TaskFailure(
+                                "missing_input" if report["task_status"] == "needs_input" else "task_incomplete"
+                            )
+                    if set(required) - succeeded or any(
+                        not (set(group) & succeeded) for group in groups
+                    ):
                         raise TaskFailure("missing_required_tool", retryable=True)
                     mode = request.get("mode", "tools")
                     if not receipts and mode != "reasoning":
@@ -298,7 +355,7 @@ class TaskAgentExecutor:
                 outcome = await self.execute_tool(job, tool, args)
                 if (
                     not isinstance(outcome, Mapping)
-                    or outcome.get("status") != "success"
+                    or outcome.get("status") not in {"success", "error"}
                     or not outcome.get("receipt")
                     or "content" not in outcome
                 ):
@@ -318,9 +375,36 @@ class TaskAgentExecutor:
                 raise TaskFailure("unknown_result") from None
             if not self.service.heartbeat(job):
                 raise TaskFailure("lease_lost")
+            correcting_directory = (
+                outcome["status"] == "error"
+                and name == "pc_task_workspace"
+                and outcome.get("recoverable") is True
+                and workspace_corrections < 2
+            )
+            if outcome["status"] == "error" and not correcting_directory:
+                current = self.service.get(job.task_id, job.scope)
+                if current is None or not self.service.record_step(
+                    job,
+                    current.step_key,
+                    {
+                        "kind": "tool_error",
+                        "number": completed + 1,
+                        "tool": name,
+                        "outcome": outcome,
+                        "contexts": contexts,
+                        "pending_calls": pending[1:],
+                        "receipts": receipts,
+                    },
+                    next_step=f"failed_tool:{completed + 1}",
+                ):
+                    raise TaskFailure("lease_lost")
+                raise TaskFailure("tool_failed")
             completed += 1
-            receipts.append({"name": name, "receipt": outcome["receipt"]})
-            succeeded.add(name)
+            if correcting_directory:
+                workspace_corrections += 1
+            else:
+                receipts.append({"name": name, "receipt": outcome["receipt"]})
+                succeeded.add(name)
             pending = pending[1:]
             current = self.service.get(job.task_id, job.scope)
             if current is None or not self.service.record_step(
@@ -332,6 +416,7 @@ class TaskAgentExecutor:
                     "contexts": contexts,
                     "pending_calls": pending,
                     "receipts": receipts,
+                    "workspace_corrections": workspace_corrections,
                 },
                 next_step=f"tool:{completed + 1}",
             ):

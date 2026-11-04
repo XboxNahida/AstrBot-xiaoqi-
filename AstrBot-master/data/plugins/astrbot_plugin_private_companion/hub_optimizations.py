@@ -183,7 +183,11 @@ async def call_hub_model(
     )
     if not batchable:
         return await plugin._llm_call(
-            prompt, max_tokens=max_tokens, provider_id=provider_id, task="astrbot_reply"
+            prompt,
+            max_tokens=max_tokens,
+            provider_id=provider_id,
+            task="astrbot_reply",
+            timeout_key="CONVERSATION_HUB_PROVIDER_ID",
         )
     batches = getattr(plugin, "_hub_group_batches", None)
     if not isinstance(batches, dict):
@@ -219,6 +223,7 @@ async def call_hub_model(
                         max_tokens=max_tokens,
                         provider_id=provider_id,
                         task="astrbot_reply",
+                        timeout_key="CONVERSATION_HUB_PROVIDER_ID",
                     )
                     if not item["future"].done():
                         item["future"].set_result(raw)
@@ -248,6 +253,7 @@ async def call_hub_model(
                     max_tokens=min(2400, max_tokens * len(items)),
                     provider_id=provider_id,
                     task="astrbot_reply",
+                    timeout_key="CONVERSATION_HUB_PROVIDER_ID",
                 )
                 try:
                     clean = re.sub(

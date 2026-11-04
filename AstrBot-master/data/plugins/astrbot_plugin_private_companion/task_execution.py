@@ -23,8 +23,12 @@ from pathlib import Path
 from typing import Protocol
 
 try:
+    from .task_acl_scan import WINDOWS_ACL_SCAN
+    from .task_acl_watch import WindowsAclWatch as _WindowsAclWatch
     from .task_permissions import TaskActor, TaskPermissionStore
 except ImportError:
+    from task_acl_scan import WINDOWS_ACL_SCAN
+    from task_acl_watch import WindowsAclWatch as _WindowsAclWatch
     from task_permissions import TaskActor, TaskPermissionStore
 
 
@@ -112,17 +116,24 @@ class WindowsDeploymentVerifier:
             if guard is None:
                 guard = _WindowsAclWatch((self.root, *self.protected_roots))
                 _ACL_GUARDS[key] = guard
-            full_scan = not guard.validated or guard.changed()
-            if full_scan:
+            changes = guard.take_changes()
+            full_scan = not guard.validated or changes is None
+            for attempt in range(8):
+                if full_scan or changes:
+                    guard.validated = False
+                live = _host_acl_probe(
+                    self.root,
+                    (workspace, *self.protected_roots),
+                    account=account,
+                    scan=full_scan or bool(changes),
+                    scan_paths=None if full_scan else changes,
+                )
+                changes = guard.take_changes()
+                if changes == ():
+                    break
                 guard.validated = False
-            live = _host_acl_probe(
-                self.root,
-                (workspace, *self.protected_roots),
-                account=account,
-                scan=full_scan,
-            )
-            if guard.changed():
-                guard.validated = False
+                full_scan = changes is None
+            else:
                 raise PermissionError("Protected ACL tree changed during validation")
             guard.validated = True
         if (
@@ -200,59 +211,21 @@ _ACL_GUARDS = {}
 _ACL_GUARD_LOCK = threading.Lock()
 
 
-class _WindowsAclWatch:
-    """Invalidate full scans after recursive create/rename/security ACL changes."""
-
-    def __init__(self, roots):
-        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        self.kernel.FindFirstChangeNotificationW.argtypes = [
-            wintypes.LPCWSTR,
-            wintypes.BOOL,
-            wintypes.DWORD,
-        ]
-        self.kernel.FindFirstChangeNotificationW.restype = wintypes.HANDLE
-        self.kernel.FindNextChangeNotification.argtypes = [wintypes.HANDLE]
-        self.kernel.FindNextChangeNotification.restype = wintypes.BOOL
-        self.kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-        self.kernel.WaitForSingleObject.restype = wintypes.DWORD
-        self.kernel.FindCloseChangeNotification.argtypes = [wintypes.HANDLE]
-        self.handles = []
-        self.validated = False
-        for root in dict.fromkeys(roots):
-            native = self.kernel.FindFirstChangeNotificationW(
-                str(root), True, 1 | 2 | 0x100
-            )
-            if not native or native == ctypes.c_void_p(-1).value:
-                self.close()
-                raise PermissionError("Protected ACL monitor could not be established")
-            self.handles.append(native)
-
-    def changed(self):
-        changed = False
-        for native in self.handles:
-            status = self.kernel.WaitForSingleObject(native, 0)
-            if status == 0:
-                changed = True
-                if not self.kernel.FindNextChangeNotification(native):
-                    raise PermissionError("Protected ACL monitoring failed")
-            elif status != 0x102:
-                raise PermissionError("Protected ACL monitoring state is unknown")
-        return changed
-
-    def close(self):
-        for native in self.handles:
-            self.kernel.FindCloseChangeNotification(native)
-        self.handles.clear()
-
-
 def _host_acl_probe(
-    root: Path, paths: Sequence[Path], *, account: str = "", scan: bool = True
+    root: Path, paths: Sequence[Path], *, account: str = "", scan: bool = True,
+    scan_paths: Sequence[Path] | None = None,
 ) -> dict:
     """Run fixed host ACL inspection without task payload or inherited host env."""
     if os.name != "nt" or any(not p.exists() or _is_reparse(p) for p in (root, *paths)):
         raise PermissionError("Host deployment path is missing or reparsed")
     if any(_is_reparse(parent) for path in (root, *paths) for parent in path.parents):
         raise PermissionError("Host deployment ancestor is reparsed")
+    if scan_paths is not None:
+        for changed in scan_paths:
+            if not any(changed.is_relative_to(p) for p in paths[1:]):
+                raise PermissionError("ACL change escaped protected roots")
+            if any(p.exists() and _is_reparse(p) for p in (changed, *changed.parents)):
+                raise PermissionError("ACL change has a reparsed ancestor")
     request = base64.b64encode(
         json.dumps(
             {
@@ -260,6 +233,7 @@ def _host_acl_probe(
                 "paths": [str(p) for p in paths],
                 "account": account,
                 "scan": scan,
+                "scan_paths": None if scan_paths is None else [str(p) for p in scan_paths],
             }
         ).encode("utf-8")
     ).decode("ascii")
@@ -281,17 +255,12 @@ foreach($p in $hostPaths) {
 if (-not $q.account) { '{}' ; exit }
 $u=Get-LocalUser -Name $q.account
 $taskSid=$u.SID.Value
-if($q.scan) { foreach($protected in @($q.paths | Select-Object -Skip 1)) {
- foreach($item in @((Get-Item -LiteralPath $protected -Force)) + @(Get-ChildItem -LiteralPath $protected -Force -Recurse -ErrorAction Stop)) {
-  if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparsed protected tree' }
-  $acl=Get-Acl -LiteralPath $item.FullName
-  if(-not $acl.AreAccessRulesCanonical) { throw 'Protected ACL order is not canonical' }
-  $rules=$acl.Access
-  $denials=@($rules | Where-Object { $_.AccessControlType -eq 'Deny' -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $taskSid -and ([int]$_.FileSystemRights -band 2032127) -eq 2032127 -and -not ($_.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) })
-  $explicitAllow=@($rules | Where-Object { $_.AccessControlType -eq 'Allow' -and -not $_.IsInherited -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $trusted }).Count -gt 0
-  $denied=(@($denials | Where-Object {-not $_.IsInherited}).Count -gt 0) -or ($denials.Count -gt 0 -and -not $explicitAllow)
-  if (-not $denied) { throw 'Protected tree lacks explicit task denial' }
- }
+if($q.scan) {
+ACL_TREE_SCANNER
+if($null -eq $q.scan_paths) {
+ [AstrBotProtectedAcl]::Verify([string[]]@($q.paths | Select-Object -Skip 1), $taskSid)
+} else {
+ [AstrBotProtectedAcl]::Verify([string[]]@($q.scan_paths), $taskSid, $true)
 }
 }
 $admin=$false
@@ -303,7 +272,7 @@ foreach($p in $q.paths) { $sddl += (Get-Acl -LiteralPath $p).Sddl }
 $h=[Security.Cryptography.SHA256]::Create()
 try { $hash=([BitConverter]::ToString($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($sddl)))).Replace('-','').ToLowerInvariant() } finally { $h.Dispose() }
 @{machine_sid=$u.SID.AccountDomainSid.Value;user_sid=$u.SID.Value;domain=[Environment]::MachineName;enabled=$u.Enabled;admin=$admin;acl_sha256=$hash} | ConvertTo-Json -Compress
-""".replace("REQUEST", request)
+""".replace("REQUEST", request).replace("ACL_TREE_SCANNER", WINDOWS_ACL_SCAN)
     ps = Path("C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
     env = {
         "SystemRoot": str(ps.parents[3]),
@@ -591,6 +560,14 @@ class TaskExecutionBroker:
             "PIP_CONFIG_FILE": "NUL",
             "PYTHONNOUSERSITE": "1",
         }
+        encoded_root = base64.b64encode(str(root).encode("utf-8")).decode("ascii")
+        initialized_code = (
+            "Set-Location -LiteralPath ([Text.Encoding]::UTF8.GetString("
+            "[Convert]::FromBase64String('" + encoded_root + "'))) -ErrorAction Stop; "
+            "[Environment]::CurrentDirectory=(Get-Location).ProviderPath; "
+            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+            "$OutputEncoding=[Text.Encoding]::UTF8; " + code
+        )
         starting = asyncio.create_task(
             asyncio.to_thread(
                 self.backend.start,
@@ -601,7 +578,7 @@ class TaskExecutionBroker:
                     "-NoProfile",
                     "-NonInteractive",
                     "-Command",
-                    code,
+                    initialized_code,
                 ),
                 root,
                 env,

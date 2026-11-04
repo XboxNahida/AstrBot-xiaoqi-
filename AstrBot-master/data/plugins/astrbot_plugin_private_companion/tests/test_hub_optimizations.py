@@ -83,6 +83,48 @@ class HubOptimizationTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(self.call(plugin, "m1"), self.call(plugin, "m2"))
         self.assertEqual(2, plugin._llm_call.await_count)
 
+    async def test_hub_fallback_uses_its_card_for_direct_single_and_batch(self):
+        from astrbot_plugin_private_companion.tests.test_model_fallback import (
+            _FallbackHarness,
+        )
+
+        for mode in ("direct", "single", "batch"):
+            with self.subTest(mode=mode):
+                response = '{"reply":false,"actions":[]}'
+                if mode == "batch":
+                    response = json.dumps(
+                        {
+                            "decisions": [
+                                {"message_id": "m1", "reply": False, "actions": []},
+                                {"message_id": "m2", "reply": False, "actions": []},
+                            ]
+                        }
+                    )
+                plugin = _FallbackHarness(
+                    {"hub": RuntimeError("unavailable"), "gemini": response},
+                    mode="quick",
+                )
+                plugin.config = {
+                    "CONVERSATION_HUB_PROVIDER_ID": "hub",
+                    "FAST_RESPONSE_PROVIDER_ID": "hub",
+                }
+                plugin.model_fallback_overrides = {
+                    "CONVERSATION_HUB_PROVIDER_ID": "gemini",
+                    "FAST_RESPONSE_PROVIDER_ID": "wrong-fallback",
+                }
+                plugin.enable_hub_group_batching = mode != "direct"
+                plugin.hub_group_batch_seconds = 0
+                if mode == "batch":
+                    results = await asyncio.gather(
+                        self.call(plugin, "m1"), self.call(plugin, "m2")
+                    )
+                else:
+                    results = [await self.call(plugin, "m1")]
+                self.assertEqual(["hub", "gemini"], plugin.context.calls)
+                self.assertTrue(
+                    all(json.loads(result)["reply"] is False for result in results)
+                )
+
     async def test_bot_instances_and_groups_do_not_share_batches(self):
         plugin = self.plugin()
         await asyncio.gather(

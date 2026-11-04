@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
-from astrbot.api.message_components import Plain
+from astrbot.api.message_components import Plain, Reply
 from astrbot_plugin_private_companion.capability_hub import CapabilityDecision
 from astrbot_plugin_private_companion.final_response_persistence import (
     FinalResponsePersistenceMixin,
@@ -88,6 +88,28 @@ class HubGroupParticipationTests(unittest.IsolatedAsyncioTestCase):
         await append_capability_guidance(self.plugin, self.event(private), None)
         prompt = self.plugin._llm_call.await_args.args[0]
         return json.loads(prompt.split("输入数据：\n", 1)[1])
+
+    async def test_inline_quoted_text_reaches_hub_without_message_id(self):
+        event = self.event(private=True)
+        event.message_str = "这个任务"
+        event.message_obj.message = [Reply(id="", chain=[Plain("明天到周五7:30叫我，每分钟一次，回复即停")])]
+        await append_capability_guidance(self.plugin, event, None)
+        prompt = self.plugin._llm_call.await_args.args[0]
+        data = json.loads(prompt.split("输入数据：\n", 1)[1])
+        self.assertEqual("这个任务", data["current_message"])
+        self.assertIn("每分钟一次", data["platform_scene"]["quoted_messages"][0]["text"])
+        self.assertEqual("", data["platform_scene"]["quoted_messages"][0]["message_id"])
+
+    async def test_inline_quote_change_invalidates_same_event_reuse(self):
+        event = self.event(private=True)
+        event.message_str = "这个任务"
+        event.message_obj.message = [Reply(id="", message_str="提醒喝水")]
+        self.plugin.enable_hub_decision_reuse = True
+        await append_capability_guidance(self.plugin, event, None)
+        calls = self.plugin._llm_call.await_count
+        event.message_obj.message = [Reply(id="", message_str="改成每分钟一次，回复即停")]
+        await append_capability_guidance(self.plugin, event, None)
+        self.assertGreater(self.plugin._llm_call.await_count, calls)
 
     async def test_unavailable_hub_does_not_wake_ordinary_group_messages(self):
         self.plugin._llm_call.return_value = None

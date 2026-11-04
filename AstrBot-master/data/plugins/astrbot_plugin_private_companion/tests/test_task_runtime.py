@@ -1,5 +1,5 @@
-import json
 import copy
+import json
 import sqlite3
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from astrbot.core.agent.message import TextPart
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 from astrbot.core.cron.events import CronMessageEvent
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
@@ -122,9 +123,11 @@ async def test_official_future_tool_registers_without_mutating_schema(
         )
         assert receipt["accepted"]
         job = runtime.service.get(receipt["task_id"], runtime.scope(e))
-        assert job.metadata["request"]["required_tool_names"] == (
-            ["future_task"] if actions else []
-        )
+        assert job.metadata["request"]["required_tool_names"] == []
+        if actions:
+            assert job.metadata["request"]["required_tool_groups"] == [
+                ["future_task", "pc_interaction_channel"]
+            ]
     else:
         assert runtime.make_intent_tool(e).name == "pc_submit_task_intent"
 
@@ -332,6 +335,91 @@ async def test_workspace_intent_is_durable_before_account_setup(runtime):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("user,capabilities,expected", [
+    ("owner", None, True),
+    ("member", ["schedule"], False),
+    ("member", ["schedule", "read", "write", "shell", "network"], True),
+])
+async def test_reply_omitted_workspace_uses_existing_grant(runtime, user, capabilities, expected):
+    if capabilities is not None:
+        runtime.permissions.grant(
+            runtime.dashboard_actor("bot", "group", "web-admin"), user,
+            capabilities=capabilities, roots=[runtime.workspace],
+        )
+    runtime.test_tools.append(FutureTaskTool())
+    runtime.plugin.context.get_config = lambda **_: {
+        "provider_settings": {"proactive_capability": {"add_cron_tools": True}}
+    }
+    e = event(user)
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"action": "submit", "goal": "这个任务，每分钟叫一次，回复就停止"})
+    assert receipt["accepted"]
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert job.metadata["request"]["use_workspace"] is expected
+    assert ("pc_task_write_file" in job.metadata["request"]["tool_names"]) is expected
+    assert job.metadata["request"].get("completion_contract") == "status_v1"
+    assert runtime._events[e]["request"]["use_workspace"] is False
+
+
+@pytest.mark.asyncio
+async def test_reply_explicit_workspace_false_is_preserved(runtime):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "只查询", "use_workspace": False})
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert job.metadata["request"]["use_workspace"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["hub", "reply"])
+async def test_read_authorized_task_needs_no_model_workspace_switch(runtime, source):
+    member = event("reader")
+    runtime.permissions.grant(
+        runtime.dashboard_actor("bot", "group", "web-admin"), "reader",
+        capabilities=["read"], roots=[runtime.workspace],
+    )
+    register(runtime, member)
+    receipt = await runtime.submit(member, {"goal": "读取同群的任务文件"}, source=source)
+    job = runtime.service.get(receipt["task_id"], runtime.scope(member))
+    assert job.metadata["request"]["use_workspace"] is True
+    assert "pc_task_workspace" in job.metadata["request"]["tool_names"]
+    assert "pc_task_write_file" not in runtime._registry(member.unified_msg_origin, runtime.actor(member))
+
+
+def test_workspace_prompt_contains_real_location_and_explicit_read_routes(runtime):
+    actor = runtime.actor(event())
+    prompt = runtime.workspace_prompt(actor)
+    from astrbot_plugin_private_companion.task_execution import actor_workspace
+    context, _ = json.JSONDecoder().raw_decode(prompt[prompt.index("{"):])
+    assert context["working_directory"] == str(actor_workspace(runtime.workspace, actor))
+    assert "pc_task_workspace" in prompt and "workspace_id" in prompt
+    assert "C:/AstrBotTasks/tools" not in prompt
+    assert "never guess" in prompt.lower()
+
+
+@pytest.mark.asyncio
+async def test_execution_injects_fresh_peer_catalog_before_model_call(runtime, monkeypatch):
+    from astrbot_plugin_private_companion import task_agent_executor, task_runtime
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "检查各群友的文件"})
+    job = runtime.service.claim("test")
+    assert job.task_id == receipt["task_id"]
+    runtime._account_setup = SimpleNamespace(prepare=AsyncMock(return_value=SimpleNamespace(ready=True)))
+    runtime._workspace_directory = SimpleNamespace(call=AsyncMock(return_value={
+        "success": True, "workspaces": [{"workspace_id": "peer", "user_id": "real-peer", "path": "C:/actual-peer"}],
+        "total": 1, "next_offset": None,
+    }))
+    monkeypatch.setattr(task_runtime, "bind_event_bot_identity", AsyncMock(return_value=None))
+    execute = AsyncMock(return_value={"text": "actual result"})
+    monkeypatch.setattr(task_agent_executor.TaskAgentExecutor, "execute", execute)
+    await runtime.execute(job)
+    current_prompt = execute.await_args.args[0].metadata["request"]["system_prompt"]
+    assert "real-peer" in current_prompt and "C:/actual-peer" in current_prompt
+    assert current_prompt.count("HOST WORKSPACE CONTEXT") == 1
+
+
+@pytest.mark.asyncio
 async def test_hub_workspace_action_is_tool_task_before_account_exists(runtime):
     e = event()
     runtime.register(
@@ -346,6 +434,44 @@ async def test_hub_workspace_action_is_tool_task_before_account_exists(runtime):
     assert job.metadata["request"]["mode"] == "tools"
     assert job.metadata["request"]["use_workspace"] is True
     assert "pc_task_read_tool" in job.metadata["request"]["tool_names"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "capabilities,expected",
+    [
+        (None, True),
+        (["schedule"], False),
+        (["schedule", "read", "write", "shell", "network"], True),
+    ],
+)
+async def test_schedule_exposes_script_workspace_only_with_existing_grant(
+    runtime, capabilities, expected
+):
+    user = "owner" if capabilities is None else "member"
+    if capabilities is not None:
+        runtime.permissions.grant(
+            runtime.dashboard_actor("bot", "group", "web-admin"),
+            user,
+            capabilities=capabilities,
+            roots=[runtime.workspace],
+        )
+    runtime.test_tools.append(FutureTaskTool())
+    runtime.plugin.context.get_config = lambda **_: {
+        "provider_settings": {"proactive_capability": {"add_cron_tools": True}}
+    }
+    e = event(user)
+    runtime.register(
+        e,
+        runtime.test_request,
+        SimpleNamespace(route="task", actions=("schedule",), reply=True),
+        reply_eligible=True,
+    )
+    receipt = await runtime.submit(e, {"goal": "按之前要求写互动脚本"}, source="hub")
+    assert receipt["accepted"]
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert job.metadata["request"]["use_workspace"] is expected
+    assert ("pc_task_read_tool" in job.metadata["request"]["tool_names"]) is expected
 
 
 @pytest.mark.asyncio
@@ -813,3 +939,301 @@ async def test_monitor_policy_uses_actual_tool_result_for_no_update(runtime):
     assert runtime.snapshot_for_scope("bot", "bot:GroupMessage:group", "owner")
     assert not runtime.snapshot_for_scope("other", "bot:GroupMessage:group", "owner")
     assert runtime.service.get(receipt["task_id"], job.scope).status == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_notifications_keep_original_chat_memory_and_fresh_same_session(runtime):
+    e = event()
+    runtime.test_request.system_prompt = "原有小七人格和对话示例"
+    runtime.test_request.contexts = [{"role": "user", "content": "叫我小林"}]
+    runtime.test_request.extra_user_content_parts = [
+        TextPart(text="偏好称呼小林；当前情绪嘴硬但愿意帮忙")
+    ]
+    runtime.test_request.conversation = SimpleNamespace(cid="same-session")
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    runtime.test_request.system_prompt = "任务执行器的其他指令"
+    runtime.test_request.contexts.clear()
+    manager = SimpleNamespace(
+        get_curr_conversation_id=AsyncMock(return_value="same-session"),
+        get_conversation=AsyncMock(
+            return_value=SimpleNamespace(
+                history=json.dumps(
+                    [
+                        {"role": "user", "content": "刚才说的事别忘了"},
+                        {"role": "assistant", "content": "记着呢。"},
+                    ]
+                )
+            )
+        ),
+    )
+    runtime.plugin.context.conversation_manager = manager
+    chat = SimpleNamespace(
+        text_chat=AsyncMock(
+            return_value=SimpleNamespace(
+                role="assistant", completion_text="行，我看看。", tools_call_name=[]
+            )
+        )
+    )
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    current = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert (
+        await runtime.render_notification(
+            SimpleNamespace(kind="accepted", payload={}), current
+        )
+        == "行，我看看。"
+    )
+    request = chat.text_chat.await_args.kwargs
+    assert "原有小七人格" in request["system_prompt"]
+    assert "任务执行器的其他指令" not in request["system_prompt"]
+    assert "刚才说的事别忘了" in json.dumps(request["contexts"], ensure_ascii=False)
+    assert "偏好称呼小林" in str(request.get("extra_user_content_parts"))
+    assert request["func_tool"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "delivered,switched", [(True, False), (False, False), (True, True)]
+)
+async def test_only_sent_notifications_are_remembered_in_the_original_chat(
+    runtime, delivered, switched
+):
+    e = event()
+    runtime.test_request.conversation = SimpleNamespace(cid="original")
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "查公告"})
+    manager = SimpleNamespace(
+        get_curr_conversation_id=AsyncMock(
+            return_value="new-chat" if switched else "original"
+        ),
+        get_conversation=AsyncMock(return_value=SimpleNamespace(history="[]")),
+        add_message_pair=AsyncMock(),
+    )
+    runtime.plugin.context.conversation_manager = manager
+    runtime.plugin.context.send_message.return_value = delivered
+    await runtime.send_once()
+    assert manager.add_message_pair.await_count == int(delivered and not switched)
+    if delivered and not switched:
+        saved = manager.add_message_pair.await_args.kwargs
+        assert saved["cid"] == "original"
+        assert saved["user_message"]["content"] == e.message_str
+        assert str(saved["assistant_message"])
+
+
+@pytest.mark.asyncio
+async def test_sent_history_failure_never_requeues_already_delivered_notice(runtime):
+    e = event()
+    runtime.test_request.conversation = SimpleNamespace(cid="original")
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "查公告"})
+    runtime.plugin.context.conversation_manager = SimpleNamespace(
+        get_curr_conversation_id=AsyncMock(return_value="original"),
+        get_conversation=AsyncMock(return_value=SimpleNamespace(history="[]")),
+        add_message_pair=AsyncMock(side_effect=RuntimeError("locked")),
+    )
+    await runtime.send_once()
+    assert not await runtime.send_once()
+    assert runtime.plugin.context.send_message.await_count == 1
+    with sqlite3.connect(runtime.service.path) as db:
+        assert db.execute("SELECT state FROM pt_outbox").fetchone()[0] == "sent"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["accepted", "progress", "result", "state"])
+async def test_all_task_notifications_strip_controls_but_preserve_literal_code(
+    runtime, kind
+):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "写示例代码"})
+    code = "```python\nprint('&&reply&&')\n```"
+    chat = SimpleNamespace(
+        text_chat=AsyncMock(
+            return_value=SimpleNamespace(
+                role="assistant",
+                completion_text="<think>内部推理</think>行，给你。 &&reply&&\n"
+                + code
+                + "\n[[PCTTS:private]]",
+                tools_call_name=[],
+            )
+        )
+    )
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    current = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    text = await runtime.render_notification(
+        SimpleNamespace(kind=kind, payload={}), current
+    )
+    assert "内部推理" not in text
+    assert "[[PCTTS:" not in text
+    assert "给你。 &&reply&&" not in text
+    assert code in text
+
+
+@pytest.mark.asyncio
+async def test_send_boundary_also_cleans_non_model_notification(runtime):
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "查公告"})
+    runtime.render_notification = AsyncMock(return_value="行，我看看。 &&reply&&")
+    await runtime.send_once()
+    sent = runtime.plugin.context.send_message.await_args.args[1].chain[0].text
+    assert sent == "行，我看看。"
+
+
+@pytest.mark.parametrize(
+    "text", ["查到了吗", "做完了吗？", "有结果了吗", "进度怎么样", "还要多久"]
+)
+def test_progress_questions_read_existing_task_even_if_hub_suggests_schedule(
+    runtime, text
+):
+    e = event()
+    register(runtime, e)
+    task = runtime.service.submit(
+        runtime.scope(e),
+        "earlier-message",
+        "main",
+        "查询任务列表",
+        workdir=runtime.workspace,
+    )
+    e.message_str = text
+    decision = SimpleNamespace(
+        reply=True, task_query=False, route="task", actions=("schedule",)
+    )
+    assert runtime.prepare_task_query(e, runtime.test_request, decision)
+    assert len(runtime.service.list(runtime.scope(e))) == 1
+    assert task.task_id in runtime.test_request.system_prompt
+    assert "queued" in runtime.test_request.system_prompt
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "重新查一下",
+        "查到了吗，顺便查天气",
+        "取消任务",
+        "继续做",
+        "查一下有没有定时任务",
+        "帮我查到了吗这句话怎么翻译",
+    ],
+)
+def test_new_work_and_control_are_not_swallowed_as_status_questions(runtime, text):
+    e = event()
+    register(runtime, e)
+    runtime.service.submit(
+        runtime.scope(e),
+        "earlier-message",
+        "main",
+        "查询任务列表",
+        workdir=runtime.workspace,
+    )
+    e.message_str = text
+    assert not runtime.prepare_task_query(
+        e, runtime.test_request, SimpleNamespace(reply=True, task_query=False)
+    )
+
+
+def test_progress_query_does_not_cross_sender_or_bot(runtime):
+    e = event()
+    register(runtime, e)
+    runtime.service.submit(
+        runtime.scope(e),
+        "earlier-message",
+        "main",
+        "查询任务列表",
+        workdir=runtime.workspace,
+    )
+    other = event(user="other-user")
+    register(runtime, other)
+    other.message_str = "查到了吗"
+    assert not runtime.prepare_task_query(
+        other, runtime.test_request, SimpleNamespace(reply=True, task_query=True)
+    )
+
+
+@pytest.mark.asyncio
+async def test_unfinished_task_cannot_announce_completion_even_if_chat_claims_it(
+    runtime,
+):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    chat = SimpleNamespace(
+        text_chat=AsyncMock(
+            return_value=SimpleNamespace(
+                role="assistant",
+                completion_text="已经完成了，全部搞定。",
+                tools_call_name=[],
+            )
+        )
+    )
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    current = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    text = await runtime.render_notification(
+        SimpleNamespace(kind="accepted", payload={}), current
+    )
+    assert "全部搞定" not in text
+    assert "已经完成" not in text
+
+
+def test_completed_query_uses_verified_result_and_hub_query_cannot_hide_new_work(
+    runtime,
+):
+    e = event()
+    register(runtime, e)
+    runtime.service.submit(
+        runtime.scope(e), "earlier-message", "main", "算结果", workdir=runtime.workspace
+    )
+    job = runtime.service.claim("worker")
+    runtime.service.finish(job, {"text": "精确结果12.3400"})
+    e.message_str = "查到了吗"
+    assert runtime.prepare_task_query(
+        e, runtime.test_request, SimpleNamespace(reply=True, task_query=False)
+    )
+    assert "精确结果12.3400" in runtime.test_request.system_prompt
+    e.message_str = "查到了吗，顺便查天气"
+    assert not runtime.prepare_task_query(
+        e, runtime.test_request, SimpleNamespace(reply=True, task_query=True)
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_snapshot_preserves_text_parts_without_persisting_media_payload(
+    runtime,
+):
+    e = event()
+    runtime.test_request.contexts = [
+        {"role": "user", "content": [{"type": "text", "text": f"第{i}句"}]}
+        for i in range(20)
+    ]
+    runtime.test_request.contexts[-1]["content"].append(
+        {"type": "image_url", "image_url": {"url": "private-image-payload"}}
+    )
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    current = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert len(current.metadata["chat_context"]["contexts"]) == 20
+    assert "private-image-payload" not in json.dumps(current.metadata["chat_context"])
+    chat = SimpleNamespace(
+        text_chat=AsyncMock(
+            return_value=SimpleNamespace(
+                role="assistant", completion_text="行，我看看。", tools_call_name=[]
+            )
+        )
+    )
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    await runtime.render_notification(
+        SimpleNamespace(kind="accepted", payload={}), current
+    )
+    assert chat.text_chat.await_args.kwargs["contexts"][-1]["content"] == "第19句"
+
+
+@pytest.mark.parametrize("closing", ["</think>", ""])
+@pytest.mark.parametrize("tag", ["think", "tts"])
+def test_control_cleaner_never_preserves_code_from_internal_reasoning(closing, tag):
+    from astrbot_plugin_private_companion.conversation_route import _task_chat_text
+
+    raw = f"<{tag}>内部推理\n```text\n不可外发的推理\n```\n" + closing.replace(
+        "think", tag
+    )
+    assert "不可外发" not in _task_chat_text(raw)
+    assert "内部推理" not in _task_chat_text(raw)

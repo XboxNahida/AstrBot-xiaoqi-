@@ -42,3 +42,22 @@ async def test_nonzero_exit_is_failure_and_unknown_outcome_is_not_faked():
     broker.run_powershell.side_effect = TimeoutError()
     with pytest.raises(TimeoutError):
         await tool.call(None, code="long running")
+
+
+@pytest.mark.asyncio
+async def test_workspace_tool_binds_identity_and_returns_recoverable_input_error():
+    actor = object()
+    directory = SimpleNamespace(call=AsyncMock(return_value={"success": True, "workspaces": []}))
+    tools = create_execution_tools(SimpleNamespace(), actor, workspace_directory=directory)
+    tool = tools["pc_task_workspace"]
+    result = json.loads(await tool.call(None, action="list", path=".", workspace_id="peer"))
+    assert result["success"]
+    directory.call.assert_awaited_once_with(actor, action="list", path=".", workspace_id="peer")
+    directory.call.side_effect = FileNotFoundError("not found")
+    result = json.loads(await tool.call(None, action="read", path="wrong.txt"))
+    assert result["success"] is False and result["recoverable"] is True
+    assert result["code"] == "workspace_path_error"
+    directory.call.side_effect = PermissionError("revoked")
+    result = json.loads(await tool.call(None, action="info"))
+    assert result["success"] is False and result.get("recoverable") is not True
+    assert result["code"] == "workspace_access_denied"

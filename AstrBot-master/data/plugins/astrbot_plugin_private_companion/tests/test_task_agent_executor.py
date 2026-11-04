@@ -133,6 +133,92 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, len(self.permissions))
         self.assertEqual(1, self.service.get(job.task_id, job.scope).attempts)
 
+    async def test_readonly_workspace_path_failure_can_be_corrected_without_fake_receipt(self):
+        name = "pc_task_workspace"
+        self.tools = {name: SimpleNamespace(name=name)}
+        job = self.submit(tool_names=[name], required_tool_names=[name])
+        self.primary = Provider(
+            Response(calls=[(name, {"action": "read", "path": "wrong.txt"})]),
+            Response(calls=[(name, {"action": "list", "path": "."})]),
+            Response("done"),
+        )
+        calls = []
+        async def read(job, tool, args):
+            calls.append(args)
+            return {"status": "error" if len(calls) == 1 else "success", "content": "correct the path" if len(calls) == 1 else "actual listing", "receipt": {"operation_id": str(len(calls))}, "recoverable": True}
+        result = await self.executor(execute_tool=read).execute(job)
+        self.assertEqual("done", result["text"])
+        self.assertEqual(2, len(calls))
+        self.assertEqual(1, len(result["receipts"]))
+        self.assertEqual("2", result["receipts"][0]["receipt"]["operation_id"])
+        self.assertIn("correct the path", str(self.primary.requests[1]["contexts"]))
+
+    async def test_readonly_workspace_corrections_are_bounded_and_permission_denial_stops(self):
+        name = "pc_task_workspace"
+        self.tools = {name: SimpleNamespace(name=name)}
+        job = self.submit(tool_names=[name], required_tool_names=[name])
+        self.primary = Provider(*(Response(calls=[(name, {"action": "list"})]) for _ in range(4)))
+        async def fail(*args):
+            return {"status": "error", "content": "bad path", "receipt": {"operation_id": "error"}, "recoverable": True}
+        await self.run_failure(self.executor(execute_tool=fail), job, "tool_failed")
+        self.assertEqual(3, len(self.primary.requests))
+
+    async def test_required_tool_group_accepts_alternative_with_real_receipt(self):
+        job = self.submit(required_tool_names=[], required_tool_groups=[["read", "write"]])
+        self.primary = Provider(Response(calls=[("write", {})]), Response("done"))
+        result = await self.executor().execute(job)
+        self.assertEqual(["write"], result["successful_tool_names"])
+        self.assertEqual("required", self.primary.requests[0]["tool_choice"])
+        self.assertEqual("auto", self.primary.requests[1]["tool_choice"])
+
+    async def test_query_then_blocked_is_not_completed_and_preserves_reason(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {})]),
+            Response(json.dumps({"task_status": "blocked", "text": "只查到了旧提醒，脚本尚未配置"})),
+        )
+        state = await self.run_failure(self.executor(), job, "task_incomplete")
+        self.assertEqual("failed", state.status)
+        reports = [x for x in state.steps.values() if x.get("kind") == "completion_report"]
+        self.assertEqual("只查到了旧提醒，脚本尚未配置", reports[0]["text"])
+        self.assertEqual(1, len(reports[0]["receipts"]))
+        self.assertIn("task_status", self.primary.requests[-1]["system_prompt"])
+
+    async def test_structured_completed_returns_chat_text_with_receipts(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {})]),
+            Response('```json\n{"task_status":"completed","text":"实际结果"}\n```'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual("实际结果", result["text"])
+        self.assertEqual(["read"], result["successful_tool_names"])
+
+    async def test_structured_needs_input_waits_for_user_without_auto_retry(self):
+        job = self.submit(completion_contract="status_v1", mode="reasoning", required_tool_names=[])
+        self.primary = Provider(Response('{"task_status":"needs_input","text":"请明确时间"}'))
+        state = await self.run_failure(self.executor(), job, "missing_input")
+        self.assertEqual("waiting_user", state.status)
+
+    async def test_contract_rejects_unstructured_completion(self):
+        job = self.submit(completion_contract="status_v1", mode="reasoning", required_tool_names=[])
+        self.primary = Provider(Response("查到了，但还没改"))
+        await self.run_failure(self.executor(), job, "protocol_error")
+
+    async def test_unrelated_tool_cannot_satisfy_required_group(self):
+        job = self.submit(required_tool_names=[], required_tool_groups=[["write"]])
+        self.primary = Provider(Response(calls=[("read", {})]), Response("done"))
+        await self.run_failure(self.executor(), job, "missing_required_tool")
+
+    async def test_missing_group_capability_fails_before_model_request(self):
+        job = self.submit(required_tool_names=[], required_tool_groups=[["not_allowed"]])
+        await self.run_failure(self.executor(), job, "permission_denied")
+        self.assertEqual([], self.primary.requests)
+
+    async def test_invalid_group_schema_is_rejected(self):
+        job = self.submit(required_tool_groups=["write"])
+        await self.run_failure(self.executor(), job, "missing_input")
+
     async def test_host_denial_before_execution_preserves_permission_failure(self):
         job = self.submit()
         self.primary = Provider(Response(calls=[("read", {})]))

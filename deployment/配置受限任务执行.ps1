@@ -263,7 +263,7 @@ if ($Mode -eq 'Provision') {
         Set-TaskLogonRights $sid
         foreach ($directory in @($TaskRoot, (Join-Path $TaskRoot $botHash), (Join-Path (Join-Path $TaskRoot $botHash) $groupHash))) {
             $acl = Get-Acl -LiteralPath $directory
-            $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($local.SID, 'Traverse', 'None', 'None', 'Allow')))
+            $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($local.SID, 'Traverse,ReadAttributes', 'None', 'None', 'Allow')))
             Set-Acl -LiteralPath $directory -AclObject $acl
         }
         $sharedTools = Join-Path $TaskRoot 'tools'

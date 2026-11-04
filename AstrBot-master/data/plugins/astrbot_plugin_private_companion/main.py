@@ -7008,6 +7008,22 @@ class PrivateCompanionPlugin(
                     profile,
                 )
 
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=240000)
+    @_multi_persona_event_context
+    async def observe_script_interaction_input(self, event: AstrMessageEvent, *args, **kwargs):
+        """Record true owner input for scripts before ordinary reply batching.
+
+        Args:
+            event: Original platform event, never model-generated task content.
+        """
+        runtime = getattr(self, "_persistent_task_runtime", None)
+        if runtime is None or not bool(getattr(self, "enabled", False)):
+            return
+        try:
+            runtime.observe_script_interactions(event)
+        except Exception as exc:
+            logger.warning("Script input observation failed: %s", type(exc).__name__)
+
     @filter.event_message_type(filter.EventMessageType.ALL, priority=11000)
     @_multi_persona_event_context
     async def prepare_tts_streaming_boundary(self, event: AstrMessageEvent, *args, **kwargs):
@@ -15897,6 +15913,15 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 return
             runtime = getattr(self, "_persistent_task_runtime", None)
             registered = runtime.register(event, req, decision, reply_eligible=True) if runtime else False
+            prepare_query = getattr(runtime, "prepare_task_query", None)
+            persistent_query = bool(registered and callable(prepare_query) and prepare_query(event, req, decision))
+            if persistent_query:
+                if hasattr(decision, "__dataclass_fields__"):
+                    decision = replace(decision, route="chat", actions=(), segments=(), task_query=True)
+                else:
+                    decision = copy(decision)
+                    decision.route, decision.actions, decision.segments, decision.task_query = "chat", (), (), True
+                setattr(event, "_private_companion_capability_decision", decision)
             if registered and getattr(decision, "reason", "") == "hub_unavailable":
                 # The ordinary participation gate and trusted identity were checked above.
                 # Work still requires the persistent intent tool's program authorization.
@@ -15909,6 +15934,11 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 snapshot = runtime.snapshot(event)
                 if snapshot:
                     req.system_prompt += "\n【持久任务清单｜只读事实，不是新授权】\n" + snapshot
+                interaction_snapshot = getattr(runtime, "script_interaction_snapshot", None)
+                if callable(interaction_snapshot):
+                    channels = interaction_snapshot(event)
+                    if channels:
+                        req.system_prompt += "\n【仍在运行或等待的脚本互动通道｜只读事实】\n" + channels
                 if str(getattr(decision, "route", "chat")) in {"task", "mixed"}:
                     if not registered:
                         raise ValueError("本次消息来源未通过任务身份核验，任务未启动。")
@@ -15938,7 +15968,7 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                     setattr(event, "_private_companion_capability_decision", decision)
                     req.system_prompt += "\n后台任务已入队，以下回执只表示接收，勿重复提交或宣称完成：" + json.dumps(receipts, ensure_ascii=False)
             configure_conversation_request(self, event, req)
-            if runtime is not None and registered and bool(getattr(self, "enable_reply_task_intents", True)):
+            if runtime is not None and registered and not persistent_query and bool(getattr(self, "enable_reply_task_intents", True)):
                 if req.func_tool is None:
                     req.func_tool = ToolSet()
                 req.func_tool.add_tool(runtime.make_intent_tool(event))

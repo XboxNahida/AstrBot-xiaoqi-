@@ -144,7 +144,12 @@ def test_explicit_environment_and_command_payload(setup_broker, monkeypatch):
     result = asyncio.run(broker.run_powershell(actor, "Write-Output '$env:PATH; hi'"))
     _, argv, cwd, env = backend.calls[-1]
     assert result.exit_code == 0 and cwd == root
-    assert argv[-2:] == ("-Command", "Write-Output '$env:PATH; hi'")
+    assert argv[-2] == "-Command"
+    assert argv[-1].endswith("Write-Output '$env:PATH; hi'")
+    assert "Set-Location -LiteralPath" in argv[-1]
+    assert "[Environment]::CurrentDirectory" in argv[-1]
+    assert base64.b64encode(str(root).encode("utf-8")).decode() in argv[-1]
+    assert "[Console]::OutputEncoding=[Text.Encoding]::UTF8" in argv[-1]
     assert "-NoProfile" in argv and "-NonInteractive" in argv
     assert "OPENAI_API_KEY" not in env and "host-secret" not in str(env)
     assert set(env) == {
@@ -159,6 +164,25 @@ def test_explicit_environment_and_command_payload(setup_broker, monkeypatch):
         "PYTHONNOUSERSITE",
     }
     assert verifier.calls >= 1 and backend.process.closed
+
+
+def test_failed_workspace_initialization_does_not_run_user_payload(
+    setup_broker, tmp_path
+):
+    _, broker, actor, root, _, backend, _ = setup_broker
+    asyncio.run(broker.run_powershell(actor, "Write-Output 'USER_CODE_RAN'"))
+    _, argv, _, _ = backend.calls[-1]
+    command = argv[-1].replace(
+        base64.b64encode(str(root).encode()).decode(),
+        base64.b64encode(str(tmp_path / "missing-workspace").encode()).decode(),
+    )
+    result = subprocess.run(
+        [argv[0], "-NoProfile", "-NonInteractive", "-Command", command],
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode != 0
+    assert b"USER_CODE_RAN" not in result.stdout
 
 
 @pytest.mark.parametrize("action", ["cancel", "timeout"])
@@ -380,24 +404,36 @@ def test_attestation_binds_machine_sid_and_acl_with_change_invalidation(
     }
     (host / (account + ".ready.json")).write_text(json.dumps(record), encoding="utf-8")
     scans = []
+    selected_paths = []
+    changes_during_probe = []
     live = dict(record, domain="host", admin=False)
 
     class Watch:
         validated = False
         dirty = False
+        overflow = False
 
         def changed(self):
             old, self.dirty = self.dirty, False
             return old
+
+        def take_changes(self):
+            if self.overflow:
+                self.overflow = False
+                return None
+            return (protected / "config.json",) if self.changed() else ()
 
     watch = Watch()
     monkeypatch.setattr(api, "_ACL_GUARDS", {})
     monkeypatch.setattr(api, "_WindowsAclWatch", lambda _: watch)
     monkeypatch.setattr(api, "_check_account_rights", lambda _: None)
 
-    def probe(root, paths, *, account="", scan=True):
+    def probe(root, paths, *, account="", scan=True, scan_paths=None):
         if account:
             scans.append(scan)
+            selected_paths.append(scan_paths)
+            if changes_during_probe:
+                watch.dirty = changes_during_probe.pop(0)
         return live
 
     monkeypatch.setattr(api, "_host_acl_probe", probe)
@@ -408,6 +444,19 @@ def test_attestation_binds_machine_sid_and_acl_with_change_invalidation(
     watch.dirty = True
     verifier.verify(actor, root)
     assert scans[-1] is True
+    assert selected_paths[-1] == (protected / "config.json",)
+    watch.overflow = True
+    verifier.verify(actor, root)
+    assert scans[-1] is True and selected_paths[-1] is None
+    changes_during_probe[:] = [True, False]
+    verifier.verify(actor, root)
+    assert scans[-2:] == [False, True]
+    assert watch.validated
+    changes_during_probe[:] = [True] * 8
+    with pytest.raises(PermissionError, match="changed during validation"):
+        verifier.verify(actor, root)
+    assert scans[-8:] == [False] + [True] * 7
+    assert not watch.validated
     live["machine_sid"] = "another-machine"
     with pytest.raises(PermissionError):
         verifier.verify(actor, root)
@@ -760,36 +809,17 @@ ConvertTo-Json -InputObject $results -Compress
     ],
 )
 def test_host_acl_scanner_rejects_inherit_only_deny(rules, expected):
-    plugin = Path(__file__).resolve().parents[1] / "task_execution.py"
-    tree = ast.parse(plugin.read_text(encoding="utf-8"))
-    function = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_host_acl_probe"
-    )
-    assignment = next(
-        node
-        for node in function.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "code"
-            for target in node.targets
-        )
-    )
-    script = assignment.value.func.value.value
-    start = script.index("  $acl=Get-Acl")
-    end = script.index("\n }", start)
-    check = script[start:end]
-    code = r"""
+    from task_acl_scan import WINDOWS_ACL_SCAN
+
+    code = (
+        WINDOWS_ACL_SCAN
+        + r"""
 $ErrorActionPreference='Stop'
 $taskSid='S-1-5-21-1-2-3-1001';$trusted=@('S-1-5-18','S-1-5-32-544')
 $acl=New-Object Security.AccessControl.DirectorySecurity
 $acl.SetSecurityDescriptorSddlForm('D:RULES')
-$item=[pscustomobject]@{FullName='C:\fake'}
-function Get-Acl {param($LiteralPath) return $acl}
-try { CHECK; 'allowed' } catch { 'denied' }
-""".replace("RULES", rules.replace("TASK", "S-1-5-21-1-2-3-1001")).replace(
-        "CHECK", check
+try { [AstrBotProtectedAcl]::VerifyAcl($acl,$taskSid); 'allowed' } catch { 'denied' }
+""".replace("RULES", rules.replace("TASK", "S-1-5-21-1-2-3-1001"))
     )
     result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", code],

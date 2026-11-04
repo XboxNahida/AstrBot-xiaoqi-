@@ -66,6 +66,21 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         runtime.register.assert_not_called()
         runtime.submit.assert_not_awaited()
 
+    async def test_existing_task_query_uses_original_chat_request_without_submission(self):
+        plugin, event, req, runtime = self.setup_route()
+        event.message_str = "查到了吗"
+        req.prompt = event.message_str
+        req.system_prompt = "原聊天人格和记忆"
+        runtime.prepare_task_query = MagicMock(return_value=True)
+        configure = await self.invoke(plugin, event, req)
+        runtime.submit.assert_not_awaited()
+        configure.assert_called_once()
+        self.assertEqual("chat", event._private_companion_capability_decision.route)
+        self.assertEqual((), event._private_companion_capability_decision.actions)
+        self.assertEqual("查到了吗", req.prompt)
+        self.assertIn("原聊天人格和记忆", req.system_prompt)
+        self.assertNotIn("pc_submit_task_intent", [t.name for t in (req.func_tool.tools if req.func_tool else [])])
+
     async def test_failed_persistence_does_not_run_old_task(self):
         plugin, event, req, runtime = self.setup_route()
         runtime.submit.return_value = {"accepted": False, "code": "permission_denied"}
