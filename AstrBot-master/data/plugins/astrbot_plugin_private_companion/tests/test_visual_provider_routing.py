@@ -433,9 +433,9 @@ class VisualProviderRoutingTests(unittest.IsolatedAsyncioTestCase):
         provider = SimpleNamespace(provider_config={"modalities": []})
         self.assertTrue(PrivateImageMixin._provider_supports_image(provider))
 
-    def test_configured_caption_route_wins_over_main_direct_image(self) -> None:
+    def test_native_image_route_wins_over_optional_caption(self) -> None:
         self.assertEqual(
-            "caption",
+            "direct",
             PrivateImageMixin._private_image_delivery_mode(
                 has_visual_provider=True,
                 main_provider_supports_image=True,

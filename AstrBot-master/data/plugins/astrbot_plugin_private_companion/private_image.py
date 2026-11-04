@@ -2170,7 +2170,7 @@ class PrivateImageMixin:
     def _provider_supports_image(provider: Any) -> bool:
         config = getattr(provider, "provider_config", None) or getattr(provider, "config", None) or {}
         modalities = config.get("modalities") if isinstance(config, dict) else None
-        if modalities == []:
+        if not modalities:
             # AstrBot treats an empty migrated list as unspecified/all modalities.
             return True
         return isinstance(modalities, list) and "image" in modalities
@@ -2182,16 +2182,23 @@ class PrivateImageMixin:
         main_provider_supports_image: bool,
         has_dynamic_gif: bool,
     ) -> str:
-        # A configured caption route is an explicit user choice and carries its
-        # own fallback chain. Only direct-attach when no caption route is usable.
+        # Native multimodal input keeps the image and text in the same request.
+        # GIF inputs are normalized to provider-compatible frames before dispatch.
+        if main_provider_supports_image:
+            return "direct"
         if has_visual_provider:
             return "caption"
-        if main_provider_supports_image and not has_dynamic_gif:
-            return "direct"
         return "no_vision"
 
     def _event_main_provider_supports_image(self, event: AstrMessageEvent) -> bool:
         provider = None
+        if bool(getattr(self, "enable_conversation_model_routing", False)):
+            identity = str(getattr(self, "conversation_chat_provider_id", "") or "")
+            getter = getattr(self.context, "get_provider_by_id", None)
+            if identity and callable(getter):
+                candidate = getter(identity)
+                if candidate is not None:
+                    return self._provider_supports_image(candidate)
         try:
             selected = _single_line(event.get_extra("selected_provider"), 160)
         except Exception:
@@ -3368,6 +3375,8 @@ class PrivateImageMixin:
         sender_id: str = "",
         text: str = "",
     ) -> asyncio.Task | None:
+        if getattr(event, "_private_companion_native_multimodal", False):
+            return None
         if not bool(getattr(self, "enable_group_image_understanding", False)):
             return None
         if bool(getattr(self, "_central_hub_scheduler_enabled", False)):
@@ -3664,6 +3673,8 @@ class PrivateImageMixin:
         event: AstrMessageEvent,
         req: ProviderRequest,
     ) -> bool:
+        if getattr(event, "_private_companion_native_multimodal", False):
+            return False
         summary = await self._await_group_image_understanding_for_request(event)
         if not summary:
             return False
@@ -4973,6 +4984,8 @@ class PrivateImageMixin:
         self, event: AstrMessageEvent
     ) -> str:
         """在主 Provider 创建前提供本轮图片转述，供关键词路由插件匹配。"""
+        if getattr(event, "_private_companion_native_multimodal", False):
+            return ""
         existing_fields = (
             "private_companion_image_caption_route_text",
             "private_companion_delayed_image_vision_text",
@@ -5495,7 +5508,7 @@ class PrivateImageMixin:
             umo = str(getattr(event, "unified_msg_origin", "") or "")
             framework_context = self._private_image_framework_context()
             framework_event = event
-            if umo and framework_context is not None:
+            if umo and framework_context is not None and not getattr(event, "_private_companion_native_multimodal", False):
                 try:
                     from astrbot.core.platform.message_session import MessageSession
                     from .proactive_message import SyntheticPrivateWakeEvent

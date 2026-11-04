@@ -45,19 +45,20 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
             await handler(plugin, event, req)
         return configure
 
-    async def test_task_goes_to_service_without_running_old_request(self):
+    async def test_hub_task_classification_goes_to_gemini_without_auto_submission(self):
         plugin, event, req, runtime = self.setup_route()
         configure = await self.invoke(plugin, event, req)
-        runtime.submit.assert_awaited_once()
-        event.stop_event.assert_called_once()
-        configure.assert_not_called()
+        runtime.submit.assert_not_awaited()
+        event.stop_event.assert_not_called()
+        configure.assert_called_once()
+        self.assertIn("pc_submit_task_intent", [tool.name for tool in req.func_tool.tools])
         self.assertNotIn("_private_companion_task_id", vars(event))
 
-    async def test_task_handoff_releases_only_current_pending_debounce(self):
+    async def test_gemini_turn_keeps_pending_debounce_until_chat_finishes(self):
         plugin, event, req, runtime = self.setup_route()
         plugin.settle_pending_message_debounce = AsyncMock()
         await self.invoke(plugin, event, req)
-        plugin.settle_pending_message_debounce.assert_awaited_once_with(event, None)
+        plugin.settle_pending_message_debounce.assert_not_awaited()
 
     async def test_chat_keeps_single_supplemental_tool_and_snapshot(self):
         plugin, event, req, runtime = self.setup_route("chat")
@@ -87,6 +88,15 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(file_tool, req.func_tool.tools)
         self.assertIn("pc_task_send_files", req.system_prompt)
         self.assertIn("ZIP", req.system_prompt)
+        runtime.submit.assert_not_awaited()
+
+    async def test_optional_vision_tool_is_exposed_without_prefetching_or_a_task(self):
+        plugin, event, req, runtime = self.setup_route("task")
+        tool = FunctionTool(name="pc_inspect_images", description="按需识图", parameters={"type": "object"})
+        runtime.make_vision_tool = MagicMock(return_value=tool)
+        await self.invoke(plugin, event, req)
+        self.assertIn(tool, req.func_tool.tools)
+        self.assertIn("按需", req.system_prompt)
         runtime.submit.assert_not_awaited()
 
     async def test_existing_task_management_stays_with_gemini_without_background_query(self):
@@ -142,17 +152,18 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((), event._private_companion_capability_decision.actions)
         self.assertEqual("查到了吗", req.prompt)
         self.assertIn("原聊天人格和记忆", req.system_prompt)
-        self.assertNotIn("pc_submit_task_intent", [t.name for t in (req.func_tool.tools if req.func_tool else [])])
+        self.assertIn("pc_submit_task_intent", [t.name for t in (req.func_tool.tools if req.func_tool else [])])
         self.assertIn("pc_read_background", [t.name for t in req.func_tool.tools])
 
-    async def test_failed_persistence_does_not_run_old_task(self):
+    async def test_hub_does_not_attempt_persistence_before_gemini_decides(self):
         plugin, event, req, runtime = self.setup_route()
         runtime.submit.return_value = {"accepted": False, "code": "permission_denied"}
         event.send = AsyncMock()
         event.plain_result = lambda value: value
         configure = await self.invoke(plugin, event, req)
-        configure.assert_not_called()
-        event.stop_event.assert_called_once()
+        configure.assert_called_once()
+        runtime.submit.assert_not_awaited()
+        event.stop_event.assert_not_called()
 
     async def test_tool_schema_failure_is_not_reported_as_model_configuration(self):
         plugin, event, req, runtime = self.setup_route()
@@ -171,15 +182,14 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("invalid required", str(warning.call_args))
         self.assertNotIn("topsecret", str(warning.call_args))
 
-    async def test_mixed_keeps_chat_and_separate_stable_task_fragments(self):
+    async def test_mixed_keeps_entire_original_message_for_gemini(self):
         plugin, event, req, runtime = self.setup_route("mixed")
         event._private_companion_capability_decision.segments = (
             ("chat", "今天辛苦了"), ("task", "查询公告"), ("task", "写分析"),
         )
         configure = await self.invoke(plugin, event, req)
-        self.assertEqual(2, runtime.submit.await_count)
-        self.assertEqual(["main", "task:1"], [call.args[1]["fragment_key"] for call in runtime.submit.await_args_list])
+        runtime.submit.assert_not_awaited()
         event.stop_event.assert_not_called()
         configure.assert_called_once()
         self.assertEqual("chat", event._private_companion_capability_decision.route)
-        self.assertIn("今天辛苦了", req.prompt)
+        self.assertEqual(event.message_str, req.prompt)

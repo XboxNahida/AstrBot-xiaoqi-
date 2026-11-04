@@ -2065,6 +2065,7 @@ async def inject_humanized_state(
     )
     if (
         buffered_images
+        and not getattr(event, "_private_companion_native_multimodal", False)
         and not buffered_image_vision
         and buffered_image_mode != "no_vision"
         and (
@@ -2371,6 +2372,17 @@ async def inject_humanized_state(
         )
     ):
         reply_image_sources = await self._find_reply_image_sources_for_event(event)
+        if reply_image_sources and getattr(event, "_private_companion_native_multimodal", False):
+            existing = list(getattr(req, "image_urls", ()) or ())
+            for reference in self._private_image_sources_for_astrbot_request(reply_image_sources):
+                if reference not in existing:
+                    existing.append(reference)
+            req.image_urls = existing
+            prompt_surface.add(
+                "image.reply.native", "【本轮引用图片】本次附图来自用户明确引用的消息，请结合本轮问题读取原图。",
+                priority=55, source="private_image",
+            )
+            reply_image_sources = []
         if reply_image_sources:
             reply_image_limit = self._private_image_vision_text_limit(
                 len(reply_image_sources)

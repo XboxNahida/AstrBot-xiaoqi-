@@ -14,8 +14,10 @@ import jsonschema
 from astrbot.core.agent.tool import ToolSet
 
 try:
+    from .task_multimodal import materialize_images
     from .task_service import TaskFailure, TaskJob, TaskService
 except ImportError:
+    from task_multimodal import materialize_images
     from task_service import TaskFailure, TaskJob, TaskService
 
 
@@ -155,8 +157,17 @@ class TaskAgentExecutor:
             checkpoint.get("contexts", request.get("contexts", []))
         )
         if not checkpoint and request.get("prompt", job.goal):
+            current = request.get("current_input", {})
+            content = request.get("prompt", job.goal)
+            if isinstance(current, dict) and current.get("content"):
+                content = [
+                    {"type": "text", "text": "本次后台任务目标：" + job.goal
+                     + "\n以下是同一来源消息的原始文字及附件，旧聊天仅用于理解追问，不替代本轮材料。"
+                     + "如果图片被提供器移除、显示为占位或无法读取，可调用pc_inspect_images核对；不要凭旧图或旧题猜测本轮画面。"},
+                    *copy.deepcopy(current["content"]),
+                ]
             contexts.append(
-                {"role": "user", "content": request.get("prompt", job.goal)}
+                {"role": "user", "content": content}
             )
             contexts = self._bounded(contexts)
         system_prompt = request.get("system_prompt", "")
@@ -264,10 +275,12 @@ class TaskAgentExecutor:
                 reserved = False
                 try:
                     provider = await self._resolve(self.resolve_provider, provider_id)
+                    modalities = getattr(provider, "provider_config", {}).get("modalities")
+                    outgoing = materialize_images(contexts, request, supports_image=not modalities or "image" in modalities)
                     response = await provider.text_chat(
-                        prompt="",
+                        prompt=None,
                         system_prompt=system_prompt,
-                        contexts=copy.deepcopy(contexts),
+                        contexts=outgoing,
                         func_tool=toolset,
                         tool_choice="auto",
                         request_max_retries=0,

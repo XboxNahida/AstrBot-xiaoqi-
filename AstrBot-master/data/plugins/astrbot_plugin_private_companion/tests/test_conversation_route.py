@@ -92,7 +92,7 @@ class ConversationRouteTests(unittest.TestCase):
         self.assertEqual("gpt", req.provider_id)
         self.assertIn(schedule_tool, req.func_tool.tools)
         self.assertEqual("task", self.event._private_companion_conversation_route)
-        self.assertEqual(("future_task",), req.required_tool_names)
+        self.assertEqual((), req.required_tool_names)
 
     def test_task_accepts_user_selected_non_gpt_provider(self):
         self.plugin.conversation_task_provider_id = "kimi"
@@ -659,7 +659,7 @@ class ConversationHookTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(timer, 1)
             progress.assert_awaited_once_with("plugin", "event")
 
-    async def test_request_hook_sends_ack_and_schedules_progress_for_task(self):
+    async def test_request_hook_keeps_task_classification_in_gemini_without_legacy_ack(self):
         from astrbot_plugin_private_companion.conversation_task_state import ConversationTaskStateStore
         from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
 
@@ -688,9 +688,9 @@ class ConversationHookTests(unittest.IsolatedAsyncioTestCase):
         try:
             req = ProviderRequest(prompt=event.message_str)
             await PrivateCompanionPlugin.route_conversation_models.__wrapped__(plugin, event, req)
-            self.assertEqual("task-model", req.provider_id)
-            event.send.assert_awaited_once_with("我先处理，等下回来。")
-            self.assertEqual(1, len(pending))
+            self.assertEqual("gemini", req.provider_id)
+            event.send.assert_not_awaited()
+            self.assertEqual(0, len(pending))
             task.text_chat.assert_not_awaited()
             event.stop_event.assert_not_called()
         finally:

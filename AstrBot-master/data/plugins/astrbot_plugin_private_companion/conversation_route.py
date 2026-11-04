@@ -398,6 +398,25 @@ def record_task_tool_event(plugin: Any, event: Any, tool: Any, result: Any = Non
         store.save_task(state)
 
 
+def prepare_native_chat_entry(plugin: Any, event: Any) -> None:
+    """Select the configured chat model before the framework reads attachments.
+
+    Args:
+        plugin: Active persona-scoped companion configuration.
+        event: Original input event; this selection never grants task permission.
+    """
+    if not (getattr(plugin, "enabled", False) and getattr(plugin, "enable_conversation_model_routing", False)):
+        return
+    identity = str(getattr(plugin, "conversation_chat_provider_id", "") or "")
+    provider = plugin.context.get_provider_by_id(identity) if identity else None
+    if not isinstance(provider, Provider) or provider.provider_config.get("enable") is False:
+        return
+    event.set_extra("selected_provider", identity)
+    event.set_extra("selected_model", None)
+    modalities = provider.provider_config.get("modalities")
+    event._private_companion_native_multimodal = not modalities or isinstance(modalities, list) and "image" in modalities
+
+
 def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
     """Apply the hub's route using configured provider IDs only.
 
@@ -456,9 +475,7 @@ def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
             ids.append(identity)
     req.model = None
     req.disable_streaming = True
-    req.required_tool_names = (
-        ("future_task",) if "schedule" in decision.actions else ()
-    )
+    req.required_tool_names = ()
     setattr(event, "_private_companion_chat_provider_ids", ids)
     setattr(event, "_private_companion_conversation_route", route)
     setattr(

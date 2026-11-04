@@ -133,6 +133,50 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, len(self.permissions))
         self.assertEqual(1, self.service.get(job.task_id, job.scope).attempts)
 
+    async def test_current_multimodal_question_survives_tools_and_resume(self):
+        key = "pc-task-image://current"
+        image = "data:image/png;base64,c3ludGhldGlj"
+        job = self.submit(
+            current_input={"message_id": "new", "content": [
+                {"type": "text", "text": "本轮H(z)，不是FFT"},
+                {"type": "image_url", "image_url": {"url": key}},
+            ]},
+            media={key: image},
+            contexts=[{"role": "user", "content": "上一题FFT"}],
+        )
+        self.primary = Provider(Response(calls=[("read", {"path": "x"})]), RuntimeError("interrupted"))
+        saved = await self.run_failure(self.executor(), job, "provider_unavailable")
+        first = self.primary.requests[0]["contexts"][-1]["content"]
+        self.assertIsInstance(first, list)
+        self.assertIn("本轮H(z)", str(first))
+        self.assertIn(image, str(first))
+        self.assertIn(key, str(saved.steps))
+        self.assertNotIn(image, str(saved.steps))
+        self.now += 1000
+        resumed = self.service.claim("resume")
+        self.fallback = Provider(Response("done"))
+        result = await self.executor().execute(resumed)
+        self.assertEqual("done", result["text"])
+        self.assertIn(image, str(self.fallback.requests[0]["contexts"]))
+        self.assertEqual(1, len(self.executions))
+
+    async def test_text_only_task_provider_receives_image_notice_and_can_inspect(self):
+        name = "pc_inspect_images"
+        self.tools[name] = SimpleNamespace(name=name)
+        job = self.submit(tool_names=[name], required_tool_names=[name],
+            current_input={"message_id": "new", "content": [
+                {"type": "text", "text": "本轮新题"},
+                {"type": "image_url", "image_url": {"url": "pc-task-image://new"}},
+            ]}, media={"pc-task-image://new": "data:image/png;base64,YQ=="})
+        self.primary = Provider(Response(calls=[(name, {"question": "核对本轮题干"})]), Response("done"))
+        self.primary.provider_config = {"modalities": ["text", "tool_use"]}
+        result = await self.executor().execute(job)
+        sent = self.primary.requests[0]["contexts"][-1]["content"]
+        self.assertNotIn("image_url", str(sent))
+        self.assertIn("pc_inspect_images", str(sent))
+        self.assertIn("本轮新题", str(sent))
+        self.assertEqual([name], result["successful_tool_names"])
+
     async def test_readonly_workspace_path_failure_can_be_corrected_without_fake_receipt(self):
         name = "pc_task_workspace"
         self.tools = {name: SimpleNamespace(name=name)}

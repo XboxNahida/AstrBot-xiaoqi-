@@ -654,16 +654,35 @@ class TaskService:
             )
             return True
 
-    def revise_goal(self, task_id: str, scope: TaskScope, goal: str) -> bool:
+    def revise_goal(self, task_id: str, scope: TaskScope, goal: str, *, input_metadata=None) -> bool:
         """Revise one safely idle task without reopening or erasing evidence."""
         if not isinstance(goal, str) or not goal.strip() or len(goal) > 4000:
             raise ValueError("A revised goal of at most 4000 characters is required")
         with self._transaction() as db:
+            row = db.execute(
+                "SELECT metadata FROM pt_tasks WHERE task_id=? AND bot_id=? AND session_key=? AND sender_id=?",
+                (task_id, scope.bot_id, scope.session_key, scope.sender_id),
+            ).fetchone()
+            if row is None:
+                return False
+            metadata = json.loads(row["metadata"])
+            incoming = (input_metadata or {}).get("request", {})
+            if incoming.get("current_input"):
+                saved = metadata.setdefault("request", {})
+                contexts = list(saved.get("contexts", ()))
+                previous = saved.get("current_input", {})
+                if previous.get("content"):
+                    contexts.append({"role": "user", "content": previous["content"]})
+                saved.update(
+                    contexts=contexts,
+                    current_input=incoming["current_input"],
+                    media={**saved.get("media", {}), **incoming.get("media", {})},
+                )
             changed = db.execute(
-                "UPDATE pt_tasks SET goal=?,revision=revision+1 WHERE task_id=? AND bot_id=? "
+                "UPDATE pt_tasks SET goal=?,metadata=?,revision=revision+1 WHERE task_id=? AND bot_id=? "
                 "AND session_key=? AND sender_id=? AND status IN ('queued','paused') "
                 "AND NOT EXISTS(SELECT 1 FROM pt_steps WHERE pt_steps.task_id=pt_tasks.task_id)",
-                (goal, task_id, scope.bot_id, scope.session_key, scope.sender_id),
+                (goal, json.dumps(metadata, ensure_ascii=False), task_id, scope.bot_id, scope.session_key, scope.sender_id),
             ).rowcount
             if not changed:
                 return False

@@ -252,10 +252,13 @@ class TaskIntentAdapter:
                 "task_id": task.task_id,
                 "status": task.status,
             }
-        changed = (
-            self.service.revise_goal(task_id, scope, intent.goal)
-            if action == "revise" else getattr(self.service, action)(task_id, scope)
-        )
+        if action == "revise":
+            supplied = self.metadata_factory(request) if self.metadata_factory else None
+            if inspect.isawaitable(supplied):
+                supplied = await supplied
+            changed = self.service.revise_goal(task_id, scope, intent.goal, input_metadata=supplied)
+        else:
+            changed = getattr(self.service, action)(task_id, scope)
         current = self.service.get(task_id, scope)
         return {
             **receipt,

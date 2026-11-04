@@ -454,6 +454,12 @@ class NativeVisionCaptionCacheTests(unittest.IsolatedAsyncioTestCase):
             [(images, captions) for images, captions, _ in original_requests],
             [([], ["generated caption"]), ([], ["generated caption"])],
         )
+        event._private_companion_native_multimodal = True
+        native_req = SimpleNamespace(conversation=object(), image_urls=["current-original.png"], extra_user_content_parts=[])
+        await ama._decorate_llm_request(event, native_req, context, config, provider)
+        self.assertEqual(native_req.image_urls, ["current-original.png"])
+        self.assertEqual(native_req.extra_user_content_parts, [])
+        self.assertEqual(len(provider.calls), 1)
 
 
 if __name__ == "__main__":

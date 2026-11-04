@@ -167,6 +167,7 @@ class ImageCaptionCachePatcher:
                 and req.image_urls
                 and image_caption_provider_id
                 and provider_supports_image
+                and not getattr(event, "_private_companion_native_multimodal", False)
             ):
                 self._logger.debug(
                     "Main provider supports image input; forcing cached image "

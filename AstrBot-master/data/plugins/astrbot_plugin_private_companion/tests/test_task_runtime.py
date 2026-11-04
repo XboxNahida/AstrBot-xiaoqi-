@@ -94,6 +94,164 @@ def register(rt, e, **kwargs):
 
 
 @pytest.mark.asyncio
+async def test_repeated_submission_reuses_frozen_image_after_source_is_removed(runtime, tmp_path):
+    from PIL import Image as PILImage
+
+    e = event()
+    path = tmp_path / "source.png"
+    PILImage.new("RGB", (4, 4)).save(path)
+    runtime.test_request.image_urls = [str(path)]
+    register(runtime, e)
+    first = await runtime.submit(e, {"goal": "解本轮图片题"})
+    path.unlink()
+    second = await runtime.submit(e, {"goal": "解本轮图片题"})
+    assert second["task_id"] == first["task_id"] and not second["created"]
+
+
+@pytest.mark.asyncio
+async def test_parallel_submissions_do_not_mix_temporary_request_modes(runtime, monkeypatch):
+    import astrbot_plugin_private_companion.task_runtime as module
+
+    e = event()
+    register(runtime, e)
+    captured = copy.deepcopy(runtime._events[e])
+    actual = module.freeze_images
+
+    async def slow_freeze(request):
+        await asyncio.sleep(0.01)
+        await actual(request)
+
+    monkeypatch.setattr(module, "freeze_images", slow_freeze)
+    receipts = await asyncio.gather(
+        runtime.submit(e, {"goal": "分析", "mode": "reasoning", "fragment_key": "analysis"}),
+        runtime.submit(e, {"goal": "执行", "mode": "tools", "fragment_key": "execute"}),
+    )
+    jobs = [runtime.service.get(r["task_id"], runtime.scope(e)) for r in receipts]
+    assert [j.metadata["request"]["mode"] for j in jobs] == ["reasoning", "tools"]
+    assert runtime._events[e] == captured
+
+
+def test_hub_schedule_hint_does_not_force_tools_for_unified_chat(runtime):
+    runtime._registry = lambda *_: {"future_task": FutureTaskTool()}
+    e = event(mid="retained")
+    runtime.register(e, runtime.test_request,
+                     SimpleNamespace(route="chat", actions=("schedule",), reply=True), reply_eligible=True)
+    request = runtime._events[e]["request"]
+    assert request["required_tool_names"] == []
+    assert not request.get("required_tool_groups")
+
+
+@pytest.mark.asyncio
+async def test_reply_submission_has_no_duplicate_background_ack(runtime):
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    assert runtime._notification_current(SimpleNamespace(
+        task_id=receipt["task_id"], scope=runtime.scope(e), kind="accepted")) is None
+
+
+@pytest.mark.asyncio
+async def test_idle_task_revision_keeps_new_image_and_original_material(runtime, tmp_path):
+    from PIL import Image as PILImage
+
+    e = event(mid="first")
+    runtime.test_request.prompt = "原任务要求"
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "解题"})
+    path = tmp_path / "revision.png"
+    PILImage.new("RGB", (4, 4), "blue").save(path)
+    followup = event(mid="followup")
+    runtime.test_request.prompt = "补充条件见新图"
+    runtime.test_request.image_urls = [str(path)]
+    register(runtime, followup)
+    changed = await runtime.submit(followup, {"action": "revise", "task_id": receipt["task_id"], "goal": "结合补充条件解题"})
+    assert changed["accepted"]
+    saved = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    request = saved.metadata["request"]
+    assert request["current_input"]["message_id"] == "followup"
+    assert "pc-task-image://" in str(request["current_input"])
+    assert "原任务要求" in str(request["contexts"])
+    assert request["media"]
+
+
+@pytest.mark.asyncio
+async def test_task_submission_freezes_current_question_instead_of_only_old_context(runtime, tmp_path):
+    from PIL import Image as PILImage
+
+    from astrbot_plugin_private_companion.task_multimodal import materialize_images
+
+    e = event()
+    e.message_str = "这道题怎么做"
+    path = tmp_path / "current.png"
+    PILImage.new("RGB", (6, 6)).save(path)
+    runtime.test_request.prompt = e.message_str
+    runtime.test_request.contexts = [{"role": "user", "content": "上一题FFT"}]
+    runtime.test_request.extra_user_content_parts = [TextPart(text="本轮H(z)题干")]
+    runtime.test_request.image_urls = [str(path)]
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "详细推导本轮传递函数", "mode": "reasoning"})
+    assert receipt["accepted"]
+    path.unlink()
+    saved = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    request = saved.metadata["request"]
+    current = request["current_input"]
+    assert current["message_id"] == e.message_obj.message_id
+    outgoing = materialize_images([{"role": "user", "content": current["content"]}], request)
+    assert "本轮H(z)题干" in str(outgoing)
+    assert "data:image/png;base64," in str(outgoing)
+    assert request["contexts"][0]["content"] == "上一题FFT"
+    assert saved.goal == "详细推导本轮传递函数"
+    restored = runtime.restore_event(saved)
+    assert any(str(getattr(part, "file", "")).startswith("base64://") for part in restored.message_obj.message)
+    assert runtime._events[e]["request"]["current_input"]["content"][-1]["image_url"]["url"] == str(path)
+
+
+@pytest.mark.asyncio
+async def test_independent_vision_tool_is_lazy_scoped_and_uses_current_image(runtime):
+    e = event()
+    runtime.test_request.image_urls = ["current-image.png"]
+    runtime.plugin._transcribe_private_inbound_images = AsyncMock(return_value="本轮系数为3/4")
+    register(runtime, e)
+    assert hasattr(runtime, "make_vision_tool"), "缺少按需识图工具"
+    runtime.plugin._transcribe_private_inbound_images.assert_not_awaited()
+    tool = runtime.make_vision_tool(e)
+    result = json.loads(await tool.call(None, question="只核对分母系数"))
+    assert result["success"] and result["text"] == "本轮系数为3/4"
+    call = runtime.plugin._transcribe_private_inbound_images.await_args
+    assert call.args[0] == ["current-image.png"]
+    assert call.kwargs["user_text"] == "只核对分母系数"
+    e.message_obj.sender.user_id = "changed"
+    assert json.loads(await tool.call(None, question="再看"))["code"] == "untrusted_event"
+    assert runtime.plugin._transcribe_private_inbound_images.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_backend_vision_tool_reads_durable_task_images_not_arbitrary_paths(runtime, tmp_path):
+    from PIL import Image as PILImage
+
+    from astrbot.core.agent.run_context import ContextWrapper
+
+    path = tmp_path / "task.png"
+    PILImage.new("RGB", (8, 8)).save(path)
+    e = event()
+    runtime.test_request.image_urls = [str(path)]
+    runtime.plugin._transcribe_private_inbound_images = AsyncMock(return_value="H(z)")
+    register(runtime, e)
+    accepted = await runtime.submit(e, {"goal": "核对图片"})
+    job = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    path.unlink()
+    tools = runtime.resolve_tools(job, None)
+    assert "pc_inspect_images" in tools
+    context = ContextWrapper(context=SimpleNamespace(event=runtime.restore_event(job)))
+    tool = tools["pc_inspect_images"]
+    result = json.loads(await tool.call(context, question="核对"))
+    assert result["success"]
+    assert runtime.plugin._transcribe_private_inbound_images.await_args.args[0][0].startswith("data:image/png;base64,")
+    invalid = json.loads(await tool.call(context, question="读取", paths=["other-user.png"]))
+    assert invalid["code"] == "invalid_arguments"
+
+
+@pytest.mark.asyncio
 async def test_file_tool_is_available_to_backend_and_trusted_chat_without_shell(runtime):
     e = event()
     register(runtime, e)
@@ -1165,7 +1323,7 @@ async def test_member_requires_whole_task_grant_and_revocation(runtime):
 async def test_outbox_generation_rechecks_state_and_send_false_is_unknown(runtime):
     e = event()
     register(runtime, e)
-    await runtime.submit(e, {"goal": "查版本"})
+    await runtime.submit(e, {"goal": "查版本"}, source="hub")
     job = runtime.service.claim("test")
     runtime.service.progress(job, "working")
     await runtime.send_once()
@@ -1577,7 +1735,7 @@ async def test_only_sent_notifications_are_remembered_in_the_original_chat(
     e = event()
     runtime.test_request.conversation = SimpleNamespace(cid="original")
     register(runtime, e)
-    await runtime.submit(e, {"goal": "查公告"})
+    await runtime.submit(e, {"goal": "查公告"}, source="hub")
     manager = SimpleNamespace(
         get_curr_conversation_id=AsyncMock(
             return_value="new-chat" if switched else "original"
@@ -1601,7 +1759,7 @@ async def test_sent_history_failure_never_requeues_already_delivered_notice(runt
     e = event()
     runtime.test_request.conversation = SimpleNamespace(cid="original")
     register(runtime, e)
-    await runtime.submit(e, {"goal": "查公告"})
+    await runtime.submit(e, {"goal": "查公告"}, source="hub")
     runtime.plugin.context.conversation_manager = SimpleNamespace(
         get_curr_conversation_id=AsyncMock(return_value="original"),
         get_conversation=AsyncMock(return_value=SimpleNamespace(history="[]")),
@@ -1649,7 +1807,7 @@ async def test_all_task_notifications_strip_controls_but_preserve_literal_code(
 async def test_send_boundary_also_cleans_non_model_notification(runtime):
     e = event()
     register(runtime, e)
-    await runtime.submit(e, {"goal": "查公告"})
+    await runtime.submit(e, {"goal": "查公告"}, source="hub")
     runtime.render_notification = AsyncMock(return_value="行，我看看。 &&reply&&")
     await runtime.send_once()
     sent = runtime.plugin.context.send_message.await_args.args[1].chain[0].text
