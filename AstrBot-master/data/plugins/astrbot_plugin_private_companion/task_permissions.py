@@ -77,8 +77,10 @@ class TaskPermissionStore:
         *,
         allowed_roots: Iterable[str | Path] = (),
         allowed_capabilities: Iterable[str] = (),
+        whole_task_grants: bool = False,
     ) -> None:
         self.db_path = Path(db_path).resolve()
+        self.whole_task_grants = bool(whole_task_grants)
         self.allowed_capabilities = frozenset(allowed_capabilities)
         if "bot_admin" in self.allowed_capabilities or any(
             not isinstance(value, str) or not value.strip()
@@ -287,7 +289,7 @@ class TaskPermissionStore:
             return any(
                 grant.revoked_at is None
                 and (grant.expires_at is None or now < grant.expires_at)
-                and capability in grant.capabilities
+                and (self.whole_task_grants and bool(grant.capabilities) or capability in grant.capabilities)
                 and any(resolved.is_relative_to(root) for root in grant.roots)
                 for grant in self.list(actor)
             )

@@ -29,7 +29,7 @@ from astrbot.core.agent.message import ImageURLPart, TextPart, ThinkPart
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 from astrbot.core.agent.tool_image_cache import tool_image_cache
 from astrbot.core.exceptions import EmptyModelOutputError
-from astrbot.core.message.components import Json
+from astrbot.core.message.components import Json, Plain
 from astrbot.core.message.message_event_result import (
     MessageChain,
 )
@@ -41,6 +41,7 @@ from astrbot.core.provider.entities import (
     ProviderRequest,
     ToolCallsResult,
 )
+from astrbot.core.provider.error_response import looks_like_upstream_llm_error_response
 from astrbot.core.provider.modalities import (
     log_context_sanitize_stats,
     sanitize_contexts_by_modalities,
@@ -654,6 +655,29 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                                     continue
 
                                 if (
+                                    not has_stream_output
+                                    and resp.role == "assistant"
+                                    and not resp.tools_call_name
+                                    and not any(
+                                        not isinstance(component, Plain)
+                                        for component in getattr(resp.result_chain, "chain", []) or []
+                                    )
+                                    and looks_like_upstream_llm_error_response(
+                                        resp.completion_text, require_error_envelope=True
+                                    )
+                                ):
+                                    # Retry only the model request; tools and visible output are never replayed.
+                                    resp = LLMResponse(
+                                        role="err",
+                                        completion_text="Provider returned an upstream failure response.",
+                                        id=resp.id,
+                                        usage=resp.usage,
+                                    )
+                                    if is_last_candidate:
+                                        last_err_response = resp
+                                        raise EmptyModelOutputError(resp.completion_text)
+
+                                if (
                                     resp.role == "err" and not has_stream_output
                                 ):
                                     last_err_response = resp
@@ -722,6 +746,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             completion_text=self._all_chat_models_failed_message(
                 detail, is_task=self._is_task_request
             ),
+            id=last_err_response.id if last_err_response else None,
+            usage=last_err_response.usage if last_err_response else None,
         )
 
     def _sanitize_contexts_for_provider(

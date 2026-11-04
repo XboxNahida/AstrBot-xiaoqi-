@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import json
 import sqlite3
@@ -232,6 +233,218 @@ async def test_real_context_and_function_tool_executor(runtime):
 
 
 @pytest.mark.asyncio
+async def test_explicit_tool_error_preserves_redacted_body_for_model(
+    runtime, monkeypatch
+):
+    from astrbot_plugin_private_companion import task_runtime as module
+
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "检查排程"})
+    job = runtime.service.claim("error-feedback")
+    monkeypatch.setattr(module, "AstrAgentContext", lambda **kw: SimpleNamespace(**kw))
+
+    async def failed(tool, context, **args):
+        yield SimpleNamespace(
+            isError=True,
+            content=[
+                SimpleNamespace(
+                    type="text",
+                    text='{"code":"script_starts_after_channel_expiry","api_key":"never-leak-secret"}',
+                )
+            ],
+        )
+
+    monkeypatch.setattr(module.FunctionToolExecutor, "execute", failed)
+    outcome = await runtime.execute_tool(job, runtime.test_tools[0], {})
+    assert outcome["status"] == "error"
+    assert "script_starts_after_channel_expiry" in outcome["content"]
+    assert "never-leak-secret" not in outcome["content"]
+
+
+@pytest.mark.asyncio
+async def test_task_tools_follow_current_authority_not_saved_names(runtime):
+    e = event()
+    register(runtime, e)
+    accepted = await runtime.submit(e, {"goal": "按当前工具继续"})
+    job = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    newer = FunctionTool(
+        name="web_search_brave",
+        description="current search",
+        parameters={"type": "object"},
+    )
+    runtime.test_tools.append(newer)
+    runtime.plugin.context.get_config = lambda **_: {
+        "provider_settings": {"web_search": True, "websearch_provider": "brave"}
+    }
+    assert runtime.resolve_tools(job, ["web_search_brave"])["web_search_brave"] is newer
+
+
+@pytest.mark.asyncio
+async def test_semantic_reasoning_preference_does_not_remove_authorized_tools(runtime):
+    e = event()
+    decision = SimpleNamespace(
+        route="task", actions=(), reply=True, task_mode="reasoning"
+    )
+    runtime.register(e, runtime.test_request, decision, reply_eligible=True)
+    accepted = await runtime.submit(
+        e, {"goal": "先分析，需要时核对资料", "mode": "reasoning"}
+    )
+    assert accepted["accepted"]
+    job = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    assert "web_search_tavily" in job.metadata["request"]["tool_names"]
+    assert "web_search_tavily" in runtime.resolve_tools(job, ["web_search_tavily"])
+
+
+@pytest.mark.asyncio
+async def test_script_failure_submits_one_scoped_recovery_without_replay(runtime):
+    e = event()
+    register(runtime, e)
+    accepted = await runtime.submit(e, {"goal": "按约定执行互动"})
+    original = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    channel = runtime.interaction_api.channels.open(
+        original.scope, "existing", original.metadata
+    )
+    callback = {
+        "event_id": "script:existing:failed",
+        "script_id": "existing",
+        "status": "failed",
+        "channel_id": channel["id"],
+        "channel": channel,
+        "receipt": {
+            "error_code": "process_failed",
+            "stderr": "api_key=never-leak-secret",
+        },
+    }
+    assert await runtime.handle_script_event(callback)
+    assert await runtime.handle_script_event(callback)
+    jobs = runtime.service.list(original.scope)
+    assert len(jobs) == 2
+    recovery = next(job for job in jobs if job.task_id != original.task_id)
+    assert recovery.metadata["script_recovery"] is True
+    assert recovery.metadata["script_channel_id"] == channel["id"]
+    assert "never-leak-secret" not in json.dumps(recovery.metadata)
+    assert "script_tool_call" not in recovery.metadata
+    assert "existing" in recovery.goal
+    assert original.metadata["original_text"] in recovery.goal
+    assert "not automatically rerun" in recovery.metadata["request"]["system_prompt"]
+    assert (
+        runtime._notification_current(
+            SimpleNamespace(
+                task_id=recovery.task_id, scope=recovery.scope, kind="accepted"
+            )
+        )
+        is None
+    )
+    assert runtime.authorize_job(recovery)
+    runtime.plugin._is_private_companion_owner_user_id = lambda _: False
+    assert not runtime.authorize_job(recovery)
+    runtime.plugin.context.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_large_escaped_script_receipt_still_recovers_and_close_revokes(runtime):
+    e = event()
+    register(runtime, e)
+    accepted = await runtime.submit(e, {"goal": "互动"})
+    original = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    channel = runtime.interaction_api.channels.open(
+        original.scope, "large", original.metadata
+    )
+    callback = {
+        "event_id": "script:large:failed",
+        "script_id": "large",
+        "status": "failed",
+        "channel_id": channel["id"],
+        "channel": channel,
+        "receipt": {"stdout": '"' * 12000, "stderr": "\\n" * 2000},
+    }
+    assert await runtime.handle_script_event(callback)
+    recovery = next(
+        j for j in runtime.service.list(original.scope) if j.task_id != original.task_id
+    )
+    assert len(recovery.metadata["recovery_event"]["receipt"]["stdout"]) == 12000
+    assert runtime.authorize_job(recovery)
+    runtime.interaction_api.channels.control(channel["id"], "close")
+    assert not runtime.authorize_job(recovery)
+    assert not runtime.authorize_tool(recovery, runtime.test_tools[0], {})
+
+
+@pytest.mark.asyncio
+async def test_workspace_probe_exception_is_known_not_executed(runtime):
+    from astrbot_plugin_private_companion.task_service import TaskFailure
+
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "准备工作区"})
+    job = runtime.service.claim("worker")
+    runtime._account_setup = SimpleNamespace(
+        prepare=AsyncMock(side_effect=OSError("temporary ACL probe"))
+    )
+    with pytest.raises(TaskFailure) as failure:
+        await runtime.ensure_workspace(job)
+    assert failure.value.error_kind == "execution_setup_failed"
+    assert failure.value.retryable
+
+
+@pytest.mark.asyncio
+async def test_interaction_listener_recovers_without_new_user_message(
+    runtime, monkeypatch
+):
+    attempts = []
+
+    async def start(_):
+        attempts.append(True)
+        if len(attempts) == 1:
+            raise OSError("temporary port issue")
+        runtime.interaction_api.base_url = "http://127.0.0.1:6196"
+
+    monkeypatch.setattr(runtime.interaction_api, "start", start)
+    runtime.interaction_api.stop = AsyncMock()
+    runtime.interaction_api.script_runner.tick = AsyncMock(
+        side_effect=runtime._stop.set
+    )
+    runtime.interaction_api.script_runner.stop = AsyncMock()
+
+    async def fast_wait(awaitable, _):
+        awaitable.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(asyncio, "wait_for", fast_wait)
+    await runtime._interaction_loop()
+    assert len(attempts) == 2
+    runtime.interaction_api.script_runner.tick.assert_awaited_once()
+    runtime.plugin.context.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_slow_chat_delivery_does_not_block_interaction_ticks(runtime):
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_delivery():
+        entered.set()
+        await release.wait()
+        return False
+
+    async def tick():
+        await entered.wait()
+        runtime._stop.set()
+        release.set()
+
+    runtime.send_once = slow_delivery
+    runtime.send_script_reply_once = AsyncMock(return_value=False)
+    runtime.interaction_api.start = AsyncMock()
+    runtime.interaction_api.base_url = "http://127.0.0.1:6196"
+    runtime.interaction_api.stop = AsyncMock()
+    runtime.interaction_api.script_runner.tick = tick
+    runtime.interaction_api.script_runner.stop = AsyncMock()
+    await asyncio.wait_for(
+        asyncio.gather(runtime._sender_loop(), runtime._interaction_loop()), 2
+    )
+
+
+@pytest.mark.asyncio
 async def test_no_registration_cron_and_known_synthetic_fail_closed(runtime):
     assert not (await runtime.submit(event(), {"goal": "伪造"}))["accepted"]
     for flag in (
@@ -271,7 +484,9 @@ async def test_bound_function_tool_cannot_take_another_context_identity(runtime)
 
 
 @pytest.mark.asyncio
-async def test_reply_reasoning_mode_has_no_tools_or_execution_receipts(runtime):
+async def test_reply_reasoning_mode_preserves_live_tools_without_required_receipts(
+    runtime,
+):
     e = event()
     register(runtime, e)
     result = json.loads(
@@ -282,7 +497,7 @@ async def test_reply_reasoning_mode_has_no_tools_or_execution_receipts(runtime):
     assert result["accepted"]
     job = runtime.service.get(result["task_id"], runtime.scope(e))
     assert job.metadata["request"]["mode"] == "reasoning"
-    assert job.metadata["request"]["tool_names"] == []
+    assert "web_search_tavily" in job.metadata["request"]["tool_names"]
     assert job.metadata["request"]["required_tool_names"] == []
     assert runtime.authorize_job(job)
 
@@ -293,13 +508,57 @@ async def test_hub_text_only_task_does_not_require_an_unrelated_tool_receipt(run
     runtime.register(
         e,
         runtime.test_request,
-        SimpleNamespace(route="task", actions=(), reply=True),
+        SimpleNamespace(route="task", actions=(), reply=True, task_mode="reasoning"),
         reply_eligible=True,
     )
     receipt = await runtime.submit(e, {"goal": "写一篇短文"}, source="hub")
     job = runtime.service.get(receipt["task_id"], runtime.scope(e))
     assert job.metadata["request"]["mode"] == "reasoning"
-    assert job.metadata["request"]["tool_names"] == []
+    assert "web_search_tavily" in job.metadata["request"]["tool_names"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("task_mode", [None, "", "tools"])
+async def test_hub_execution_with_omitted_actions_keeps_authorized_tools(
+    runtime, task_mode
+):
+    e = event()
+    e.message_str = "已经调整好了，你可以试试"
+    runtime.test_request.prompt = e.message_str
+    runtime.test_request.contexts = [
+        {"role": "user", "content": "完成刚才的起床任务，连催五次，回复就停"},
+        {"role": "assistant", "content": "上次任务失败，尚未完成"},
+    ]
+    decision = SimpleNamespace(route="task", actions=(), reply=True)
+    if task_mode is not None:
+        decision.task_mode = task_mode
+    assert runtime.register(e, runtime.test_request, decision, reply_eligible=True)
+    captured = copy.deepcopy(runtime._events[e])
+    receipt = await runtime.submit(e, {"goal": e.message_str}, source="hub")
+    assert receipt["accepted"]
+    job = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    assert job.metadata["request"]["mode"] == "tools"
+    assert job.metadata["request"]["use_workspace"] is True
+    assert {"pc_interaction_channel", "pc_task_workspace", "pc_task_write_file"} <= set(
+        job.metadata["request"]["tool_names"]
+    )
+    assert job.metadata["request"]["contexts"] == runtime.test_request.contexts
+    assert runtime._events[e] == captured
+    runtime.plugin.context.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_hub_omitted_actions_do_not_authorize_an_unknown_member(runtime):
+    e = event("unapproved")
+    runtime.register(
+        e,
+        runtime.test_request,
+        SimpleNamespace(route="task", actions=(), reply=True),
+        reply_eligible=True,
+    )
+    result = await runtime.submit(e, {"goal": "再试试那个任务"}, source="hub")
+    assert result["accepted"] is False
+    assert runtime.service.list(runtime.scope(e)) == []
 
 
 @pytest.mark.asyncio
@@ -308,7 +567,7 @@ async def test_reply_can_request_tools_after_hub_text_only_classification(runtim
     runtime.register(
         e,
         runtime.test_request,
-        SimpleNamespace(route="task", actions=(), reply=True),
+        SimpleNamespace(route="task", actions=(), reply=True, task_mode="reasoning"),
         reply_eligible=True,
     )
     receipt = await runtime.submit(e, {"goal": "查询版本", "mode": "tools"})
@@ -335,16 +594,23 @@ async def test_workspace_intent_is_durable_before_account_setup(runtime):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("user,capabilities,expected", [
-    ("owner", None, True),
-    ("member", ["schedule"], False),
-    ("member", ["schedule", "read", "write", "shell", "network"], True),
-])
-async def test_reply_omitted_workspace_uses_existing_grant(runtime, user, capabilities, expected):
+@pytest.mark.parametrize(
+    "user,capabilities,expected",
+    [
+        ("owner", None, True),
+        ("member", ["schedule"], True),
+        ("member", ["schedule", "read", "write", "shell", "network"], True),
+    ],
+)
+async def test_reply_omitted_workspace_uses_existing_grant(
+    runtime, user, capabilities, expected
+):
     if capabilities is not None:
         runtime.permissions.grant(
-            runtime.dashboard_actor("bot", "group", "web-admin"), user,
-            capabilities=capabilities, roots=[runtime.workspace],
+            runtime.dashboard_actor("bot", "group", "web-admin"),
+            user,
+            capabilities=capabilities,
+            roots=[runtime.workspace],
         )
     runtime.test_tools.append(FutureTaskTool())
     runtime.plugin.context.get_config = lambda **_: {
@@ -352,7 +618,9 @@ async def test_reply_omitted_workspace_uses_existing_grant(runtime, user, capabi
     }
     e = event(user)
     register(runtime, e)
-    receipt = await runtime.submit(e, {"action": "submit", "goal": "这个任务，每分钟叫一次，回复就停止"})
+    receipt = await runtime.submit(
+        e, {"action": "submit", "goal": "这个任务，每分钟叫一次，回复就停止"}
+    )
     assert receipt["accepted"]
     job = runtime.service.get(receipt["task_id"], runtime.scope(e))
     assert job.metadata["request"]["use_workspace"] is expected
@@ -372,45 +640,77 @@ async def test_reply_explicit_workspace_false_is_preserved(runtime):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("source", ["hub", "reply"])
-async def test_read_authorized_task_needs_no_model_workspace_switch(runtime, source):
+async def test_existing_whole_task_grant_needs_no_model_workspace_switch(
+    runtime, source
+):
+    runtime._workspace_directory = SimpleNamespace()
+    runtime.get_execution_broker = lambda _: SimpleNamespace()
     member = event("reader")
     runtime.permissions.grant(
-        runtime.dashboard_actor("bot", "group", "web-admin"), "reader",
-        capabilities=["read"], roots=[runtime.workspace],
+        runtime.dashboard_actor("bot", "group", "web-admin"),
+        "reader",
+        capabilities=["read"],
+        roots=[runtime.workspace],
     )
     register(runtime, member)
-    receipt = await runtime.submit(member, {"goal": "读取同群的任务文件"}, source=source)
+    receipt = await runtime.submit(
+        member, {"goal": "读取同群的任务文件"}, source=source
+    )
     job = runtime.service.get(receipt["task_id"], runtime.scope(member))
     assert job.metadata["request"]["use_workspace"] is True
     assert "pc_task_workspace" in job.metadata["request"]["tool_names"]
-    assert "pc_task_write_file" not in runtime._registry(member.unified_msg_origin, runtime.actor(member))
+    assert "pc_task_write_file" in runtime._registry(
+        member.unified_msg_origin, runtime.actor(member)
+    )
 
 
 def test_workspace_prompt_contains_real_location_and_explicit_read_routes(runtime):
     actor = runtime.actor(event())
     prompt = runtime.workspace_prompt(actor)
     from astrbot_plugin_private_companion.task_execution import actor_workspace
-    context, _ = json.JSONDecoder().raw_decode(prompt[prompt.index("{"):])
-    assert context["working_directory"] == str(actor_workspace(runtime.workspace, actor))
+
+    context, _ = json.JSONDecoder().raw_decode(prompt[prompt.index("{") :])
+    assert context["working_directory"] == str(
+        actor_workspace(runtime.workspace, actor)
+    )
     assert "pc_task_workspace" in prompt and "workspace_id" in prompt
     assert "C:/AstrBotTasks/tools" not in prompt
     assert "never guess" in prompt.lower()
 
 
 @pytest.mark.asyncio
-async def test_execution_injects_fresh_peer_catalog_before_model_call(runtime, monkeypatch):
+async def test_execution_injects_fresh_peer_catalog_before_model_call(
+    runtime, monkeypatch
+):
     from astrbot_plugin_private_companion import task_agent_executor, task_runtime
+
     e = event()
     register(runtime, e)
     receipt = await runtime.submit(e, {"goal": "检查各群友的文件"})
     job = runtime.service.claim("test")
     assert job.task_id == receipt["task_id"]
-    runtime._account_setup = SimpleNamespace(prepare=AsyncMock(return_value=SimpleNamespace(ready=True)))
-    runtime._workspace_directory = SimpleNamespace(call=AsyncMock(return_value={
-        "success": True, "workspaces": [{"workspace_id": "peer", "user_id": "real-peer", "path": "C:/actual-peer"}],
-        "total": 1, "next_offset": None,
-    }))
-    monkeypatch.setattr(task_runtime, "bind_event_bot_identity", AsyncMock(return_value=None))
+    runtime._account_setup = SimpleNamespace(
+        prepare=AsyncMock(return_value=SimpleNamespace(ready=True))
+    )
+    runtime._workspace_directory = SimpleNamespace(
+        call=AsyncMock(
+            return_value={
+                "success": True,
+                "workspaces": [
+                    {
+                        "workspace_id": "peer",
+                        "user_id": "real-peer",
+                        "path": "C:/actual-peer",
+                    }
+                ],
+                "total": 1,
+                "next_offset": None,
+            }
+        )
+    )
+    monkeypatch.setattr(
+        task_runtime, "bind_event_bot_identity", AsyncMock(return_value=None)
+    )
     execute = AsyncMock(return_value={"text": "actual result"})
     monkeypatch.setattr(task_agent_executor.TaskAgentExecutor, "execute", execute)
     await runtime.execute(job)
@@ -441,7 +741,7 @@ async def test_hub_workspace_action_is_tool_task_before_account_exists(runtime):
     "capabilities,expected",
     [
         (None, True),
-        (["schedule"], False),
+        (["schedule"], True),
         (["schedule", "read", "write", "shell", "network"], True),
     ],
 )
@@ -475,7 +775,7 @@ async def test_schedule_exposes_script_workspace_only_with_existing_grant(
 
 
 @pytest.mark.asyncio
-async def test_explicit_text_only_intent_clears_hub_workspace_setup(runtime):
+async def test_reasoning_hint_does_not_remove_live_workspace_authority(runtime):
     e = event()
     runtime.register(
         e,
@@ -488,7 +788,7 @@ async def test_explicit_text_only_intent_clears_hub_workspace_setup(runtime):
     )
     job = runtime.service.get(receipt["task_id"], runtime.scope(e))
     assert job.metadata["request"]["use_workspace"] is False
-    assert job.metadata["request"]["tool_names"] == []
+    assert "web_search_tavily" in runtime.resolve_tools(job, None)
 
 
 def test_account_refresh_resolves_owner_in_target_persona_context(runtime):
@@ -520,7 +820,8 @@ async def test_unauthorized_workspace_request_is_not_accepted(runtime):
 
 
 @pytest.mark.asyncio
-async def test_workspace_setup_failure_stops_before_model_execution(runtime):
+async def test_workspace_setup_is_lazy_and_failure_is_retryable(runtime, monkeypatch):
+    from astrbot_plugin_private_companion import task_agent_executor, task_runtime
     from astrbot_plugin_private_companion.task_service import TaskFailure
 
     e = event()
@@ -532,11 +833,22 @@ async def test_workspace_setup_failure_stops_before_model_execution(runtime):
     runtime._account_setup = SimpleNamespace(
         prepare=AsyncMock(return_value=SimpleNamespace(ready=False))
     )
+    runtime._workspace_directory = SimpleNamespace(
+        call=AsyncMock(return_value={"workspaces": [], "total": 0, "next_offset": None})
+    )
+    monkeypatch.setattr(
+        task_runtime, "bind_event_bot_identity", AsyncMock(return_value=None)
+    )
+    execute = AsyncMock(return_value={"text": "可先查询资料"})
+    monkeypatch.setattr(task_agent_executor.TaskAgentExecutor, "execute", execute)
+    await runtime.execute(job)
+    execute.assert_awaited_once()
+    runtime._account_setup.prepare.assert_not_awaited()
     with pytest.raises(TaskFailure) as failure:
-        await runtime.execute(job)
+        await runtime.ensure_workspace(job)
     assert failure.value.error_kind == "execution_setup_failed"
+    assert failure.value.retryable
     runtime._account_setup.prepare.assert_awaited_once_with(runtime.actor(e))
-    runtime.plugin._activate_persona_for_event_context.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -565,7 +877,7 @@ async def test_latest_permissions_and_registry_are_rechecked(runtime):
 
 
 @pytest.mark.asyncio
-async def test_member_requires_group_capability_grant_and_revocation(runtime):
+async def test_member_requires_whole_task_grant_and_revocation(runtime):
     member = event("member")
     register(runtime, member)
     assert not (await runtime.submit(member, {"goal": "查版本"}))["accepted"]
@@ -577,7 +889,7 @@ async def test_member_requires_group_capability_grant_and_revocation(runtime):
     assert accepted["accepted"]
     job = runtime.service.claim("test")
     assert runtime.authorize_tool(job, runtime.test_tools[0], {})
-    assert not runtime.authorize_tool(job, runtime.test_tools[2], {})
+    assert runtime.authorize_tool(job, runtime.test_tools[2], {})
     runtime.permissions.revoke(actor, grant.grant_id)
     assert not runtime.authorize_job(job)
 
@@ -624,7 +936,7 @@ async def test_worker_and_sender_lifecycle_and_bounded_snapshot(runtime):
     )
     assert latest.task_id in runtime.snapshot(e)
     runtime.start()
-    assert len(runtime._tasks) == 2
+    assert len(runtime._tasks) == 3
     await runtime.stop()
     assert all(task.done() for task in runtime._tasks)
 
@@ -737,7 +1049,6 @@ def test_execution_tool_discovery_never_scans_acl_and_keeps_cached_identity(
     from astrbot_plugin_private_companion import task_runtime as module
 
     actor = runtime.actor(event())
-    assert "pc_task_read_file" not in runtime._registry("bot:GroupMessage:group", actor)
     monkeypatch.setattr(
         module.WindowsDeploymentVerifier,
         "verify",
@@ -745,15 +1056,12 @@ def test_execution_tool_discovery_never_scans_acl_and_keeps_cached_identity(
             "Discovery must not perform synchronous ACL attestation"
         ),
     )
-    vault = runtime.workspace / "test.credential.dpapi"
-    vault.parent.mkdir(parents=True, exist_ok=True)
-    vault.write_bytes(b"host credential")
-    vault.with_name("test.ready.json").write_text("{}", encoding="utf-8")
+    runtime._workspace_directory = SimpleNamespace()
     monkeypatch.setattr(
         runtime,
         "get_execution_broker",
         lambda _: SimpleNamespace(
-            backend=SimpleNamespace(credentials=SimpleNamespace(vault=vault)),
+            backend=SimpleNamespace(credentials=SimpleNamespace()),
             verifier=module.WindowsDeploymentVerifier(
                 runtime.workspace, protected_roots=[]
             ),

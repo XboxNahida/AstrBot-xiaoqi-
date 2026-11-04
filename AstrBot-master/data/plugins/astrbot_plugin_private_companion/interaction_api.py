@@ -54,7 +54,7 @@ class InteractionAPI:
                     else "invalid_request"
                 )
                 return web.json_response(
-                    {"error": code},
+                    {"error": code, **getattr(exc, "details", {})},
                     status=409
                     if code
                     in {
@@ -82,12 +82,14 @@ class InteractionAPI:
                 web.post("/v1/reply", self.reply),
                 web.get("/v1/replies/{request_id}", self.reply_status),
                 web.post("/v1/{action:stop|resume|close}", self.control),
+                web.post("/v1/renew", self.renew),
                 web.get("/v1/tasks", self.tasks),
                 web.get("/v1/tasks/{task_id}", self.tasks),
                 web.get("/v1/history", self.history),
                 web.get("/v1/tools", self.tools),
                 web.post("/v1/tool-call", self.tools),
                 web.post("/v1/scripts", self.scripts),
+                web.get("/v1/scripts", self.scripts),
                 web.get("/v1/scripts/{script_id}", self.scripts),
                 web.post("/v1/scripts/{script_id}/stop", self.scripts),
             ]
@@ -204,6 +206,23 @@ class InteractionAPI:
         self.changed.set()
         return web.json_response(result)
 
+    async def renew(self, request):
+        data = await request.json()
+        if not isinstance(data, dict) or set(data) - {"ttl_seconds", "cancel_on_input"}:
+            raise ValueError("invalid_renew_fields")
+        channel = request[CHANNEL]
+        if self.runtime.interaction_allowed(channel) is not True:
+            raise PermissionError("permission_denied")
+        scope = TaskScope(channel["bot_id"], channel["session_key"], channel["sender_id"])
+        current = self.channels.renew(
+            scope, channel["id"], ttl_seconds=data["ttl_seconds"],
+            cancel_on_input=data.get("cancel_on_input"),
+        )
+        return web.json_response({
+            "channel_id": current["id"], "expires_at": current["expires_at"],
+            "status": current["status"], "cancel_on_input": bool(current["cancel_on_input"]),
+        })
+
     async def tasks(self, request):
         channel = request[CHANNEL]
         scope = TaskScope(
@@ -287,15 +306,13 @@ class InteractionAPI:
 
     async def tools(self, request):
         channel = request[CHANNEL]
-        saved = channel["metadata"].get("request", {}).get("tool_names", [])
         actor = self.runtime.actor(
             self.runtime.restore_event(self.runtime.interaction_job(channel))
         )
         registry = self.runtime._registry(channel["session_key"], actor)
         allowed = {
-            name: registry[name]
-            for name in saved
-            if name in registry and name != "pc_interaction_channel"
+            name: tool for name, tool in registry.items()
+            if name != "pc_interaction_channel"
         }
         if request.method == "GET":
             return web.json_response(
@@ -331,7 +348,7 @@ class InteractionAPI:
             script_tool_call={"name": tool.name, "arguments": arguments},
             silent=True,
         )
-        metadata["request"].update(
+        metadata.setdefault("request", {}).update(
             mode="tools", tool_names=[tool.name], required_tool_names=[tool.name]
         )
         scope = TaskScope(
@@ -354,7 +371,15 @@ class InteractionAPI:
         if runner is None:
             raise web.HTTPServiceUnavailable()
         if request.method == "GET":
-            result = runner.status(request[CHANNEL], request.match_info["script_id"])
+            if "script_id" in request.match_info:
+                result = runner.status(request[CHANNEL], request.match_info["script_id"])
+            else:
+                if set(request.query) - {"offset", "limit"}:
+                    raise ValueError("invalid_script_page")
+                offset = int(request.query.get("offset", 0))
+                limit = int(request.query.get("limit", 50))
+                rows = runner.list(request[CHANNEL], offset=offset, limit=limit)
+                result = {"scripts": rows, "next_offset": offset + len(rows) if len(rows) == limit else None}
         elif "script_id" in request.match_info:
             result = await runner.cancel(
                 request[CHANNEL], request.match_info["script_id"]

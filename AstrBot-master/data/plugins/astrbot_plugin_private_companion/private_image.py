@@ -38,6 +38,7 @@ from .segmented_message import (
     component_strategies_from_owner,
     plan_component_chunks,
 )
+from .token_budget import _looks_like_upstream_llm_error_response
 
 
 PREPARED_IMAGE_MAX_AGE_SECONDS = 30 * 60
@@ -823,7 +824,7 @@ class PrivateImageMixin:
 
         def use_item(key: str, item: dict[str, Any], *, fallback: bool = False, detail: str = "") -> str:
             text = _single_line(item.get("text"), 900 if scope == "forward_image" else self._private_image_vision_text_limit(expected_count))
-            if not text:
+            if not text or self._private_image_vision_summary_unusable(text, allow_unlabeled_transcription=True):
                 cache.pop(key, None)
                 return ""
             item["hits"] = _safe_int(item.get("hits"), 0, 0) + 1
@@ -1409,6 +1410,11 @@ class PrivateImageMixin:
     def _private_image_vision_summary_unusable(self, text: str, *, allow_unlabeled_transcription: bool = False) -> bool:
         compact = re.sub(r"\s+", "", str(text or ""))
         if not compact:
+            return True
+        if _looks_like_upstream_llm_error_response(text, require_error_envelope=True) and not (
+            self._private_image_visible_line(text) and self._private_image_type_line(text)
+        ):
+            # Preserve error text that was actually transcribed from an image.
             return True
         failure_tokens = (
             "无法查看图片", "无法看到图片", "无法识别图片", "无法读取图片", "无法打开图片",
@@ -3045,11 +3051,15 @@ class PrivateImageMixin:
                 cleaned_text = _single_line(_strip_internal_message_blocks(text), text_limit)
                 if not group_mode:
                     cleaned_text = self._private_image_downgrade_conflicting_ownership(cleaned_text)
-                if self._private_image_vision_summary_unusable(
+                provider_error = str(getattr(result, "role", "") or "").strip().lower() == "err"
+                if provider_error or self._private_image_vision_summary_unusable(
                     cleaned_text,
                     allow_unlabeled_transcription=customized_prompt,
                 ):
-                    empty_note = "识图模型返回空摘要" if not cleaned_text else "识图模型返回不可用摘要"
+                    empty_note = (
+                        "provider_error_role" if provider_error else
+                        "识图模型返回空摘要" if not cleaned_text else "识图模型返回不可用摘要"
+                    )
                     self._record_llm_usage(
                         provider_id=provider_id,
                         task=clean_task_name,

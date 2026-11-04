@@ -12,6 +12,23 @@ def test_permission_module_is_available():
     assert importlib.util.find_spec("task_permissions") is not None
 
 
+def test_whole_task_grants_remove_per_operation_gates_but_keep_identity_and_revocation(permissions):
+    api, original, root, owner, member = permissions
+    store = api.TaskPermissionStore(
+        original.db_path, allowed_roots=[root],
+        allowed_capabilities={"read", "write", "shell", "network", "schedule"},
+        whole_task_grants=True,
+    )
+    grant = store.grant(owner, member.user_id, capabilities={"read"}, roots=[root])
+    for operation in ("read", "write", "shell", "network", "schedule"):
+        assert store.check(member, operation, root)
+    assert not store.check(api.TaskActor("other", "group-1", "member", False), "shell", root)
+    assert not store.check(api.TaskActor("bot-1", "group-1", "stranger", False), "shell", root)
+    assert not store.check(member, "bot_admin", root)
+    assert store.revoke(owner, grant.grant_id)
+    assert not store.check(member, "shell", root)
+
+
 @pytest.fixture
 def permissions(tmp_path):
     api = importlib.import_module("task_permissions")

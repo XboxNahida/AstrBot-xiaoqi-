@@ -32,7 +32,7 @@ def create_execution_tools(broker, actor, *, workspace_directory=None):
             ["name"],
         ),
         "pc_task_read_file": (
-            "Read UTF-8 text from your isolated task workspace. Paths are relative.",
+            "Read ordinary UTF-8 text using a task-relative or absolute local path, including peer documents and bot source. Credentials, private runtime data, key files and links are blocked; secret fields are redacted. This tool cannot write or execute files.",
             {"path": {"type": "string"}},
             ["path"],
         ),
@@ -44,9 +44,9 @@ def create_execution_tools(broker, actor, *, workspace_directory=None):
         "pc_task_run_command": (
             "Run PowerShell as the verified restricted account in your isolated workspace. "
             "The host already sets your working directory: use relative paths such as Get-ChildItem -LiteralPath . . "
-            "For directory discovery or reading another member's workspace use pc_task_workspace, never scan C:/AstrBotTasks. "
-            "Bot installation, configuration, credentials and other users' workspaces are forbidden. "
-            "Commands require shell and network grants. Python is .runtime/python.exe or .venv/Scripts/python.exe.",
+            "For broad ordinary reads, directory discovery or another member's files use pc_task_workspace/pc_task_read_file; the fixed read interface accepts absolute paths. "
+            "Commands cannot write bot code/data or peer workspaces and never receive peer execution identities. "
+            "Ordinary task execution uses the host's whole-task grant. Python is .runtime/python.exe or .venv/Scripts/python.exe.",
             {
                 "code": {"type": "string"},
                 "timeout": {"type": "number", "minimum": 1, "maximum": 120},
@@ -71,8 +71,8 @@ def create_execution_tools(broker, actor, *, workspace_directory=None):
             "Discover exact user/group workspace paths and current permissions (action=info); "
             "list a directory (action=list, path='.') or read UTF-8 text (action=read). "
             "Use workspace_id returned by info for a peer; omit it for your own workspace. "
-            "Same-group files are read-only; the primary user in private chat may read this bot's group workspaces. "
-            "No access to other users' private workspaces or other bots. Use relative paths, never guess account hashes. "
+            "Ordinary local files across workspaces and bot source may be read/listed using absolute local paths; credentials and private runtime data remain protected. "
+            "Use exact paths and real IDs, never guess account hashes. Writes remain in your own workspace. "
             "For large directories/catalogs pass next_offset from the previous result.",
             {
                 "action": {"type": "string", "enum": ["info", "list", "read"]},
@@ -89,7 +89,7 @@ def create_execution_tools(broker, actor, *, workspace_directory=None):
                 try:
                     output = await workspace_directory.call(actor, **kwargs)
                 except PermissionError:
-                    output = {"success": False, "code": "workspace_access_denied", "hint": "The current actor or target scope is not authorized. Do not bypass it."}
+                    output = {"success": False, "code": "workspace_access_denied", "hint": "Task authorization is absent/revoked, or the path contains protected credentials, private runtime data or links. Ordinary files are readable; use the fixed interface, never bypass sensitive-file protection."}
                 except (FileNotFoundError, NotADirectoryError, ValueError, KeyError):
                     output = {"success": False, "code": "workspace_path_error", "recoverable": True, "hint": "Call action=info, then action=list path='.' and use the exact returned workspace_id and relative filename."}
                 return json.dumps(output, ensure_ascii=False)
@@ -98,6 +98,14 @@ def create_execution_tools(broker, actor, *, workspace_directory=None):
             elif self.name == "pc_task_read_tool":
                 result = await broker.read_tool(actor, kwargs["name"])
             elif self.name == "pc_task_read_file":
+                if workspace_directory is not None and getattr(workspace_directory, "ordinary_reader", None) is not None:
+                    try:
+                        output = await workspace_directory.call(actor, action="read", path=kwargs["path"])
+                    except PermissionError:
+                        output = {"success": False, "code": "sensitive_read_denied", "hint": "Credentials, key files, private runtime data, links or revoked task access cannot be read. Use an ordinary local document or source file."}
+                    except (OSError, ValueError):
+                        output = {"success": False, "code": "workspace_path_error", "recoverable": True, "hint": "List the parent directory through pc_task_workspace and read the exact UTF-8 filename."}
+                    return json.dumps(output, ensure_ascii=False)
                 result = await broker.read_text(actor, kwargs["path"])
             elif self.name == "pc_task_write_file":
                 result = await broker.write_text(

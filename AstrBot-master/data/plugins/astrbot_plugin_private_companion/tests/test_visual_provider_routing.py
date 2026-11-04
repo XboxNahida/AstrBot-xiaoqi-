@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -260,6 +261,118 @@ class _ForwardVisionHarness(ForwardMessageMixin):
 
 
 class VisualProviderRoutingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_visual_provider_errors_try_configured_backup_without_caching_failure(self) -> None:
+        for role, text in (
+            ("err", "Rate limit exceeded. Please try again later."),
+            ("err", "图片类型：截图 可见内容：错误角色不能作为识图成功"),
+            ("assistant", "All chat models failed"),
+            ("assistant", ""),
+        ):
+            with self.subTest(role=role, text=text):
+                harness = _PrivateVisionPromptHarness()
+                calls, usage, cached = [], [], []
+
+                async def primary_response(**_kwargs):
+                    calls.append("vision")
+                    return SimpleNamespace(role=role, completion_text=text)
+
+                async def backup_response(**_kwargs):
+                    calls.append("backup")
+                    return SimpleNamespace(role="assistant", completion_text="图片类型：照片 可见内容：一只猫")
+
+                providers = {
+                    "vision": SimpleNamespace(text_chat=primary_response),
+                    "backup": SimpleNamespace(text_chat=backup_response),
+                }
+                harness._private_image_visual_provider_candidates = lambda _umo: [
+                    ("vision", "plugin_vision", ""), ("backup", "plugin_vision_fallback", "")
+                ]
+                harness._private_image_provider_by_id = providers.get
+                harness._record_llm_usage = lambda **kwargs: usage.append(kwargs)
+                harness._set_private_image_vision_cache = lambda *_args, **kwargs: cached.append(kwargs)
+
+                result = await harness._transcribe_private_inbound_images(["image.png"])
+
+                self.assertIn("一只猫", result)
+                self.assertEqual(calls, ["vision", "backup"])
+                self.assertEqual([item["success"] for item in usage], [False, True])
+                self.assertEqual([item["provider_id"] for item in cached], ["backup"])
+
+    async def test_visual_error_without_backup_remains_failed(self) -> None:
+        harness = _PrivateVisionPromptHarness("All chat models failed")
+        usage, cached = [], []
+        harness._record_llm_usage = lambda **kwargs: usage.append(kwargs)
+        harness._set_private_image_vision_cache = lambda *_args, **kwargs: cached.append(kwargs)
+
+        result = await harness._transcribe_private_inbound_images(["image.png"])
+
+        self.assertEqual(result, "")
+        self.assertEqual([item["success"] for item in usage], [False])
+        self.assertEqual(cached, [])
+
+    async def test_visual_success_and_screenshot_error_text_do_not_request_backup(self) -> None:
+        for text in (
+            "图片类型：照片 可见内容：一只猫",
+            "图片类型：截图 可见内容：终端显示 All chat models failed 图像表达意图：询问报错",
+            "图片类型：聊天记录 可见内容：对方发来 RateLimitError: status code 429",
+            "图中终端显示 All chat models failed，用户正在询问错误含义。",
+        ):
+            with self.subTest(text=text):
+                harness = _PrivateVisionPromptHarness(text)
+                harness._private_image_visual_provider_candidates = lambda _umo: [
+                    ("vision", "plugin_vision", ""), ("backup", "plugin_vision_fallback", "")
+                ]
+                looked_up = []
+
+                def provider_by_id(provider_id):
+                    looked_up.append(provider_id)
+                    return harness.provider
+
+                harness._private_image_provider_by_id = provider_by_id
+                result = await harness._transcribe_private_inbound_images(["image.png"])
+
+                self.assertEqual(result, text)
+                self.assertEqual(looked_up, ["vision"])
+                self.assertEqual(harness.provider.calls, 1)
+
+    async def test_visual_cancellation_does_not_try_backup(self) -> None:
+        harness = _PrivateVisionPromptHarness()
+        looked_up = []
+
+        async def cancel_response(**_kwargs):
+            raise asyncio.CancelledError
+
+        harness.provider.text_chat = cancel_response
+        harness._private_image_visual_provider_candidates = lambda _umo: [
+            ("vision", "plugin_vision", ""), ("backup", "plugin_vision_fallback", "")
+        ]
+
+        def provider_by_id(provider_id):
+            looked_up.append(provider_id)
+            return harness.provider
+
+        harness._private_image_provider_by_id = provider_by_id
+        with self.assertRaises(asyncio.CancelledError):
+            await harness._transcribe_private_inbound_images(["image.png"])
+        self.assertEqual(looked_up, ["vision"])
+
+    def test_old_visual_error_cache_is_evicted_but_screenshot_is_preserved(self) -> None:
+        for text, expected in (
+            ("All chat models failed", ""),
+            ("图片类型：截图 可见内容：终端显示 All chat models failed", "图片类型：截图 可见内容：终端显示 All chat models failed"),
+        ):
+            with self.subTest(text=text):
+                harness = _PrivateVisionPromptHarness()
+                harness.enable_private_image_vision_cache = True
+                cache = {"old": {"text": text}}
+                harness._private_image_vision_cache_store = lambda: cache
+                harness._record_cache_metric = lambda *_args, **_kwargs: None
+
+                result = PrivateImageMixin._get_private_image_vision_cache(harness, "old", image_count=1)
+
+                self.assertEqual(result, expected)
+                self.assertEqual("old" in cache, bool(expected))
+
     async def test_default_visual_prompt_includes_astrbot_caption_prompt(self) -> None:
         harness = _PrivateVisionPromptHarness()
 

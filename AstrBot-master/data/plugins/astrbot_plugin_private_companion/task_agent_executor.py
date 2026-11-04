@@ -40,7 +40,6 @@ class TaskAgentExecutor:
     exception traces are neither persisted nor attached to TaskFailure.
     """
 
-    MAX_STEPS = 30
     MAX_CONTEXT_MESSAGES = 128
     MAX_CONTEXT_BYTES = 131072
 
@@ -86,17 +85,30 @@ class TaskAgentExecutor:
         """
         try:
             encoded = json.dumps(contexts, ensure_ascii=False, allow_nan=False)
-            valid = (
-                isinstance(contexts, list)
-                and len(contexts) <= self.MAX_CONTEXT_MESSAGES
-                and len(encoded.encode("utf-8")) <= self.MAX_CONTEXT_BYTES
-                and all(isinstance(item, dict) for item in contexts)
+            valid = isinstance(contexts, list) and all(
+                isinstance(item, dict) for item in contexts
             )
         except (ValueError, TypeError, UnicodeError):
             valid = False
         if not valid:
             raise TaskFailure("context_limit") from None
-        return json.loads(encoded)
+        messages = json.loads(encoded)
+        while (
+            len(messages) > self.MAX_CONTEXT_MESSAGES
+            or len(json.dumps(messages, ensure_ascii=False).encode("utf-8"))
+            > self.MAX_CONTEXT_BYTES
+        ):
+            rounds = [
+                i
+                for i, item in enumerate(messages)
+                if item.get("role") == "assistant" and item.get("tool_calls")
+            ]
+            if len(rounds) < 2:
+                raise TaskFailure("context_limit")
+            # Retain the original user context and whole recent protocol rounds.
+            # Full observations remain in durable step records, not a lossy claim.
+            del messages[rounds[0] : rounds[1]]
+        return messages
 
     async def execute(self, job: TaskJob) -> Mapping[str, Any]:
         """Continue the most recent successful checkpoint with bounded calls.
@@ -151,16 +163,22 @@ class TaskAgentExecutor:
         completion_contract = request.get("completion_contract") == "status_v1"
         if completion_contract:
             system_prompt += (
-                '\nWhen no more tools are needed, return only a JSON object '
+                "\nWhen no more tools are needed, return only a JSON object "
                 '{"task_status":"completed|blocked|needs_input","text":"user-facing factual summary"}. '
-                'completed means the ENTIRE requested goal has verified tool evidence; '
-                'listing existing settings does not complete a request to change them. '
-                'If tools or capabilities are missing, report blocked with the unfinished work '
-                'and actual reason; if user input is required report needs_input. '
-                'Never return completed for partial work or an explanation of how to do it. '
-                'For custom interactions, write and schedule your script through pc_interaction_channel '
-                'and verify its receipt before reporting completed. Do not ask the user to '
-                'provide internal script tools that are already available to you.'
+                "You decide whether the ENTIRE requested goal is fulfilled using actual observations. "
+                "Distinguish a textual answer from external operations and never invent tool success. "
+                "Tool suggestions are not mandatory workflows; choose and repair your own plan. "
+                "A tool error is feedback, not the end of the task. Correct parameters or choose another approach. "
+                "An unknown result means an operation MAY already have happened: inspect actual state before repeating it. "
+                "Unexecuted calls from a failed batch have no effects and may be replanned. "
+                "Earlier full tool outputs remain in durable task steps if context is compacted. "
+                "Listing existing settings does not complete a request to change them. "
+                "If tools or capabilities are missing, report blocked with the unfinished work "
+                "and actual reason; if user input is required report needs_input. "
+                "Never return completed for partial work or an explanation of how to do it. "
+                "For custom interactions, write and schedule your script through pc_interaction_channel "
+                "and verify its receipt before reporting completed. Do not ask the user to "
+                "provide internal script tools that are already available to you."
             )
         if job.error_kind in {
             "missing_required_tool",
@@ -175,7 +193,6 @@ class TaskAgentExecutor:
         receipts = copy.deepcopy(checkpoint.get("receipts", []))
         pending = copy.deepcopy(checkpoint.get("pending_calls", []))
         completed = checkpoint.get("number", 0)
-        workspace_corrections = checkpoint.get("workspace_corrections", 0)
         succeeded = {item["name"] for item in receipts}
         if pending and job.error_kind in {"tool_argument_error", "protocol_error"}:
             for call in pending:
@@ -191,22 +208,24 @@ class TaskAgentExecutor:
             pending = []
             contexts = self._bounded(contexts)
         try:
-            resolved = await self._resolve(self.resolve_tools, job, tuple(names))
+            resolved = await self._resolve(
+                self.resolve_tools,
+                job,
+                None if request.get("dynamic_tool_catalog") is True else tuple(names),
+            )
         except Exception:
             raise TaskFailure("permission_denied") from None
         if not isinstance(resolved, Mapping):
             raise TaskFailure("permission_denied")
         allowed = {
             name: resolved[name]
-            for name in names
+            for name in (
+                resolved if request.get("dynamic_tool_catalog") is True else names
+            )
             if name in resolved
             and getattr(resolved[name], "name", None) == name
             and getattr(resolved[name], "active", True) is True
         }
-        if set(required) - succeeded - allowed.keys():
-            raise TaskFailure("permission_denied")
-        if any(not (set(group) & (succeeded | allowed.keys())) for group in groups):
-            raise TaskFailure("permission_denied")
         toolset = ToolSet()
         for tool in allowed.values():
             toolset.add_tool(tool)
@@ -215,6 +234,24 @@ class TaskAgentExecutor:
             if not self.service.heartbeat(job):
                 raise TaskFailure("lease_lost")
             if not pending:
+                if request.get("dynamic_tool_catalog") is True:
+                    try:
+                        current_tools = await self._resolve(
+                            self.resolve_tools, job, None
+                        )
+                    except Exception:
+                        raise TaskFailure("permission_denied") from None
+                    if not isinstance(current_tools, Mapping):
+                        raise TaskFailure("permission_denied")
+                    allowed = {
+                        name: tool
+                        for name, tool in current_tools.items()
+                        if getattr(tool, "name", None) == name
+                        and getattr(tool, "active", True) is True
+                    }
+                    toolset = ToolSet()
+                    for tool in allowed.values():
+                        toolset.add_tool(tool)
                 current = self.service.get(job.task_id, job.scope)
                 if current is None:
                     raise TaskFailure("lease_lost")
@@ -232,10 +269,7 @@ class TaskAgentExecutor:
                         system_prompt=system_prompt,
                         contexts=copy.deepcopy(contexts),
                         func_tool=toolset,
-                        tool_choice="required"
-                        if set(required) - succeeded
-                        or any(not (set(group) & succeeded) for group in groups)
-                        else "auto",
+                        tool_choice="auto",
                         request_max_retries=0,
                     )
                 except Exception:
@@ -269,36 +303,44 @@ class TaskAgentExecutor:
                 if not pending:
                     if completion_contract:
                         try:
-                            report = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip()))
+                            report = json.loads(
+                                re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+                            )
                             if (
                                 not isinstance(report, dict)
-                                or report.get("task_status") not in {"completed", "blocked", "needs_input"}
+                                or report.get("task_status")
+                                not in {"completed", "blocked", "needs_input"}
                                 or not isinstance(report.get("text"), str)
                                 or not report["text"].strip()
                             ):
                                 raise ValueError
                         except (ValueError, TypeError):
-                            raise TaskFailure("protocol_error", retryable=True) from None
+                            raise TaskFailure(
+                                "protocol_error", retryable=True
+                            ) from None
                         text = report["text"]
                         self._bounded([{"role": "assistant", "content": text}])
                         if report["task_status"] != "completed":
                             current = self.service.get(job.task_id, job.scope)
                             if current is None or not self.service.record_step(
-                                job, current.step_key,
-                                {"kind": "completion_report", "text": text,
-                                 "task_status": report["task_status"], "receipts": receipts},
+                                job,
+                                current.step_key,
+                                {
+                                    "kind": "completion_report",
+                                    "text": text,
+                                    "task_status": report["task_status"],
+                                    "receipts": receipts,
+                                },
                                 next_step=f"incomplete:{completed + 1}",
                             ):
                                 raise TaskFailure("lease_lost")
                             raise TaskFailure(
-                                "missing_input" if report["task_status"] == "needs_input" else "task_incomplete"
+                                "missing_input"
+                                if report["task_status"] == "needs_input"
+                                else "task_incomplete"
                             )
-                    if set(required) - succeeded or any(
-                        not (set(group) & succeeded) for group in groups
-                    ):
-                        raise TaskFailure("missing_required_tool", retryable=True)
                     mode = request.get("mode", "tools")
-                    if not receipts and mode != "reasoning":
+                    if not receipts and mode != "reasoning" and not completion_contract:
                         raise TaskFailure("missing_evidence")
                     if not text.strip():
                         raise TaskFailure("missing_evidence")
@@ -308,54 +350,76 @@ class TaskAgentExecutor:
                         "text": text,
                         "successful_tool_names": sorted(succeeded),
                         "receipts": receipts,
+                        "verification": "tool_receipts"
+                        if receipts
+                        else "model_report_only",
                     }
                 contexts.append(
                     {"role": "assistant", "content": text, "tool_calls": pending}
                 )
                 contexts = self._bounded(contexts)
-            if completed >= self.MAX_STEPS:
-                raise TaskFailure("step_limit")
             call = pending[0]
+            name = call["function"]["name"]
+            if name not in allowed:
+                raise TaskFailure("permission_denied")
+            tool = allowed[name]
+            invalid_arguments = False
             try:
-                name = call["function"]["name"]
                 arguments = call["function"]["arguments"]
                 args = (
                     json.loads(arguments) if isinstance(arguments, str) else arguments
                 )
-                if (
-                    not isinstance(args, dict)
-                    or not isinstance(name, str)
-                    or not isinstance(call["id"], str)
-                ):
+                if not isinstance(args, dict):
                     raise ValueError
             except (KeyError, ValueError, TypeError):
-                raise TaskFailure("tool_argument_error", retryable=True) from None
-            if name not in allowed:
-                raise TaskFailure("permission_denied")
-            tool = allowed[name]
+                invalid_arguments = True
             schema = getattr(tool, "parameters", None)
-            if schema:
+            if schema and not invalid_arguments:
                 try:
                     jsonschema.validate(args, schema)
                 except jsonschema.ValidationError:
-                    raise TaskFailure("tool_argument_error", retryable=True) from None
+                    invalid_arguments = True
                 except jsonschema.SchemaError:
                     raise TaskFailure("missing_input") from None
+            outcome = None
+            if invalid_arguments:
+                outcome = {
+                    "status": "error",
+                    "content": "tool_argument_error: not executed. Correct JSON arguments using the exposed tool schema.",
+                    "receipt": {"tool": name, "not_executed": True},
+                }
+            else:
+                try:
+                    authorized = await self._resolve(
+                        self.authorize, job, tool, copy.deepcopy(args)
+                    )
+                except Exception:
+                    authorized = False
+                if not self.service.heartbeat(job):
+                    raise TaskFailure("lease_lost")
+                if authorized is not True:
+                    raise TaskFailure("permission_denied")
             try:
-                authorized = await self._resolve(
-                    self.authorize, job, tool, copy.deepcopy(args)
-                )
-            except Exception:
-                authorized = False
-            if not self.service.heartbeat(job):
-                raise TaskFailure("lease_lost")
-            if authorized is not True:
-                raise TaskFailure("permission_denied")
-            try:
-                outcome = await self.execute_tool(job, tool, args)
+                if outcome is None:
+                    try:
+                        outcome = await self.execute_tool(job, tool, args)
+                    except TaskFailure as exc:
+                        if exc.error_kind != "unknown_result":
+                            raise
+                        outcome = {
+                            "status": "unknown",
+                            "content": "unknown_result: the operation may have happened. Query actual state before deciding whether to retry.",
+                            "receipt": {"tool": name, "observed_output": False},
+                        }
+                    except Exception:
+                        outcome = {
+                            "status": "unknown",
+                            "content": "unknown_result: the adapter did not confirm the operation. Verify actual state before retrying.",
+                            "receipt": {"tool": name, "observed_output": False},
+                        }
                 if (
                     not isinstance(outcome, Mapping)
-                    or outcome.get("status") not in {"success", "error"}
+                    or outcome.get("status") not in {"success", "error", "unknown"}
                     or not outcome.get("receipt")
                     or "content" not in outcome
                 ):
@@ -375,37 +439,27 @@ class TaskAgentExecutor:
                 raise TaskFailure("unknown_result") from None
             if not self.service.heartbeat(job):
                 raise TaskFailure("lease_lost")
-            correcting_directory = (
-                outcome["status"] == "error"
-                and name == "pc_task_workspace"
-                and outcome.get("recoverable") is True
-                and workspace_corrections < 2
-            )
-            if outcome["status"] == "error" and not correcting_directory:
-                current = self.service.get(job.task_id, job.scope)
-                if current is None or not self.service.record_step(
-                    job,
-                    current.step_key,
-                    {
-                        "kind": "tool_error",
-                        "number": completed + 1,
-                        "tool": name,
-                        "outcome": outcome,
-                        "contexts": contexts,
-                        "pending_calls": pending[1:],
-                        "receipts": receipts,
-                    },
-                    next_step=f"failed_tool:{completed + 1}",
-                ):
-                    raise TaskFailure("lease_lost")
-                raise TaskFailure("tool_failed")
             completed += 1
-            if correcting_directory:
-                workspace_corrections += 1
-            else:
+            if outcome["status"] == "success":
                 receipts.append({"name": name, "receipt": outcome["receipt"]})
                 succeeded.add(name)
             pending = pending[1:]
+            if outcome["status"] != "success":
+                for skipped in pending:
+                    contexts.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": skipped["id"],
+                            "content": json.dumps(
+                                {
+                                    "status": "not_executed",
+                                    "code": "replan_after_tool_error",
+                                }
+                            ),
+                        }
+                    )
+                pending = []
+                contexts = self._bounded(contexts)
             current = self.service.get(job.task_id, job.scope)
             if current is None or not self.service.record_step(
                 job,
@@ -416,7 +470,8 @@ class TaskAgentExecutor:
                     "contexts": contexts,
                     "pending_calls": pending,
                     "receipts": receipts,
-                    "workspace_corrections": workspace_corrections,
+                    "tool": name,
+                    "outcome": outcome,
                 },
                 next_step=f"tool:{completed + 1}",
             ):

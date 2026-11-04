@@ -51,6 +51,10 @@ async def test_api_requires_scoped_token_and_has_no_identity_override(api):
 @pytest.mark.asyncio
 async def test_api_collects_window_and_cancels_before_send(api):
     server, client, channel = api
+    server.channels.renew(
+        TaskScope(channel["bot_id"], channel["session_key"], channel["sender_id"]),
+        channel["id"], ttl_seconds=86400, cancel_on_input=True,
+    )
     auth = headers(channel)
     queued = await (
         await client.post(
@@ -257,3 +261,34 @@ async def test_standard_library_sdk_collects_fixed_window_and_stops(api, tmp_pat
         await asyncio.to_thread(sdk.reply, "暂停时不能发", key="two")
     assert caught.value.status == 409
     assert channel["token"] not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_sdk_can_renew_and_discover_existing_scripts_without_identity_input(api, tmp_path):
+    from astrbot_plugin_private_companion.interaction_scripts import InteractionScripts
+
+    server, client, channel = api
+    path = tmp_path / "own.py"
+    path.write_text("print('ok')", encoding="utf-8")
+    server.runtime.interaction_actor = lambda _: "trusted"
+    server.runtime.get_execution_broker = lambda _: SimpleNamespace(checked_path=lambda *_, **__: path)
+    server.script_runner = InteractionScripts(server)
+    record = await server.script_runner.schedule(channel, path="own.py", key="one")
+    config = tmp_path / "client.json"
+    config.write_text(json.dumps({
+        "base_url": str(client.make_url("/")).rstrip("/"),
+        "channel_id": channel["id"], "token": channel["token"],
+    }), encoding="utf-8")
+    sdk = InteractionClient(config)
+    renewed = await asyncio.to_thread(sdk.renew, 172800, cancel_on_input=True)
+    assert renewed["channel_id"] == channel["id"]
+    assert renewed["cancel_on_input"] is True
+    rows = await asyncio.to_thread(sdk.scripts)
+    assert [row["id"] for row in rows["scripts"]] == [record["id"]]
+    assert channel["token"] not in json.dumps(rows)
+    forbidden = await client.post("/v1/renew", headers=headers(channel), json={"ttl_seconds": 100, "sender_id": "other"})
+    assert forbidden.status == 400
+    server.runtime.interaction_allowed = lambda _: False
+    with pytest.raises(InteractionError) as denied:
+        await asyncio.to_thread(sdk.renew, 100)
+    assert denied.value.status == 403

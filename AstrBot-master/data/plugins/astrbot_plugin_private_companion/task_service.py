@@ -1,4 +1,4 @@
-"""Persist task ownership, bounded attempts, checkpoints, and delivery separately."""
+"""Persist task ownership, request history, checkpoints, and delivery separately."""
 
 from __future__ import annotations
 
@@ -308,7 +308,7 @@ class TaskService:
                 return None
             row = db.execute(
                 "SELECT * FROM pt_tasks WHERE status IN ('queued','waiting_retry') "
-                "AND lease_token IS NULL AND next_run<=? AND attempts<3 ORDER BY created_at,rowid LIMIT 1",
+                "AND lease_token IS NULL AND next_run<=? ORDER BY created_at,rowid LIMIT 1",
                 (self.clock(),),
             ).fetchone()
             if row is None:
@@ -368,7 +368,7 @@ class TaskService:
             )
 
     def begin_attempt(self, job: TaskJob, provider: str) -> bool:
-        """Reserve another model request, including fallback, within the shared budget.
+        """Record another model request, including fallback, under the live lease.
 
         Args:
             job: Live lease capability returned by claim.
@@ -379,7 +379,7 @@ class TaskService:
         """
         with self._transaction() as db:
             row = self._owned(db, job)
-            if not row or row["attempts"] >= 3:
+            if not row:
                 return False
             db.execute(
                 "UPDATE pt_tasks SET attempts=attempts+1 WHERE task_id=?",
@@ -484,7 +484,7 @@ class TaskService:
             return True
 
     def fail(self, job: TaskJob, error_kind: str, *, retryable: bool = False) -> bool:
-        """Persist a classified failure and bounded safe retry.
+        """Persist a classified outcome and back off explicitly safe retries.
 
         Args:
             job: Live execution lease.
@@ -508,20 +508,9 @@ class TaskService:
                 status = "waiting_user"
             elif error_kind in {"unknown_result", "interrupted"}:
                 status = "unknown_result"
-            elif retryable and row["attempts"] < 3:
+            elif retryable:
                 status = "waiting_retry"
                 next_run = self.clock() + (15 if row["attempts"] <= 1 else 60)
-                if error_kind in {
-                    "missing_required_tool",
-                    "tool_argument_error",
-                    "protocol_error",
-                }:
-                    corrected = db.execute(
-                        "INSERT OR IGNORE INTO pt_corrections(task_id,step_key,cycle) VALUES(?,?,?)",
-                        (job.task_id, row["step_key"], row["cycle"]),
-                    ).rowcount
-                    if not corrected:
-                        status, next_run = "failed", 0
             if db.execute(
                 "SELECT 1 FROM pt_steps WHERE task_id=? AND step_key=?",
                 (job.task_id, row["step_key"]),
@@ -567,7 +556,7 @@ class TaskService:
             elif action == "pause" and status in {"queued", "waiting_retry", "running"}:
                 status = "unknown_result" if status == "running" else "paused"
             elif action == "resume" and status in {"paused", "waiting_user"}:
-                status = "queued" if attempts < 3 else "failed"
+                status = "queued"
             elif action == "retry" and status in {"failed", "waiting_retry"}:
                 status, attempts, cycle = "queued", 0, cycle + 1
             else:
@@ -609,7 +598,7 @@ class TaskService:
         """Apply operator-verified reconciliation; never infer an external outcome.
 
         Only trusted program code may call this API after checking real receipts.
-        ``not_executed`` leaves work paused and preserves its attempt budget.
+        ``not_executed`` leaves work paused and preserves its request history.
         An outstanding worker lease additionally requires an operator-confirmed
         stop; model assertions must never supply ``worker_stopped``.
         """

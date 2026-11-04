@@ -15,9 +15,10 @@ from uuid import uuid4
 class InteractionError(RuntimeError):
     """Report an API status and code without printing script credentials."""
 
-    def __init__(self, status, code):
+    def __init__(self, status, code, details=None):
         self.status = status
         self.code = code
+        self.details = details or {}
         super().__init__(f"Interaction API {status}: {code}")
 
 
@@ -75,10 +76,12 @@ class InteractionClient:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
             try:
-                error = json.load(exc).get("error", "request_failed")
+                details = json.load(exc)
+                error = details.get("error", "request_failed")
             except (ValueError, AttributeError):
                 error = "request_failed"
-            raise InteractionError(exc.code, error) from None
+                details = {}
+            raise InteractionError(exc.code, error, details) from None
         except (urllib.error.URLError, TimeoutError):
             raise InteractionError(0, "connection_unavailable") from None
 
@@ -160,7 +163,8 @@ class InteractionClient:
         Args:
             message: What should be communicated, expressed using normal persona.
             key: Stable operation key; reuse it after an uncertain HTTP response.
-            based_on_seq: Last observed message sequence; stale intents are refused.
+            based_on_seq: Last observed sequence; required to be current only when
+                the channel explicitly selects cancel_on_input.
 
         Returns:
             Receipt ID and current delivery state.
@@ -188,6 +192,17 @@ class InteractionClient:
 
     def close(self):
         return self._request("POST", "/v1/close", {})
+
+    def renew(self, ttl_seconds, *, cancel_on_input=None):
+        """Extend this active channel or change its explicit input policy.
+
+        An expired token cannot renew itself. A currently authorized task can
+        renew the same channel through pc_interaction_channel(action='renew').
+        """
+        body = {"ttl_seconds": ttl_seconds}
+        if cancel_on_input is not None:
+            body["cancel_on_input"] = cancel_on_input
+        return self._request("POST", "/v1/renew", body)
 
     def tasks(self, task_id=None):
         return self._request(
@@ -224,6 +239,10 @@ class InteractionClient:
         return self._request(
             "GET", "/v1/scripts/" + urllib.parse.quote(script_id, safe="")
         )
+
+    def scripts(self, *, offset=0, limit=50):
+        """Find existing script IDs and receipts before scheduling replacements."""
+        return self._request("GET", "/v1/scripts", query={"offset": offset, "limit": limit})
 
     def stop_script(self, script_id):
         return self._request(

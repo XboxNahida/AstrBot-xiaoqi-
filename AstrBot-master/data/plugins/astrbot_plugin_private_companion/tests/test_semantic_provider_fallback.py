@@ -139,6 +139,8 @@ def _native_fallback_runner(
     runner._abort_signal = asyncio.Event()
     runner.request_max_retries = 1
     runner.final_llm_resp = None
+    runner._is_task_request = False
+    runner._pending_required_tools = set()
     return runner
 
 

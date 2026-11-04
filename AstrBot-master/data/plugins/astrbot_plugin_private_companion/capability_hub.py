@@ -8,6 +8,8 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any
 
+from astrbot.api import logger
+
 from .hub_optimizations import (
     call_hub_model,
     compact_hub_payload,
@@ -152,6 +154,7 @@ class CapabilityDecision:
     collaboration: dict[str, str] = field(default_factory=dict)
     merge_event_ids: tuple[str, ...] = ()
     image_edit_requested: bool = False
+    task_mode: str = ""
 
 
 def parse_model_capability_decision(
@@ -295,6 +298,10 @@ def parse_model_capability_decision(
             payload["reply"] and payload.get("image_edit_requested") is True
             and set(actions) & {"image_generate", "image_edit"}
         ),
+        task_mode=(
+            "reasoning" if payload.get("task_mode") == "reasoning"
+            and not set(actions) - {"reasoning", "complex_reasoning"} else "tools"
+        ) if route in {"task", "mixed"} else "",
     )
 
 
@@ -367,9 +374,12 @@ async def judge_capabilities(
         payload["group_participation"] = dict(group_participation or {})
     runtime = getattr(plugin, "_persistent_task_runtime", None)
     if runtime is not None and context.task_session_key:
-        payload["persistent_tasks"] = runtime.snapshot_for_scope(
-            context.task_session_key.split(":", 1)[0], context.task_session_key, context.sender_id,
-        )
+        try:
+            payload["persistent_tasks"] = runtime.snapshot_for_scope(
+                context.task_session_key.split(":", 1)[0], context.task_session_key, context.sender_id,
+            )
+        except Exception as exc:
+            logger.warning("Capability hub task snapshot unavailable: error=%s", type(exc).__name__)
     task_store = getattr(plugin, "_conversation_task_states", None)
     if task_store is not None:
         try:
@@ -494,6 +504,11 @@ async def judge_capabilities(
             "\n额外输出 route，仅允许 chat/task/mixed。日常陪聊、斗嘴、情感交流选 chat；"
             "复杂计算、编程、研究分析、需要工具实际执行的工作选 task；两者并存选 mixed。"
             "不得输出模型 ID，也不得因为用户情绪强烈就把闲聊分到任务。\n"
+            "执行路由额外输出 task_mode：只需生成文字、写作或不调用工具的推理选 reasoning；"
+            "需要实际查询、读写文件、运行脚本、创建互动或提醒，以及明确继续、重试这些操作时选 tools。"
+            "actions遗漏不代表用户要求纯文字，task_mode不是权限声明，宿主仍按真实身份核验。"
+            "当前用户说‘已经调整好了，你可以试试’或‘再重试一下’，若上下文是本人尚未完成的实际任务，"
+            "应承接原要求并选择tools及所需动作；不能因旧助手曾说没有接口而继续关闭工具。\n"
             "额外输出布尔值 task_query：只有用户单纯询问 background_task 的进度、结果或错误时为 true，"
             "此时 route=chat、actions=[]、merge_messages=false，不产生新的 task 分段。"
             "同时要求修改、继续执行、重试、取消或新增工作的消息必须为 false，不能把追加要求吞成状态查询。"
@@ -528,6 +543,22 @@ async def judge_capabilities(
         available_capabilities=available,
         context=context,
     )
+    if decision is None:
+        logger.warning("Capability hub output failed structural validation; requesting one correction")
+        try:
+            raw = await llm_call(
+                prompt + "\n上一轮输出未通过结构校验。请依据相同输入重新判断，只返回符合上述格式的JSON对象；reply必须是布尔值，actions必须是数组。",
+                max_tokens=600 if extended else 260,
+                provider_id=provider_id,
+                task="astrbot_reply",
+                timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+            )
+        except Exception as exc:
+            logger.warning("Capability hub structure correction unavailable: error=%s", type(exc).__name__)
+            return None
+        decision = parse_model_capability_decision(
+            raw, available_capabilities=available, context=context,
+        )
     if (
         decision is not None and context.conversation_type == "group"
         and re.fullmatch(r"(?:那|你|现在|就|请|继续|调用|执行|一下|吧|[！!。，,\s])+", context.current_text)

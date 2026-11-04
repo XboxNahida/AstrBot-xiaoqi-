@@ -122,7 +122,7 @@ class ScriptInteractionMixin:
 
         self._script_channel_tool = ChannelTool(
             name="pc_interaction_channel",
-            description="Open a script API channel for the current real bot/session/user. Write your own Python/PowerShell script for all interaction timing, counts, conditions and stop behavior. Use use_workspace=true when submitting this task. The shared SDK astrbot_interaction supports real-message cursor/time-window collection, replies via the normal chat model, stop/resume, durable JSON state, task/tool/history queries and tool calls. Credentials are written to the isolated config file, never returned here. run schedules an authored script in the restricted account; no hardcoded reminder workflow is provided.",
+            description="Manage script API channels bound to the current real bot/session/user. List existing channels and list_scripts before creating replacements. Open creates a channel; renew explicitly changes an owned channel lifetime or cancel_on_input policy, preserving its ID and state, but never reopens a closed channel. New channels default cancel_on_input=false: scripts decide whether new input stops future speech; select true to invalidate pending replies when any new input arrives. Every action except open/list requires channel_id. Write your own Python/PowerShell script for timing, conditions and stopping. run returns a durable start receipt, not completion. The Windows broker currently limits each process job to 3600 seconds; choose state checkpoints and later invocations for longer flows. Scripts receive the private config and shared SDK automatically. Credentials stay isolated.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -131,6 +131,8 @@ class ScriptInteractionMixin:
                         "enum": [
                             "open",
                             "list",
+                            "renew",
+                            "list_scripts",
                             "read",
                             "stop",
                             "resume",
@@ -145,7 +147,10 @@ class ScriptInteractionMixin:
                         "description": "Stable per-task operation key for open/run retries.",
                     },
                     "channel_id": {"type": "string"},
-                    "ttl_seconds": {"type": "number", "exclusiveMinimum": 0},
+                    "ttl_seconds": {"type": "number", "exclusiveMinimum": 0, "description": "Lifetime from now; required for renew. Must cover future script start times."},
+                    "cancel_on_input": {"type": "boolean", "description": "Invalidate pending replies on any new input. New channels default false; omitted renew keeps existing policy."},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
                     "after_seq": {"type": "integer", "minimum": 0},
                     "pause": {"type": "boolean"},
                     "path": {
@@ -161,6 +166,7 @@ class ScriptInteractionMixin:
                         "type": "number",
                         "exclusiveMinimum": 0,
                         "maximum": 3600,
+                        "description": "Process job timeout enforced by the existing Windows broker, not channel lifetime.",
                     },
                     "script_id": {"type": "string"},
                 },
@@ -190,10 +196,9 @@ class ScriptInteractionMixin:
             if action == "list":
                 return {"success": True, "channels": api.channels.list(job.scope)}
             if action == "open":
-                if not job.metadata.get("request", {}).get("use_workspace"):
-                    return {"success": False, "code": "submit_with_use_workspace_true"}
                 if not api.base_url:
                     return {"success": False, "code": "interaction_api_unavailable"}
+                await self.ensure_workspace(job)
                 metadata = {
                     **copy.deepcopy(job.metadata),
                     "source_task_id": job.task_id,
@@ -203,6 +208,7 @@ class ScriptInteractionMixin:
                     job.task_id + ":" + str(args.get("key", "main")),
                     metadata,
                     ttl_seconds=args.get("ttl_seconds", 86400),
+                    cancel_on_input=args.get("cancel_on_input", False),
                 )
                 path = await self.prepare_interaction_config(c)
                 return {
@@ -211,12 +217,45 @@ class ScriptInteractionMixin:
                     "config_path": str(path),
                     "sdk_path": str(self.workspace / "tools/astrbot_interaction.py"),
                     "expires_at": c["expires_at"],
+                    "cancel_on_input": bool(c["cancel_on_input"]),
+                    "execution_timeout_limit": 3600,
                     "api": api.base_url,
                     "usage": "from astrbot_interaction import InteractionClient; client=InteractionClient.from_env(). Scripts launched by action=run receive config and shared SDK automatically. Use events/iter_events/collect for input, reply + reply_status for speech, stop_replies/resume_replies/close for control, state/set_state for checkpoints, tasks/history/tools/call_tool for real data. reply pending means queued, not delivered. Preserve stable operation keys across retries.",
                 }
-            c = api.channels.get(job.scope, args.get("channel_id"))
+            if not args.get("channel_id"):
+                return {
+                    "success": False, "code": "channel_id_required", "recoverable": True,
+                    "hint": "Call action=list first. If no channel exists, call action=open key=<stable-key>; then pass its returned channel_id to read/run/stop/resume/close. This is a missing argument, not denied proactive communication permission.",
+                }
+            if action == "run" and not args.get("path"):
+                return {"success": False, "code": "script_path_required", "recoverable": True, "hint": "Write your .py/.ps1 script in your workspace, then pass its relative path and channel_id to action=run."}
+            if action in {"script_status", "stop_script"} and not args.get("script_id"):
+                return {"success": False, "code": "script_id_required", "recoverable": True, "hint": "Use the script_id returned by action=run or the channel's script list."}
+            c = api.channels.get(job.scope, args.get("channel_id"), include_inactive=True)
             if c is None or not self.interaction_allowed(c):
                 raise PermissionError("channel_not_owned")
+            if action == "renew":
+                if "ttl_seconds" not in args:
+                    raise ValueError("ttl_seconds_required")
+                renewed = api.channels.renew(
+                    job.scope, c["id"], ttl_seconds=args["ttl_seconds"],
+                    cancel_on_input=args.get("cancel_on_input"),
+                )
+                return {"success": True, "channel_id": renewed["id"],
+                        "expires_at": renewed["expires_at"], "status": renewed["status"],
+                        "cancel_on_input": bool(renewed["cancel_on_input"])}
+            if action == "list_scripts":
+                offset, limit = args.get("offset", 0), args.get("limit", 50)
+                rows = api.script_runner.list(c, offset=offset, limit=limit)
+                return {"success": True, "channel_id": c["id"], "scripts": rows,
+                        "next_offset": offset + len(rows) if len(rows) == limit else None}
+            if action not in {"script_status", "stop_script", "stop", "close"}:
+                if c["status"] == "closed":
+                    raise ValueError("channel_closed")
+                if c["expires_at"] <= api.channels.clock():
+                    return {"success": False, "code": "channel_expired",
+                            "expires_at": c["expires_at"], "recoverable": True,
+                            "hint": "Inspect list_scripts, then use action=renew with ttl_seconds if the current authorized plan needs more time. Reuse the existing channel ID."}
             if action == "read":
                 return {
                     "success": True,
@@ -250,8 +289,14 @@ class ScriptInteractionMixin:
                     **await api.script_runner.cancel(c, args["script_id"]),
                 }
             raise ValueError("invalid_action")
-        except (PermissionError, ValueError, KeyError) as exc:
-            return {"success": False, "code": type(exc).__name__}
+        except (PermissionError, ValueError, KeyError, TypeError) as exc:
+            code = str(exc)
+            if not code or len(code) > 70 or not code.replace("_", "").isalnum():
+                code = type(exc).__name__
+            return {"success": False, "code": code,
+                    "recoverable": not isinstance(exc, PermissionError),
+                    "hint": "Inspect the error and existing channel/script receipts, then decide whether to correct the request, stop, or ask the user. Current identity and authorization remain required.",
+                    **getattr(exc, "details", {})}
 
     async def send_script_reply_once(self):
         reply = self.interaction_api.channels.claim_reply()

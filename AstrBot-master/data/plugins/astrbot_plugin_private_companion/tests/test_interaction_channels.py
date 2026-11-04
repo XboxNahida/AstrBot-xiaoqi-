@@ -56,7 +56,7 @@ def test_collection_uses_real_scope_cursor_and_time_window(channels, scope):
 
 
 def test_old_script_reply_is_rejected_after_new_message(channels, scope):
-    c = opened(channels, scope)
+    c = channels.open(scope, "source:main", {}, cancel_on_input=True)
     reply = channels.request_reply(c["id"], "r1", "叫用户起床", based_on_seq=0)
     assert (
         channels.request_reply(c["id"], "r1", "叫用户起床", based_on_seq=0)["id"]
@@ -125,3 +125,54 @@ def test_expiry_refuses_reply_and_event_collection(channels, scope):
 def test_invalid_channel_lifetime(channels, scope, bad):
     with pytest.raises(ValueError):
         channels.open(scope, "source", {}, ttl_seconds=bad)
+
+
+def test_renew_keeps_existing_channel_and_state_but_never_changes_owner(channels, scope):
+    c = opened(channels, scope)
+    channels.set_state(c["id"], 0, {"进度": 2})
+    channels.clock = lambda: 5000
+    with pytest.raises(PermissionError, match="channel_not_owned"):
+        channels.renew(replace(scope, sender_id="other"), c["id"], ttl_seconds=100)
+    renewed = channels.renew(scope, c["id"], ttl_seconds=100)
+    assert renewed["id"] == c["id"] and renewed["token"] == c["token"]
+    assert renewed["expires_at"] == 5100
+    assert renewed["state"] == {"进度": 2}
+    channels.control(c["id"], "close")
+    with pytest.raises(ValueError, match="channel_closed"):
+        channels.renew(scope, c["id"], ttl_seconds=100)
+
+
+def test_new_channel_keeps_pending_reply_when_input_arrives(channels, scope):
+    c = opened(channels, scope)
+    reply = channels.request_reply(c["id"], "one", "脚本决定继续", based_on_seq=0)
+    claimed = channels.claim_reply()
+    channels.observe(scope, "m1", "新内容", [], 1001)
+    assert channels.begin_reply(claimed)
+    assert channels.reply_status(c["id"], reply["id"])["status"] == "sending"
+    channels.request_reply(c["id"], "two", "允许旧观察", based_on_seq=0)
+
+
+def test_cancel_on_input_is_explicit_and_can_be_updated(channels, scope):
+    c = channels.open(scope, "cancel", {}, cancel_on_input=True)
+    reply = channels.request_reply(c["id"], "one", "回复即停止", based_on_seq=0)
+    channels.observe(scope, "m1", "醒了", [], 1001)
+    assert channels.reply_status(c["id"], reply["id"])["status"] == "superseded"
+    with pytest.raises(ValueError, match="stale_cursor"):
+        channels.request_reply(c["id"], "two", "旧观察", based_on_seq=0)
+    channels.renew(scope, c["id"], ttl_seconds=100, cancel_on_input=False)
+    channels.request_reply(c["id"], "three", "模型决定继续", based_on_seq=0)
+    channels.control(c["id"], "stop", pause=False)
+    assert channels.claim_reply() is None
+
+
+def test_existing_database_migration_preserves_old_input_policy(channels, scope):
+    c = opened(channels, scope)
+    channels.set_state(c["id"], 0, {"保留": True})
+    with channels.transaction() as db:
+        db.execute("ALTER TABLE ic_channels DROP COLUMN cancel_on_input")
+    migrated = InteractionChannels(channels.path, clock=lambda: 1000)
+    old = migrated.get(scope, c["id"])
+    assert old["cancel_on_input"] == 1
+    assert old["state"] == {"保留": True}
+    assert old["token"] == c["token"]
+    assert migrated.open(scope, "new", {})["cancel_on_input"] == 0

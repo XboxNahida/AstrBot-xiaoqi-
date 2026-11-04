@@ -665,7 +665,12 @@ async def append_capability_guidance(
         reuse_enabled = bool(getattr(self, "enable_hub_decision_reuse", False))
         task_summary = {}
         task_runtime = getattr(self, "_persistent_task_runtime", None)
-        persistent_snapshot = task_runtime.snapshot(event) if task_runtime is not None else ""
+        persistent_snapshot = ""
+        if task_runtime is not None:
+            try:
+                persistent_snapshot = task_runtime.snapshot(event)
+            except Exception as exc:
+                logger.warning("Capability hub event task snapshot unavailable: error=%s", type(exc).__name__)
         task_store = getattr(self, "_conversation_task_states", None)
         if task_store is not None:
             try:
@@ -674,7 +679,7 @@ async def append_capability_guidance(
                 )
             except Exception:
                 pass
-        input_stamp = hub_semantic_stamp({
+        stamp_inputs = {
             "event_id": current_message_id or current_pending_id,
             "current_message": current_text, "sender": sender_id, "scope": scope,
             "current_media": {"image": has_current_image, "voice": has_current_voice},
@@ -692,26 +697,36 @@ async def append_capability_guidance(
             "identity": getattr(event, "_private_companion_bot_identity", None),
             "task": task_summary,
             "persistent_tasks": persistent_snapshot,
+            "available_actions": available_actions,
             "settings": [getattr(self, name, None) for name in (
                 "conversation_hub_provider_id", "llm_provider_id", "enable_short_term_emotion",
                 "enable_conversation_model_routing", "enable_hub_context_compaction",
                 "hub_recent_message_limit", "enable_hub_persona_summary", "enable_hub_group_batching",
             )],
-        }) if reuse_enabled else ""
+        } if reuse_enabled else {}
+        input_stamp = hub_semantic_stamp(stamp_inputs) if reuse_enabled else ""
+        previous_actions = tuple(getattr(event, "_private_companion_hub_available_actions", ()))
+        compatible_stamp = input_stamp
+        if reuse_enabled and set(available_actions) < set(previous_actions):
+            # Capability removal only filters an existing approval; additions need a new judgment.
+            compatible_stamp = hub_semantic_stamp({
+                **stamp_inputs, "available_actions": list(previous_actions),
+            })
         observed_queue = getattr(event, "_private_companion_hub_decision_queue_stamp", ())
         observed_ids = {row[0] for row in observed_queue}
         relevant_queue = tuple(
             row for row in queue_stamp if row[0] in observed_ids or row[2]
         )
         reuse_valid = (
-            input_stamp == getattr(event, "_private_companion_hub_input_stamp", None)
-            and not str(getattr(existing_decision, "reason", "")).startswith("hub_unavailable")
+            compatible_stamp == getattr(event, "_private_companion_hub_input_stamp", None)
             and (
                 not bool(getattr(existing_decision, "reply", True))
                 or relevant_queue == observed_queue
             )
         )
-        reused_decision = existing_decision is not None and (
+        reused_decision = existing_decision is not None and not str(
+            getattr(existing_decision, "reason", "")
+        ).startswith("hub_unavailable") and (
             reuse_valid if reuse_enabled else not force_rejudge
         )
         if reused_decision:
@@ -811,6 +826,7 @@ async def append_capability_guidance(
         setattr(event, "_private_companion_capability_decision", decision)
         setattr(event, "_private_companion_hub_queue_stamp", queue_stamp)
         setattr(event, "_private_companion_hub_input_stamp", input_stamp)
+        setattr(event, "_private_companion_hub_available_actions", tuple(available_actions))
         if not reused_decision:
             setattr(event, "_private_companion_hub_decided_ts", now.timestamp())
             setattr(event, "_private_companion_hub_decision_queue_stamp", queue_stamp)

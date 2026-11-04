@@ -124,7 +124,7 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         result = await self.executor().execute(job)
         self.assertEqual("done", result["text"])
         self.assertEqual(["read"], result["successful_tool_names"])
-        self.assertEqual("required", self.primary.requests[0]["tool_choice"])
+        self.assertEqual("auto", self.primary.requests[0]["tool_choice"])
         self.assertEqual("auto", self.primary.requests[1]["tool_choice"])
         self.assertTrue(
             all(r["request_max_retries"] == 0 for r in self.primary.requests)
@@ -153,23 +153,52 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("2", result["receipts"][0]["receipt"]["operation_id"])
         self.assertIn("correct the path", str(self.primary.requests[1]["contexts"]))
 
-    async def test_readonly_workspace_corrections_are_bounded_and_permission_denial_stops(self):
+    async def test_readonly_workspace_corrections_continue_until_model_reports_blocked(self):
         name = "pc_task_workspace"
         self.tools = {name: SimpleNamespace(name=name)}
-        job = self.submit(tool_names=[name], required_tool_names=[name])
-        self.primary = Provider(*(Response(calls=[(name, {"action": "list"})]) for _ in range(4)))
+        job = self.submit(tool_names=[name], required_tool_names=[name], completion_contract="status_v1")
+        self.primary = Provider(
+            *(Response(calls=[(name, {"action": "list"})]) for _ in range(5)),
+            Response('{"task_status":"blocked","text":"核对五次失败，当前路径不可用"}'),
+        )
+        calls = []
         async def fail(*args):
+            calls.append(args)
             return {"status": "error", "content": "bad path", "receipt": {"operation_id": "error"}, "recoverable": True}
-        await self.run_failure(self.executor(execute_tool=fail), job, "tool_failed")
-        self.assertEqual(3, len(self.primary.requests))
+        state = await self.run_failure(self.executor(execute_tool=fail), job, "task_incomplete")
+        self.assertEqual("failed", state.status)
+        self.assertEqual(5, len(calls))
+        self.assertEqual(6, len(self.primary.requests))
+        self.assertTrue(all(r["tool_choice"] == "auto" for r in self.primary.requests))
+        report = next(step for step in state.steps.values() if step["kind"] == "completion_report")
+        self.assertEqual([], report["receipts"])
 
     async def test_required_tool_group_accepts_alternative_with_real_receipt(self):
         job = self.submit(required_tool_names=[], required_tool_groups=[["read", "write"]])
         self.primary = Provider(Response(calls=[("write", {})]), Response("done"))
         result = await self.executor().execute(job)
         self.assertEqual(["write"], result["successful_tool_names"])
-        self.assertEqual("required", self.primary.requests[0]["tool_choice"])
+        self.assertEqual("auto", self.primary.requests[0]["tool_choice"])
         self.assertEqual("auto", self.primary.requests[1]["tool_choice"])
+
+    async def test_missing_interaction_id_can_be_corrected_without_fake_success(self):
+        name = "pc_interaction_channel"
+        self.tools = {name: SimpleNamespace(name=name)}
+        job = self.submit(tool_names=[name], required_tool_names=[name])
+        self.primary = Provider(
+            Response(calls=[(name, {"action": "read"})]),
+            Response(calls=[(name, {"action": "list"})]),
+            Response("done"),
+        )
+        calls = []
+        async def execute(job, tool, args):
+            calls.append(args)
+            return {"status": "error" if len(calls) == 1 else "success", "content": "channel_id_required: list or open first" if len(calls) == 1 else "channels: []", "receipt": {"operation_id": str(len(calls))}, "recoverable": len(calls) == 1}
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual(2, len(calls))
+        self.assertEqual(["pc_interaction_channel"], result["successful_tool_names"])
+        self.assertEqual(1, len(result["receipts"]))
+        self.assertEqual("2", result["receipts"][0]["receipt"]["operation_id"])
 
     async def test_query_then_blocked_is_not_completed_and_preserves_reason(self):
         job = self.submit(completion_contract="status_v1")
@@ -205,15 +234,23 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.primary = Provider(Response("查到了，但还没改"))
         await self.run_failure(self.executor(), job, "protocol_error")
 
-    async def test_unrelated_tool_cannot_satisfy_required_group(self):
-        job = self.submit(required_tool_names=[], required_tool_groups=[["write"]])
-        self.primary = Provider(Response(calls=[("read", {})]), Response("done"))
-        await self.run_failure(self.executor(), job, "missing_required_tool")
+    async def test_model_can_complete_with_tool_outside_suggested_group(self):
+        job = self.submit(required_tool_names=[], required_tool_groups=[["write"]], completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {})]),
+            Response('{"task_status":"completed","text":"查询已满足任务目标"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual(["read"], result["successful_tool_names"])
+        self.assertEqual("tool_receipts", result["verification"])
 
-    async def test_missing_group_capability_fails_before_model_request(self):
-        job = self.submit(required_tool_names=[], required_tool_groups=[["not_allowed"]])
-        await self.run_failure(self.executor(), job, "permission_denied")
-        self.assertEqual([], self.primary.requests)
+    async def test_missing_suggested_capability_is_reported_to_model_without_exposure(self):
+        job = self.submit(required_tool_names=[], required_tool_groups=[["not_allowed"]], completion_contract="status_v1")
+        self.primary = Provider(Response('{"task_status":"blocked","text":"当前工具不能完成操作"}'))
+        await self.run_failure(self.executor(), job, "task_incomplete")
+        self.assertEqual(1, len(self.primary.requests))
+        self.assertEqual({"read", "write"}, {tool.name for tool in self.primary.requests[0]["func_tool"].tools})
+        self.assertEqual([], self.executions)
 
     async def test_invalid_group_schema_is_rejected(self):
         job = self.submit(required_tool_groups=["write"])
@@ -256,24 +293,25 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
                 "SECRET", repr(db.execute("SELECT * FROM pt_outbox").fetchall())
             )
 
-    async def test_missing_required_tool_only_one_correction(self):
-        job = self.submit()
-        self.primary = Provider(Response("done"))
-        state = await self.run_failure(self.executor(), job, "missing_required_tool")
-        self.assertEqual("waiting_retry", state.status)
-        self.now += 16
-        job = self.service.claim("retry")
-        self.fallback = Provider(Response("done again"))
-        state = await self.run_failure(self.executor(), job, "missing_required_tool")
-        self.assertEqual("failed", state.status)
+    async def test_structured_model_completion_does_not_force_suggested_tool(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(Response('{"task_status":"completed","text":"现有信息足以回答"}'))
+        result = await self.executor().execute(job)
+        self.assertEqual("model_report_only", result["verification"])
+        self.assertEqual([], result["receipts"])
+        self.assertEqual("auto", self.primary.requests[0]["tool_choice"])
         self.assertEqual([], self.executions)
 
     async def test_no_available_tool_never_falls_back_to_host_tools(self):
-        job = self.submit()
+        job = self.submit(completion_contract="status_v1")
         self.tools = {}
-        state = await self.run_failure(self.executor(), job, "permission_denied")
-        self.assertEqual("waiting_user", state.status)
-        self.assertEqual([], self.primary.requests)
+        self.primary = Provider(Response('{"task_status":"blocked","text":"当前没有可用工具"}'))
+        state = await self.run_failure(self.executor(), job, "task_incomplete")
+        self.assertEqual("failed", state.status)
+        self.assertEqual([], self.primary.requests[0]["func_tool"].tools)
+        self.assertEqual("auto", self.primary.requests[0]["tool_choice"])
+        self.assertEqual([], self.executions)
+        self.assertEqual([], self.permissions)
 
     async def test_revoked_between_calls_stops_before_second_tool(self):
         job = self.submit()
@@ -314,31 +352,42 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("cancelled", state.status)
         self.assertEqual({}, state.steps)
 
-    async def test_tool_exception_is_unknown_result_and_never_automatic_retry(self):
-        job = self.submit()
-        self.primary = Provider(Response(calls=[("read", {})]))
+    async def test_tool_exception_is_returned_to_model_without_blind_retry_or_secret(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("write", {})]),
+            Response('{"task_status":"blocked","text":"操作结果不确定，需要核实"}'),
+        )
 
         async def execute(job, tool, args):
+            self.executions.append((job.scope, tool.name, args))
             raise RuntimeError("SECRET tool token")
 
         state = await self.run_failure(
-            self.executor(execute_tool=execute), job, "unknown_result"
+            self.executor(execute_tool=execute), job, "task_incomplete"
         )
-        self.assertEqual("unknown_result", state.status)
+        self.assertEqual("failed", state.status)
+        self.assertEqual(1, len(self.executions))
+        self.assertIn("unknown_result", str(self.primary.requests[1]["contexts"]))
+        self.assertNotIn("SECRET", str(self.primary.requests))
+        self.assertNotIn("SECRET", str(state.steps))
         self.assertIsNone(self.service.claim("again"))
 
-    async def test_provider_budget_is_shared_by_primary_and_fallback(self):
+    async def test_provider_outage_keeps_waiting_retry_beyond_three_attempts(self):
         job = self.submit(mode="reasoning", required_tool_names=[])
         self.primary = Provider(RuntimeError("down"))
-        self.fallback = Provider(RuntimeError("down"), RuntimeError("down"))
-        for delay in (16, 61, 0):
+        self.fallback = Provider(*(RuntimeError("down") for _ in range(4)), Response("recovered"))
+        for delay in (15, 60, 60, 60, 60):
             state = await self.run_failure(self.executor(), job, "provider_unavailable")
+            self.assertEqual("waiting_retry", state.status)
+            self.assertIsNone(self.service.claim("too-early"))
             self.now += delay
             job = self.service.claim("next")
-        self.assertEqual("failed", state.status)
+            self.assertIsNotNone(job)
+        result = await self.executor().execute(job)
+        self.assertEqual("recovered", result["text"])
         self.assertEqual(1, len(self.primary.requests))
-        self.assertEqual(2, len(self.fallback.requests))
-        self.assertIsNone(job)
+        self.assertEqual(5, len(self.fallback.requests))
 
     async def test_only_explicit_reasoning_mode_allows_completion_without_tools(self):
         job = self.submit(required_tool_names=[])
@@ -361,12 +410,16 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("waiting_user", state.status)
         self.assertEqual([], self.executions)
 
-    async def test_thirty_successful_steps_are_an_absolute_bound(self):
-        job = self.submit()
-        self.primary = Provider(*[Response(calls=[("read", {})]) for _ in range(31)])
-        state = await self.run_failure(self.executor(), job, "step_limit")
-        self.assertEqual(30, len(self.executions))
-        self.assertEqual(30, len(state.steps))
+    async def test_model_can_finish_after_more_than_thirty_successful_steps(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            *(Response(calls=[("read", {"index": index})]) for index in range(31)),
+            Response('{"task_status":"completed","text":"全部步骤完成"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual(31, len(self.executions))
+        self.assertEqual(31, len(result["receipts"]))
+        self.assertEqual(31, len(self.service.get(job.task_id, job.scope).steps))
 
     async def test_non_success_or_missing_receipt_is_unknown_result(self):
         for receipt in (
@@ -395,29 +448,36 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("inspect", [m["content"] for m in messages])
 
     async def test_protocol_correction_informs_model_without_raw_error(self):
-        job = self.submit()
-        self.primary = Provider(Response("done"))
-        await self.run_failure(self.executor(), job, "missing_required_tool")
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(Response('{"task_status":"SECRET invalid status","text":"invalid"}'))
+        await self.run_failure(self.executor(), job, "protocol_error")
         self.now += 16
         job = self.service.claim("retry")
-        self.fallback = Provider(Response(calls=[("read", {})]), Response("done"))
-        self.primary = Provider(Response("done"))
+        self.fallback = Provider(Response('{"task_status":"completed","text":"已纠正协议"}'))
         await self.executor().execute(job)
         self.assertIn(
-            "missing_required_tool", self.fallback.requests[0]["system_prompt"]
+            "protocol_error", self.fallback.requests[0]["system_prompt"]
         )
+        self.assertNotIn("SECRET", str(self.fallback.requests))
 
-    async def test_schema_error_corrects_once_without_invoking_tool(self):
+    async def test_schema_error_is_corrected_by_model_before_tool_execution(self):
         self.tools["read"].parameters = {
             "type": "object",
             "required": ["path"],
             "properties": {"path": {"type": "string"}},
         }
-        job = self.submit()
-        self.primary = Provider(Response(calls=[("read", {"path": 123})]))
-        state = await self.run_failure(self.executor(), job, "tool_argument_error")
-        self.assertEqual("waiting_retry", state.status)
-        self.assertEqual([], self.executions)
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {"path": 123})]),
+            Response(calls=[("read", {"path": "fixed"})]),
+            Response('{"task_status":"completed","text":"参数已修正并执行"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual([{"path": "fixed"}], [item[2] for item in self.executions])
+        self.assertEqual(1, len(self.permissions))
+        self.assertEqual(1, len(result["receipts"]))
+        self.assertIn("tool_argument_error", str(self.primary.requests[1]["contexts"]))
+        self.assertIn("not_executed", str(self.primary.requests[1]["contexts"]))
 
     async def test_pending_second_tool_resumes_without_repeating_first(self):
         job = self.submit()
@@ -438,17 +498,189 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_partial_batch_parameter_correction_does_not_repeat_success(self):
         self.tools["write"].parameters = {"type": "object", "required": ["path"]}
-        job = self.submit()
-        self.primary = Provider(Response(calls=[("read", {}), ("write", {})]))
-        await self.run_failure(self.executor(), job, "tool_argument_error")
-        self.now += 16
-        job = self.service.claim("correct")
+        job = self.submit(completion_contract="status_v1")
         self.primary = Provider(
-            Response(calls=[("write", {"path": "fixed"})]), Response("done")
+            Response(calls=[("read", {}), ("write", {})]),
+            Response(calls=[("write", {"path": "fixed"})]),
+            Response('{"task_status":"completed","text":"保留查询结果后修正写入"}'),
         )
         result = await self.executor().execute(job)
         self.assertEqual(["read", "write"], [x[1] for x in self.executions])
         self.assertEqual(["read", "write"], result["successful_tool_names"])
+        self.assertEqual(2, len(result["receipts"]))
+        self.assertIn("tool_argument_error", str(self.primary.requests[1]["contexts"]))
+
+    async def test_general_failure_returns_to_model_for_repair(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("write", {"path": "wrong"})]),
+            Response(calls=[("read", {"path": "actual"})]),
+            Response('{"task_status":"completed","text":"已修正方案并核验"}'),
+        )
+        async def execute(job, tool, args):
+            self.executions.append((job.scope, tool.name, args))
+            return {"status": "error" if tool.name == "write" else "success",
+                    "content": "script_starts_after_channel_expiry" if tool.name == "write" else "actual state",
+                    "receipt": {"operation_id": tool.name}}
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual(["read"], result["successful_tool_names"])
+        self.assertEqual(1, len(result["receipts"]))
+        self.assertIn("script_starts_after_channel_expiry", str(self.primary.requests[1]["contexts"]))
+        self.assertEqual("running", self.service.get(job.task_id, job.scope).status)
+
+    async def test_model_can_choose_alternative_instead_of_required_tool(self):
+        job = self.submit(completion_contract="status_v1", required_tool_names=["read"])
+        self.primary = Provider(
+            Response(calls=[("write", {})]),
+            Response('{"task_status":"completed","text":"使用替代工具完成并核验"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual(["write"], result["successful_tool_names"])
+        self.assertTrue(all(r["tool_choice"] == "auto" for r in self.primary.requests))
+
+    async def test_host_dynamic_catalog_refreshes_before_each_model_request(self):
+        job = self.submit(
+            completion_contract="status_v1", dynamic_tool_catalog=True,
+            tool_names=["read"],
+        )
+        self.primary = Provider(
+            Response(calls=[("read", {})]),
+            Response(calls=[("write", {})]),
+            Response('{"task_status":"completed","text":"按当前目录完成"}'),
+        )
+        catalog_requests = []
+
+        def resolve(job, names):
+            catalog_requests.append(names)
+            return self.tools if self.executions else {"read": self.tools["read"]}
+
+        result = await self.executor(resolve_tools=resolve).execute(job)
+        self.assertTrue(all(names is None for names in catalog_requests))
+        self.assertGreaterEqual(len(catalog_requests), 3)
+        self.assertEqual(
+            ["read"], [tool.name for tool in self.primary.requests[0]["func_tool"].tools]
+        )
+        self.assertEqual(
+            {"read", "write"},
+            {tool.name for tool in self.primary.requests[1]["func_tool"].tools},
+        )
+        self.assertEqual(["read", "write"], [item[1] for item in self.permissions])
+        self.assertEqual(["read", "write"], result["successful_tool_names"])
+
+    async def test_injected_executor_without_host_flag_keeps_names_allowlist(self):
+        job = self.submit(tool_names=["read"])
+        self.primary = Provider(Response(calls=[("write", {})]))
+        catalog_requests = []
+
+        def resolve(job, names):
+            catalog_requests.append(names)
+            return self.tools
+
+        await self.run_failure(
+            self.executor(resolve_tools=resolve), job, "permission_denied"
+        )
+        self.assertTrue(all(names == ("read",) for names in catalog_requests))
+        self.assertEqual(
+            ["read"], [tool.name for tool in self.primary.requests[0]["func_tool"].tools]
+        )
+        self.assertEqual([], self.executions)
+        self.assertEqual([], self.permissions)
+
+    async def test_model_can_report_blocked_after_ordinary_error(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {})]),
+            Response('{"task_status":"blocked","text":"核对失败原因后决定暂缓"}'),
+        )
+        async def fail(*args):
+            return {"status": "error", "content": "known failure", "receipt": {"observed": True}}
+        state = await self.run_failure(self.executor(execute_tool=fail), job, "task_incomplete")
+        reports = [s for s in state.steps.values() if s.get("kind") == "completion_report"]
+        self.assertEqual("核对失败原因后决定暂缓", reports[0]["text"])
+        self.assertEqual([], reports[0]["receipts"])
+
+    async def test_failure_replans_before_remaining_batch_operations(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("write", {"path": "bad"}), ("write", {"path": "stale"})]),
+            Response(calls=[("read", {})]),
+            Response('{"task_status":"completed","text":"已核对当前结果"}'),
+        )
+        async def execute(job, tool, args):
+            self.executions.append((job.scope, tool.name, args))
+            return {"status": "error" if tool.name == "write" else "success",
+                    "content": "invalid schedule" if tool.name == "write" else "verified",
+                    "receipt": {"operation_id": str(len(self.executions))}}
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual(["write", "read"], [x[1] for x in self.executions])
+        self.assertIn("not_executed", str(self.primary.requests[1]["contexts"]))
+        self.assertEqual(1, len(result["receipts"]))
+
+    async def test_error_checkpoint_survives_model_outage_without_replaying_tool(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(Response(calls=[("write", {})]), RuntimeError("backend unavailable"))
+        async def execute(job, tool, args):
+            self.executions.append((job.scope, tool.name, args))
+            return {"status": "error" if tool.name == "write" else "success", "content": "known failure", "receipt": {"observed": True}}
+        await self.run_failure(self.executor(execute_tool=execute), job, "provider_unavailable")
+        self.now += 16
+        resumed = self.service.claim("resume-model")
+        self.fallback = Provider(
+            Response(calls=[("read", {})]),
+        )
+        self.primary = Provider(Response('{"task_status":"completed","text":"恢复后完成核验"}'))
+        result = await self.executor(execute_tool=execute).execute(resumed)
+        self.assertEqual(["write", "read"], [x[1] for x in self.executions])
+        self.assertEqual(["read"], result["successful_tool_names"])
+        self.assertIn("known failure", str(self.fallback.requests[0]["contexts"]))
+
+    async def test_long_task_keeps_running_and_compacts_complete_rounds(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            *(Response(calls=[("read", {"index": i})]) for i in range(70)),
+            Response('{"task_status":"completed","text":"长任务完成"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual(70, len(result["receipts"]))
+        self.assertEqual(70, len(self.executions))
+        final_context = self.primary.requests[-1]["contexts"]
+        self.assertIn("inspect", [m.get("content") for m in final_context])
+        ids = set()
+        for message in final_context:
+            if message["role"] == "assistant":
+                ids.update(call["id"] for call in message.get("tool_calls", []))
+            elif message["role"] == "tool":
+                self.assertIn(message["tool_call_id"], ids)
+
+    async def test_bad_arguments_can_be_corrected_without_scheduler_failure(self):
+        self.tools["read"].parameters = {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("read", {"path": 123})]),
+            Response(calls=[("read", {"path": "valid"})]),
+            Response('{"task_status":"completed","text":"已纠正参数"}'),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual(1, len(self.executions))
+        self.assertEqual(1, len(result["receipts"]))
+        self.assertIn("tool_argument_error", str(self.primary.requests[1]["contexts"]))
+
+    async def test_uncertain_tool_result_is_returned_for_model_verification(self):
+        job = self.submit(completion_contract="status_v1")
+        self.primary = Provider(
+            Response(calls=[("write", {})]),
+            Response(calls=[("read", {})]),
+            Response('{"task_status":"completed","text":"查询确认操作已生效"}'),
+        )
+        async def execute(job, tool, args):
+            self.executions.append((job.scope, tool.name, args))
+            if tool.name == "write":
+                raise TaskFailure("unknown_result")
+            return {"status": "success", "content": "confirmed actual state", "receipt": {"observation_id": "verified"}}
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual(["write", "read"], [x[1] for x in self.executions])
+        self.assertEqual(["read"], result["successful_tool_names"])
+        self.assertIn("unknown_result", str(self.primary.requests[1]["contexts"]))
 
     async def test_oversized_context_rejected_before_provider_or_tool(self):
         job = self.submit(contexts=[{"role": "user", "content": "x" * 131072}])

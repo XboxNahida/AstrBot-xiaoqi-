@@ -82,7 +82,7 @@ class TaskServiceTests(unittest.TestCase):
         self.assertFalse(self.service.progress(job, "late"))
         self.assertEqual("cancelled", self.service.get(task.task_id, self.scope).status)
 
-    def test_retry_budget_counts_primary_and_fallback_and_backoff(self):
+    def test_retryable_failures_keep_waiting_past_three_attempts_with_backoff(self):
         task = self.submit()
         job = self.service.claim("one")
         self.assertEqual(1, job.attempts)
@@ -97,14 +97,77 @@ class TaskServiceTests(unittest.TestCase):
         self.clock.now += 1
         job = self.service.claim("three")
         self.assertEqual(3, job.attempts)
-        self.assertFalse(self.service.begin_attempt(job, "fallback"))
         self.assertTrue(self.service.fail(job, "network", retryable=True))
-        self.assertEqual("failed", self.service.get(task.task_id, self.scope).status)
+        self.assertEqual(
+            "waiting_retry", self.service.get(task.task_id, self.scope).status
+        )
+        restarted = TaskService(self.path, clock=self.clock)
+        for expected in range(4, 9):
+            self.assertIsNone(restarted.claim("too-early"))
+            self.clock.now += 60
+            job = restarted.claim("continued")
+            self.assertIsNotNone(job)
+            self.assertEqual(expected, job.attempts)
+            self.assertTrue(restarted.fail(job, "network", retryable=True))
+            self.assertEqual(
+                "waiting_retry", restarted.get(task.task_id, self.scope).status
+            )
         self.assertTrue(self.service.retry(task.task_id, self.scope))
         job = self.service.claim("manual")
         self.assertEqual(1, job.attempts)
         self.assertTrue(self.service.begin_attempt(job, "fallback"))
         self.assertEqual(2, self.service.get(task.task_id, self.scope).attempts)
+
+    def test_additional_model_requests_are_recorded_without_a_business_failure_limit(
+        self,
+    ):
+        task = self.submit()
+        job = self.service.claim("worker")
+        for index in range(8):
+            self.assertTrue(self.service.begin_attempt(job, f"provider-{index}"))
+        current = self.service.get(task.task_id, self.scope)
+        self.assertEqual(9, current.attempts)
+        self.assertEqual("running", current.status)
+        self.assertTrue(
+            self.service.finish(job, {"receipt": "verified after recovery"})
+        )
+
+    def test_resume_after_authorization_or_input_wait_ignores_historical_attempt_count(
+        self,
+    ):
+        for error_kind in (
+            "permission_denied",
+            "authorization_expired",
+            "missing_input",
+        ):
+            with self.subTest(error_kind=error_kind):
+                task = self.submit(error_kind)
+                job = self.service.claim("worker")
+                self.assertTrue(self.service.begin_attempt(job, "primary"))
+                self.assertTrue(self.service.begin_attempt(job, "fallback"))
+                self.assertTrue(self.service.fail(job, error_kind, retryable=True))
+                self.assertEqual(
+                    "waiting_user", self.service.get(task.task_id, self.scope).status
+                )
+                self.assertIsNone(self.service.claim("unauthorized-replay"))
+                self.assertTrue(self.service.resume(task.task_id, self.scope))
+                self.assertEqual(
+                    "queued", self.service.get(task.task_id, self.scope).status
+                )
+                job = self.service.claim("authorized-resume")
+                self.assertEqual(4, job.attempts)
+                self.assertTrue(self.service.finish(job, {"receipt": "resumed safely"}))
+
+    def test_paused_retry_with_many_attempts_can_resume(self):
+        task = self.submit()
+        job = self.service.claim("worker")
+        self.assertTrue(self.service.begin_attempt(job, "primary"))
+        self.assertTrue(self.service.begin_attempt(job, "fallback"))
+        self.assertTrue(self.service.fail(job, "network", retryable=True))
+        self.assertTrue(self.service.pause(task.task_id, self.scope))
+        self.assertTrue(self.service.resume(task.task_id, self.scope))
+        self.assertEqual("queued", self.service.get(task.task_id, self.scope).status)
+        self.assertIsNotNone(self.service.claim("resumed"))
 
     def test_step_checkpoints_survive_retry_and_require_evidence(self):
         task = self.submit()
@@ -324,14 +387,27 @@ class TaskServiceTests(unittest.TestCase):
             ]
             self.assertEqual(1, sum(future.result() is not None for future in futures))
 
-    def test_protocol_error_gets_only_one_correction(self):
-        task = self.submit()
-        job = self.service.claim("one")
-        self.service.fail(job, "missing_required_tool", retryable=True)
-        self.clock.now += 15
-        job = self.service.claim("two")
-        self.service.fail(job, "missing_required_tool", retryable=True)
-        self.assertEqual("failed", self.service.get(task.task_id, self.scope).status)
+    def test_retryable_protocol_errors_do_not_decide_business_failure_after_one_correction(
+        self,
+    ):
+        for error_kind in (
+            "missing_required_tool",
+            "tool_argument_error",
+            "protocol_error",
+        ):
+            with self.subTest(error_kind=error_kind):
+                task = self.submit(error_kind)
+                for _ in range(4):
+                    job = self.service.claim("worker")
+                    self.assertIsNotNone(job)
+                    self.service.fail(job, error_kind, retryable=True)
+                    self.assertEqual(
+                        "waiting_retry",
+                        self.service.get(task.task_id, self.scope).status,
+                    )
+                    self.clock.now += 60
+                job = self.service.claim("recovered")
+                self.assertTrue(self.service.finish(job, {"receipt": "corrected"}))
 
     def test_completed_current_step_is_not_automatically_repeated(self):
         task = self.submit()

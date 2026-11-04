@@ -53,6 +53,11 @@ class InteractionChannels:
                 CREATE INDEX IF NOT EXISTS ic_reply_ready ON ic_replies(status,channel_id);
             """
             )
+            if "cancel_on_input" not in {
+                row["name"] for row in db.execute("PRAGMA table_info(ic_channels)")
+            }:
+                # Existing channels retain their previously selected behavior.
+                db.execute("ALTER TABLE ic_channels ADD COLUMN cancel_on_input INTEGER NOT NULL DEFAULT 1")
 
     @contextmanager
     def transaction(self):
@@ -84,10 +89,10 @@ class InteractionChannels:
             raise ValueError("trusted_identity_required")
         return scope.bot_id, scope.session_key, scope.sender_id
 
-    def _channel(self, db, channel_id, *, allow_paused=True):
+    def _channel(self, db, channel_id, *, allow_paused=True, allow_expired=False):
         row = db.execute(
-            "SELECT * FROM ic_channels WHERE id=? AND expires_at>? AND status!='closed'",
-            (channel_id, self.clock()),
+            "SELECT * FROM ic_channels WHERE id=? AND (? OR expires_at>?) AND status!='closed'",
+            (channel_id, bool(allow_expired), self.clock()),
         ).fetchone()
         if row is None or (not allow_paused and row["status"] != "open"):
             raise ValueError("channel_not_open")
@@ -96,7 +101,7 @@ class InteractionChannels:
         data["state"] = json.loads(data.pop("state_json"))
         return data
 
-    def open(self, scope, origin_key, metadata, *, ttl_seconds=86400):
+    def open(self, scope, origin_key, metadata, *, ttl_seconds=86400, cancel_on_input=False):
         """Open one channel idempotently using a source task's trusted identity.
 
         Args:
@@ -121,11 +126,12 @@ class InteractionChannels:
             or not origin_key
             or len(origin_key) > 256
             or not isinstance(metadata, dict)
+            or type(cancel_on_input) is not bool
         ):
             raise ValueError("invalid_channel_source")
         with self.transaction() as db:
             db.execute(
-                "INSERT OR IGNORE INTO ic_channels(id,bot_id,session_key,sender_id,origin_key,token,metadata,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO ic_channels(id,bot_id,session_key,sender_id,origin_key,token,metadata,expires_at,cancel_on_input) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
                     uuid4().hex,
                     *identity,
@@ -133,6 +139,7 @@ class InteractionChannels:
                     secrets.token_urlsafe(32),
                     self.encode(metadata),
                     self.clock() + ttl_seconds,
+                    int(cancel_on_input),
                 ),
             )
             row = db.execute(
@@ -141,14 +148,51 @@ class InteractionChannels:
             ).fetchone()
             return self._channel(db, row["id"])
 
-    def get(self, scope, channel_id):
+    def renew(self, scope, channel_id, *, ttl_seconds, cancel_on_input=None):
+        """Change an owned lifetime only after the host checks current authorization.
+
+        An elapsed channel lifetime can be extended by its trusted owner. Closed
+        channels stay closed, and script tokens cannot authenticate after expiry.
+        """
+        if (
+            type(ttl_seconds) not in (int, float)
+            or not math.isfinite(ttl_seconds)
+            or ttl_seconds <= 0
+            or not math.isfinite(self.clock() + ttl_seconds)
+        ):
+            raise ValueError("invalid_channel_lifetime")
+        if cancel_on_input is not None and type(cancel_on_input) is not bool:
+            raise ValueError("invalid_input_policy")
         with self.transaction() as db:
             row = db.execute(
-                "SELECT id FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? AND id=?",
+                "SELECT * FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? AND id=?",
+                (*self._identity(scope), channel_id),
+            ).fetchone()
+            if row is None:
+                raise PermissionError("channel_not_owned")
+            if row["status"] == "closed":
+                raise ValueError("channel_closed")
+            db.execute(
+                "UPDATE ic_channels SET expires_at=?,cancel_on_input=? WHERE id=?",
+                (self.clock() + ttl_seconds,
+                 row["cancel_on_input"] if cancel_on_input is None else int(cancel_on_input),
+                 channel_id),
+            )
+            return self._channel(db, channel_id)
+
+    def get(self, scope, channel_id, *, include_inactive=False):
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? AND id=?",
                 (*self._identity(scope), channel_id),
             ).fetchone()
             if row is None:
                 return None
+            if include_inactive:
+                data = dict(row)
+                data["metadata"] = json.loads(data["metadata"])
+                data["state"] = json.loads(data.pop("state_json"))
+                return data
             try:
                 return self._channel(db, row["id"])
             except ValueError:
@@ -159,7 +203,7 @@ class InteractionChannels:
             return [
                 dict(row)
                 for row in db.execute(
-                    "SELECT id,status,seq,generation,expires_at FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY rowid DESC LIMIT 50",
+                    "SELECT id,status,seq,generation,expires_at,cancel_on_input FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY rowid DESC LIMIT 50",
                     self._identity(scope),
                 ).fetchall()
             ]
@@ -196,7 +240,7 @@ class InteractionChannels:
         updated = 0
         with self.transaction() as db:
             rows = db.execute(
-                "SELECT id,seq FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? AND status!='closed' AND expires_at>?",
+                    "SELECT id,seq,cancel_on_input FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? AND status!='closed' AND expires_at>?",
                 (*self._identity(scope), self.clock()),
             ).fetchall()
             for row in rows:
@@ -216,10 +260,11 @@ class InteractionChannels:
                     db.execute(
                         "UPDATE ic_channels SET seq=seq+1 WHERE id=?", (row["id"],)
                     )
-                    db.execute(
-                        "UPDATE ic_replies SET status='superseded' WHERE channel_id=? AND status IN ('pending','preparing')",
-                        (row["id"],),
-                    )
+                    if row["cancel_on_input"]:
+                        db.execute(
+                            "UPDATE ic_replies SET status='superseded' WHERE channel_id=? AND status IN ('pending','preparing')",
+                            (row["id"],),
+                        )
         return updated
 
     def events(self, channel_id, *, after_seq=0, since=None, until=None, limit=500):
@@ -280,6 +325,7 @@ class InteractionChannels:
                 "state": channel["state"],
                 "state_revision": channel["state_revision"],
                 "expires_at": channel["expires_at"],
+                "cancel_on_input": bool(channel["cancel_on_input"]),
             }
 
     def set_state(self, channel_id, expected_revision, state):
@@ -299,7 +345,7 @@ class InteractionChannels:
         if action not in {"stop", "resume", "close"} or type(pause) is not bool:
             raise ValueError("invalid_channel_control")
         with self.transaction() as db:
-            channel = self._channel(db, channel_id)
+            channel = self._channel(db, channel_id, allow_expired=action in {"stop", "close"})
             status = (
                 "closed"
                 if action == "close"
@@ -345,7 +391,9 @@ class InteractionChannels:
                 if old["digest"] != digest:
                     raise ValueError("request_key_conflict")
                 return {"id": old["id"], "status": old["status"], "replayed": True}
-            if channel["seq"] != based_on_seq:
+            if based_on_seq < 0 or based_on_seq > channel["seq"] or (
+                channel["cancel_on_input"] and channel["seq"] != based_on_seq
+            ):
                 raise ValueError("stale_cursor")
             request_id = uuid4().hex
             db.execute(
@@ -387,7 +435,7 @@ class InteractionChannels:
                 (self.clock(),),
             )
             row = db.execute(
-                "SELECT r.* FROM ic_replies r JOIN ic_channels c ON c.id=r.channel_id WHERE r.status='pending' AND c.status='open' AND c.expires_at>? AND r.generation=c.generation AND r.based_on_seq=c.seq ORDER BY r.rowid LIMIT 1",
+                "SELECT r.* FROM ic_replies r JOIN ic_channels c ON c.id=r.channel_id WHERE r.status='pending' AND c.status='open' AND c.expires_at>? AND r.generation=c.generation AND (c.cancel_on_input=0 OR r.based_on_seq=c.seq) ORDER BY r.rowid LIMIT 1",
                 (self.clock(),),
             ).fetchone()
             if row is None:
@@ -407,7 +455,7 @@ class InteractionChannels:
         with self.transaction() as db:
             return bool(
                 db.execute(
-                    "UPDATE ic_replies SET status='sending',lease_until=? WHERE id=? AND token=? AND status='preparing' AND lease_until>? AND EXISTS(SELECT 1 FROM ic_channels c WHERE c.id=ic_replies.channel_id AND c.status='open' AND c.expires_at>? AND c.generation=ic_replies.generation AND c.seq=ic_replies.based_on_seq)",
+                    "UPDATE ic_replies SET status='sending',lease_until=? WHERE id=? AND token=? AND status='preparing' AND lease_until>? AND EXISTS(SELECT 1 FROM ic_channels c WHERE c.id=ic_replies.channel_id AND c.status='open' AND c.expires_at>? AND c.generation=ic_replies.generation AND (c.cancel_on_input=0 OR c.seq=ic_replies.based_on_seq))",
                     (
                         self.clock() + 180,
                         reply["id"],

@@ -82,6 +82,25 @@ def test_catalog_group_read_scope_and_own_write_capabilities(directory):
     assert "token" not in json.dumps(result)
 
 
+@pytest.mark.asyncio
+async def test_ordinary_read_mode_discovers_all_workspaces_without_target_write_identity(directory):
+    from task_ordinary_read import TaskOrdinaryReader
+
+    service, actors, brokers, permissions, _, _, root = directory
+    ordinary = TaskOrdinaryReader(
+        current_workspace=lambda actor: actor_workspace(root, actor),
+        authorize=lambda actor: permissions.check(actor, "read", actor_workspace(root, actor)),
+        sensitive_roots=[], redact=lambda text, limit: text[:limit],
+    )
+    service.ordinary_reader = ordinary
+    info = await service.call(actors[1], action="info")
+    assert len(info["workspaces"]) == len(actors)
+    result = await service.call(actors[1], action="read", workspace_id=account(actors[6]), path="中文文件.txt")
+    assert result["success"] and result["stdout"] == "真实内容"
+    for broker in brokers.values():
+        broker._run_payload.assert_not_awaited()
+
+
 def test_primary_private_can_discover_group_workspaces_but_no_other_private(directory):
     service, actors, _, _, _, _, _ = directory
     result = asyncio.run(service.call(actors[4], action="info"))

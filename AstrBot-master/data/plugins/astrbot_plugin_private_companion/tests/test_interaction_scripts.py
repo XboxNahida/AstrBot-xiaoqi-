@@ -114,3 +114,135 @@ async def test_script_timeout_and_arguments_are_bounded_and_quoted(scripts):
         await runner.schedule(channel, path="custom.py", key="bad", timeout=3601)
     with pytest.raises(PermissionError):
         await runner.schedule(channel, path="../outside.py", key="outside")
+
+
+@pytest.mark.asyncio
+async def test_list_scripts_discovers_existing_pending_without_duplicate(scripts):
+    runner, channel, _ = scripts
+    record = await runner.schedule(channel, path="custom.py", key="future", run_at=1060)
+    rows = runner.list(channel)
+    assert [row["id"] for row in rows] == [record["id"]]
+    assert rows[0]["status"] == "pending"
+    assert runner.list({**channel, "id": "other"}) == []
+
+
+@pytest.mark.asyncio
+async def test_expired_pending_has_terminal_receipt_instead_of_waiting_forever(scripts):
+    runner, channel, broker = scripts
+    record = await runner.schedule(channel, path="custom.py", key="future", run_at=1060)
+    runner.api.channels.clock = lambda: channel["expires_at"] + 1
+    assert await runner.tick()
+    row = runner.status(channel, record["id"])
+    assert row["status"] == "expired"
+    assert row["error_code"] == "channel_expired"
+    assert row["finished_at"] == channel["expires_at"] + 1
+    broker.run_powershell.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_failed_script_records_root_error_and_trusted_callback_once(scripts):
+    runner, channel, broker = scripts
+    callback = AsyncMock(return_value=True)
+    runner.on_script_event = callback
+    broker.run_powershell.side_effect = RuntimeError("missing_dependency " + channel["token"])
+    record = await runner.schedule(channel, path="custom.py", key="failure")
+    await runner.tick()
+    await asyncio.gather(*runner.running.values())
+    await runner.tick()
+    await runner.tick()
+    row = runner.status(channel, record["id"])
+    assert row["status"] == "failed"
+    assert "missing_dependency" in row["stderr"]
+    assert channel["token"] not in row["stderr"]
+    assert row["finished_at"] == 1000
+    callback.assert_awaited_once()
+    event = callback.await_args.args[0]
+    assert event["event_id"] == f"script:{record['id']}:failed"
+    assert event["channel"]["sender_id"] == channel["sender_id"]
+    assert event["channel"]["bot_id"] == channel["bot_id"]
+    assert channel["token"] not in str(event)
+    assert broker.run_powershell.await_count == 1
+    restarted = InteractionScripts(runner.api, on_script_event=callback)
+    await restarted.tick()
+    callback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_restart_interruption_and_expiry_callback_keep_stable_event_identity(scripts):
+    runner, channel, _ = scripts
+    running = await runner.schedule(channel, path="custom.py", key="running")
+    with runner.api.channels.transaction() as db:
+        db.execute("UPDATE ic_scripts SET status='running' WHERE id=?", (running["id"],))
+    callback = AsyncMock(return_value=True)
+    runner = InteractionScripts(runner.api, on_script_event=callback)
+    await runner.tick()
+    assert callback.await_args.args[0]["status"] == "interrupted"
+    assert runner.status(channel, running["id"])["error_code"] == "service_restarted"
+    future = await runner.schedule(channel, path="custom.py", key="future", run_at=1060)
+    runner.api.channels.clock = lambda: channel["expires_at"] + 1
+    await runner.tick()
+    assert callback.await_count == 2
+    assert callback.await_args.args[0]["event_id"] == f"script:{future['id']}:expired"
+
+
+@pytest.mark.asyncio
+async def test_revoked_authorization_suppresses_failure_callback_and_no_script_replay(scripts):
+    runner, channel, broker = scripts
+    callback = AsyncMock(return_value=True)
+    runner.on_script_event = callback
+    broker.run_powershell.side_effect = TimeoutError("process timeout")
+    record = await runner.schedule(channel, path="custom.py", key="timeout")
+    await runner.tick()
+    await asyncio.gather(*runner.running.values())
+    runner.api.runtime.interaction_allowed = lambda _: False
+    await runner.tick()
+    assert runner.status(channel, record["id"])["error_code"] == "script_timeout"
+    callback.assert_not_awaited()
+    assert broker.run_powershell.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_callback_migration_does_not_resubmit_historical_failed_scripts(scripts):
+    runner, channel, _ = scripts
+    record = await runner.schedule(channel, path="custom.py", key="old")
+    with runner.api.channels.transaction() as db:
+        db.execute("UPDATE ic_scripts SET status='failed' WHERE id=?", (record["id"],))
+    callback = AsyncMock(return_value=True)
+    restarted = InteractionScripts(runner.api, on_script_event=callback)
+    await restarted.tick()
+    callback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_finished_receipt_is_persisted_without_requesting_model_repair(scripts):
+    runner, channel, _ = scripts
+    runner.on_script_event = AsyncMock(return_value=True)
+    record = await runner.schedule(channel, path="custom.py", key="success")
+    await runner.tick()
+    await asyncio.gather(*runner.running.values())
+    await runner.tick()
+    with runner.api.channels.transaction() as db:
+        event = db.execute("SELECT * FROM ic_script_events WHERE script_id=?", (record["id"],)).fetchone()
+    assert event["status"] == "finished"
+    assert event["callback_status"] == "receipt"
+    assert runner.status(channel, record["id"])["finished_at"] == 1000
+    runner.on_script_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_callback_retry_after_restart_reuses_event_id_without_running_script(scripts):
+    runner, channel, broker = scripts
+    callback = AsyncMock(side_effect=[RuntimeError("host submission unavailable"), True])
+    runner.on_script_event = callback
+    broker.run_powershell.side_effect = TimeoutError("timeout")
+    record = await runner.schedule(channel, path="custom.py", key="once")
+    await runner.tick()
+    await asyncio.gather(*runner.running.values())
+    await runner.tick()
+    restarted = InteractionScripts(runner.api, on_script_event=callback)
+    await restarted.tick()
+    await restarted.tick()
+    assert callback.await_count == 2
+    assert callback.await_args_list[0].args[0]["event_id"] == callback.await_args_list[1].args[0]["event_id"]
+    assert callback.await_args.args[0]["script_id"] == record["id"]
+    assert broker.run_powershell.await_count == 1

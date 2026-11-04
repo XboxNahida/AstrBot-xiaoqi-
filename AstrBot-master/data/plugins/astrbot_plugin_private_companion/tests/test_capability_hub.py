@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import unittest
 import json
+import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -10,8 +9,8 @@ from unittest.mock import AsyncMock
 from astrbot_plugin_private_companion.capability_hub import (
     build_capability_context,
     capability_allowed,
-    decision_action_allowed,
     decide_capabilities,
+    decision_action_allowed,
     explicit_singing_request,
     format_capability_guidance,
     judge_capabilities,
@@ -34,6 +33,32 @@ class CapabilityHubTests(unittest.TestCase):
             previous_message_at=datetime(2026, 9, 28, 11, 59, 50, tzinfo=timezone.utc),
             recent_messages=recent,
         )
+
+    def test_task_mode_distinguishes_explicit_text_from_execution_without_actions(self):
+        context = self._context("已经调整好了，你可以试试", scope="private:u1")
+        for value, expected in ((None, "tools"), ("tools", "tools"), ("reasoning", "reasoning"), ("invalid", "tools"), ({}, "tools")):
+            with self.subTest(value=value):
+                payload = {"reply": True, "route": "task", "actions": []}
+                if value is not None:
+                    payload["task_mode"] = value
+                decision = parse_model_capability_decision(
+                    json.dumps(payload), available_capabilities=("workspace", "schedule"), context=context,
+                )
+                self.assertEqual(expected, decision.task_mode)
+
+    def test_concrete_execution_action_overrides_conflicting_reasoning_mode(self):
+        decision = parse_model_capability_decision(
+            json.dumps({"reply": True, "route": "task", "actions": ["workspace"], "task_mode": "reasoning"}),
+            available_capabilities=("workspace",), context=self._context("运行脚本"),
+        )
+        self.assertEqual("tools", decision.task_mode)
+
+    def test_chat_mode_does_not_inherit_task_reasoning_restriction(self):
+        decision = parse_model_capability_decision(
+            json.dumps({"reply": True, "route": "chat", "actions": [], "task_mode": "reasoning"}),
+            available_capabilities=(), context=self._context("你好"),
+        )
+        self.assertEqual("", decision.task_mode)
 
     def test_decision_uses_one_deduplicated_action_list(self) -> None:
         decision = decide_capabilities(
@@ -429,6 +454,7 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_workspace_action_available_only_for_current_file_authorization(self):
         from pathlib import Path
         from unittest.mock import Mock
+
         from astrbot_plugin_private_companion.task_permissions import TaskActor
         for allowed in (False, True):
             runtime = SimpleNamespace(
@@ -471,6 +497,32 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
         await judge_capabilities(plugin, context, available_capabilities=())
         runtime.snapshot_for_scope.assert_called_once_with("bot1", "bot1:FriendMessage:u1", "u1")
         self.assertIn("task-new: running", plugin._llm_call.await_args.args[0])
+
+    async def test_task_snapshot_failure_does_not_block_hub_or_leak_error_details(self):
+        from dataclasses import replace
+        from unittest.mock import Mock, patch
+
+        plugin = SimpleNamespace(
+            _persistent_task_runtime=SimpleNamespace(
+                snapshot_for_scope=Mock(side_effect=RuntimeError("api_key=private-value")),
+            ),
+            _llm_call=AsyncMock(return_value='{"reply":true,"actions":["workspace"]}'),
+        )
+        context = replace(build_capability_context(
+            scope="private:u1", current_text="你好", sender_id="u1", sender_name="甲",
+            now=datetime.now(timezone.utc),
+        ), task_session_key="bot1:FriendMessage:u1")
+        with patch("astrbot.api.logger.warning") as warning:
+            decision = await judge_capabilities(plugin, context, available_capabilities=())
+        self.assertIsNotNone(decision)
+        self.assertTrue(decision.reply)
+        self.assertEqual((), decision.actions)
+        plugin._llm_call.assert_awaited_once()
+        prompt = plugin._llm_call.await_args.args[0]
+        self.assertNotIn("private-value", prompt)
+        self.assertNotIn("persistent_tasks", json.loads(prompt.split("输入数据：\n", 1)[1]))
+        self.assertIn("RuntimeError", str(warning.call_args))
+        self.assertNotIn("private-value", str(warning.call_args))
 
     def test_scheduling_a_future_media_reminder_does_not_perform_media_now(self):
         for text in ("十分钟后提醒我唱歌", "明天七点提醒我播放音乐"):
@@ -762,6 +814,43 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(decision.reply)
         self.assertEqual("reply-primary", llm_call.await_args.kwargs["provider_id"])
         self.assertEqual("astrbot_reply", llm_call.await_args.kwargs["task"])
+
+    async def test_model_judge_repairs_malformed_output_once_in_the_same_call(self):
+        for malformed in ("not-json", '{"reply":"yes","actions":[]}'):
+            with self.subTest(malformed=malformed):
+                plugin = SimpleNamespace(
+                    conversation_hub_provider_id="hub",
+                    _llm_call=AsyncMock(side_effect=[
+                        malformed, '{"reply":true,"actions":["workspace"],"route":"task"}',
+                    ]),
+                )
+                context = build_capability_context(
+                    scope="private:u1", current_text="运行我的脚本", sender_id="u1",
+                    sender_name="甲", now=datetime.now(timezone.utc),
+                )
+                decision = await judge_capabilities(
+                    plugin, context, available_capabilities=("workspace",),
+                )
+                self.assertIsNotNone(decision)
+                self.assertEqual(("workspace",), decision.actions)
+                self.assertEqual("task", decision.route)
+                self.assertEqual(2, plugin._llm_call.await_count)
+                self.assertEqual(
+                    "CONVERSATION_HUB_PROVIDER_ID",
+                    plugin._llm_call.await_args.kwargs["timeout_key"],
+                )
+                self.assertIn("结构", plugin._llm_call.await_args.args[0])
+
+    async def test_model_judge_repeated_malformed_output_never_creates_approval(self):
+        plugin = SimpleNamespace(_llm_call=AsyncMock(return_value="not-json"))
+        context = build_capability_context(
+            scope="private:u1", current_text="运行脚本", sender_id="u1", sender_name="甲",
+            now=datetime.now(timezone.utc),
+        )
+        self.assertIsNone(await judge_capabilities(
+            plugin, context, available_capabilities=("workspace",),
+        ))
+        self.assertEqual(2, plugin._llm_call.await_count)
 
     async def test_explicit_group_reaction_request_is_not_rejected_as_group_chat(self) -> None:
         plugin = SimpleNamespace(
