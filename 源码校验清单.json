@@ -6537,7 +6537,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/background_reader.py",
-    "SHA256": "3bb8470ab8c3d17d5a1c84242eab5d26eefd810c3463ccad9968cd62f85299ca"
+    "SHA256": "9fa062788b3fc081953d4bc4e554150bbdad878138a76cd8dcb8e73654628dcd"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/balance_awareness.py",
@@ -6569,7 +6569,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/capability_hub.py",
-    "SHA256": "50152024adf0a8233d4afdac2b8e462a224b6d8c0388af8b22d207900e36aaa8"
+    "SHA256": "79e6f95fe1e48ddc748a13c236b4a945c992be7f10d28e0a50ee988a6069d749"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/chronotype.py",
@@ -6805,7 +6805,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/main.py",
-    "SHA256": "395ba1a2ac1f6bea674c207626948389b76c66e23a0eb2adb98b0828ef53539b"
+    "SHA256": "5ae7790bd223e96356ffcc1c900c1446b2fa8935ec20d5b052a3a91390499650"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/memo_notes.py",
@@ -7312,6 +7312,10 @@
     "SHA256": "0da0b881062aae7ef2403b20b4a3aafab67759b4c57e26d259823368ce840f57"
   },
   {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_catalog.py",
+    "SHA256": "377516342c3ffbc0d0164b5c583c4ceba8065deb5ba99a02f3f09ec57da7f8b0"
+  },
+  {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_execution.py",
     "SHA256": "02542e81d5f04c422d862fe75b92387a972c563a9aeddc1d0ee5c9cebbd0ae36"
   },
@@ -7322,6 +7326,10 @@
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_intents.py",
     "SHA256": "4638ab82afb6bcc566dbe005d1a7336cb98da3d11848d4454073bd39b41eda6a"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_management.py",
+    "SHA256": "f9f49aa3c789869dc3a14cd2c1a97b30046d8f8a81dd6c2eb8cea8210aa1b9d1"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_ordinary_read.py",
@@ -7337,11 +7345,11 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_runtime.py",
-    "SHA256": "85a937bb2b35d44a389add896ee0e9181bfd52fe31d2e7f6891ae0f821fd59f3"
+    "SHA256": "f6ee4c18a0f23601acb60cd3783900ec8d7f823e8c1f01e1977b027139cdbd59"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_service.py",
-    "SHA256": "c7e9828e75f06a2090983468c5ec6dd1a22b82c822b88a8400cc7d86e1e4428c"
+    "SHA256": "8a96f904150d489e34de2c0d040cf9b36927b337084d20bfeaa298dd0dea00b7"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_workspace.py",
@@ -7521,7 +7529,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_capability_hub.py",
-    "SHA256": "8b0945af7b37f30951aa9ffe7cfc646dd0b15afdf8b821bb15edb02008d94040"
+    "SHA256": "139599520beb4e7d2d558e0db0a3fb8a0602c531bf4eff0b72556ca5a6a946a6"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_central_hub_conflicts.py",
@@ -8129,7 +8137,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_persistent_task_route.py",
-    "SHA256": "ecc0fdee3924dad19d6dd83dab4fd5742f7d6c9d78c093d24fe058b0a6b50b44"
+    "SHA256": "55404e06cd877258c7063dd6b1be322f09dcba194e9d88c4fa402d0279261cf8"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_persona_only_reply_style.py",
@@ -8788,6 +8796,10 @@
     "SHA256": "4b3af433fc7447549af9578d0bb29fb5b5db33f40ba4e74bb4b9786c31d7be22"
   },
   {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_catalog.py",
+    "SHA256": "de13763db98a9dacc7b85fdee2fe5f5646268557500c4fa9eb14d98c6dcc67cf"
+  },
+  {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_execution.py",
     "SHA256": "65a6b04e9b36dbfa6ea5850e9fed3aa7560637ac56ef37ba302fad8da846a0c2"
   },
@@ -8802,6 +8814,10 @@
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_intents.py",
     "SHA256": "92032f309e664b1cb252c7a976477d24b5d15e8f6ffeff744de3c4c3c59554e7"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_management.py",
+    "SHA256": "b383b395bc99ffd9fccd3a805bcb1e12d1c9f084e6a730b401ea8e81d167c90d"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_ordinary_read.py",
@@ -8821,7 +8837,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_runtime.py",
-    "SHA256": "16957a8cf5c4c2bff9017652a6e9785de85350f8bfc369487ceba3f9a205deb4"
+    "SHA256": "c75c3be28d289bf218591e7329ea0fc16b7f784b96bedb77e2338c48c6743526"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_service.py",
@@ -13405,11 +13421,15 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "581c295b21acd969960000d5d803e2d9b4514d61185c00a54c80592a84049586"
+    "SHA256": "33a3e1a86c3f31db0f3849b95adcdf0e8a37e6cd81c07d152106dabb2cebe1cf"
   },
   {
     "路径": "deployment/配置受限任务执行.ps1",
     "SHA256": "ef486f88532581f97a6833a00ce66d89b57530994c56d6762df05fb622a43b97"
+  },
+  {
+    "路径": "docs/四类任务管理使用说明.md",
+    "SHA256": "5b1e96882cfae5861807df719bcef0e2024af2e305241126d5803bcd483f5b8e"
   },
   {
     "路径": "docs/持久任务与共享工具.md",
@@ -13641,7 +13661,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "d02e384e322b813f78893884d034d0bd624fbcf40b537e111759cb8c124be2e2"
+    "SHA256": "2069be33e72ba89aa08d727f7e5bf5e1e5b2739d8c013716aa7ecad25b5abc11"
   },
   {
     "路径": "第三方与发布说明.md",

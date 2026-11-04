@@ -7,8 +7,9 @@ import copy
 import hashlib
 import json
 import re
+import sqlite3
 import weakref
-from contextlib import suppress
+from contextlib import closing, suppress
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -54,6 +55,8 @@ from .task_intents import TaskIntentAdapter
 from .task_permissions import TaskActor, TaskPermissionStore
 from .task_proactive_policy import ProactivePolicyStore, RuleConfig
 from .task_service import TaskFailure, TaskScheduler, TaskScope, TaskService
+from .task_catalog import BACKGROUND_TERMINAL, TaskCatalog
+from .task_management import TaskManagementTool
 
 TOOL_CAPABILITIES = {
     "web_search_tavily": "search",
@@ -144,6 +147,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         self.interaction_api.script_runner = InteractionScripts(
             self.interaction_api, on_script_event=self.handle_script_event
         )
+        self.catalog = TaskCatalog(self)
 
     def _account_actor(self, bot_id, group_id, user_id):
         session = MessageSession(
@@ -947,6 +951,35 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         """
         return BackgroundReadTool(self, event)
 
+    def make_management_tool(self, event):
+        """Bind direct management to the original verified chat event.
+
+        Args:
+            event: Normally eligible real inbound event.
+
+        Returns:
+            The chat model's classified task management tool.
+        """
+        return TaskManagementTool(self, event)
+
+    async def task_overview(self, event):
+        """Supply classified activity without injecting historical task text.
+
+        Args:
+            event: Original verified inbound event.
+
+        Returns:
+            JSON counts and one bounded page with explicit completeness.
+        """
+        data = await self.catalog.read(self.scope(event), limit=6)
+        data.pop("definitions", None)
+        while True:
+            text = json.dumps(data, ensure_ascii=False)
+            if len(text) <= 12000 or not data["items"]:
+                return text
+            data["items"].pop()
+            data["next_offset"] = len(data["items"])
+
     def make_intent_tool(self, event):
         runtime = self
 
@@ -1034,6 +1067,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 "task_id": task.task_id,
                 "goal": task.goal[:300],
                 "status": task.status,
+                "category": "history" if task.status in BACKGROUND_TERMINAL else "background",
                 "revision": task.revision,
                 "error_kind": task.error_kind,
                 "result": str((task.result or {}).get("text", ""))[:2000],
@@ -1043,7 +1077,8 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         req.system_prompt += (
             "\n【本轮为已有任务的进度追问】\n"
             + self._safe_text(json.dumps(facts, ensure_ascii=False), 16000)
-            + "\n沿用原聊天人格、记忆和语气回答。查询直接使用 pc_read_background 读取详情、"
+            + "\n以上仅为最近后台记录，含历史而非完整待办清单；查询四类当前安排和准确数量使用pc_manage_tasks。"
+            "沿用原聊天人格、记忆和语气回答。查询直接使用 pc_read_background 读取详情、"
             "工具参数、文件路径、回执和模型已输出说明，不提交新任务。"
             "已记录的工具调用提案不等于实际成功；记录未覆盖的执行细节应说明未知，不猜测。"
             "任务状态只能按以上程序事实解释：只有succeeded表示完成，queued/running/waiting_retry"
@@ -1062,16 +1097,25 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         ):
             return ""
         scope = TaskScope(bot_id, session_key, sender_id)
-        tasks = self.service.list(scope, limit=6, latest=True)
-        facts = [
-            {"task_id": t.task_id, "status": t.status, "goal": self._safe_text(t.goal, 120),
-             "error_kind": t.error_kind, "revision": t.revision, "step_key": t.step_key}
-            for t in tasks
-        ]
-        encoded = json.dumps(facts, ensure_ascii=False)
+        identity = (scope.bot_id, scope.session_key, scope.sender_id)
+        with closing(sqlite3.connect(self.service.path.resolve().as_uri() + "?mode=ro", uri=True)) as db:
+            db.row_factory = sqlite3.Row
+            counts = {row["status"]: row["amount"] for row in db.execute(
+                "SELECT status,COUNT(*) AS amount FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? AND COALESCE(json_extract(metadata,'$.history_deleted'),0)=0 GROUP BY status", identity)}
+            facts = [dict(row) for row in db.execute(
+                "SELECT task_id,status,goal,error_kind,revision,step_key FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? AND status NOT IN ('succeeded','failed','cancelled') ORDER BY created_at DESC,rowid DESC LIMIT 6", identity)]
+        for fact in facts:
+            fact["goal"] = self._safe_text(fact["goal"], 120)
+        total = sum(value for status, value in counts.items() if status not in BACKGROUND_TERMINAL)
+        data = {"category": "background", "counts": {"background": total},
+                "history_count": sum(counts.get(status, 0) for status in BACKGROUND_TERMINAL), "items": facts,
+                "total": total, "next_offset": len(facts) if total > len(facts) else None,
+                "note": "这里只含当前后台执行；定时长期/短期安排请用pc_manage_tasks查询。"}
+        encoded = json.dumps(data, ensure_ascii=False)
         while len(encoded) > 1600 and facts:
             facts.pop()
-            encoded = json.dumps(facts, ensure_ascii=False)
+            data["next_offset"] = len(facts) if total > len(facts) else None
+            encoded = json.dumps(data, ensure_ascii=False)
         return encoded
 
     def restore_event(self, job):

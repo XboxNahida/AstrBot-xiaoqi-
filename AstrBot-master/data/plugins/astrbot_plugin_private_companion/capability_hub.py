@@ -17,6 +17,7 @@ from .hub_optimizations import (
 )
 from .reaction_expression import reaction_expression_explicit_request
 from .short_term_emotion import EVENT_KINDS, PHASES
+from .task_catalog import TASK_GUIDANCE
 
 _SINGING_NEGATIVE_MARKERS = (
     "唱片",
@@ -155,6 +156,7 @@ class CapabilityDecision:
     merge_event_ids: tuple[str, ...] = ()
     image_edit_requested: bool = False
     task_mode: str = ""
+    task_manage: bool = False
 
 
 def parse_model_capability_decision(
@@ -286,6 +288,8 @@ def parse_model_capability_decision(
         segments=tuple(segments[:8]),
         task_query=(payload.get("task_query") is True and payload["reply"] and route == "chat"
                     and not actions and not any(kind == "task" for kind, _ in segments)),
+        task_manage=(payload.get("task_manage") is True and payload["reply"] and route == "chat"
+                     and not actions and not any(kind == "task" for kind, _ in segments)),
         collaboration={
             key: _bounded_text(payload["collaboration"].get(key), 240)
             for key in ("human_message_id", "human_quote", "current_quote", "need")
@@ -373,6 +377,7 @@ async def judge_capabilities(
     if context.conversation_type == "group":
         payload["group_participation"] = dict(group_participation or {})
     runtime = getattr(plugin, "_persistent_task_runtime", None)
+    payload["task_management_available"] = runtime is not None and callable(getattr(runtime, "make_management_tool", None))
     if runtime is not None and context.task_session_key:
         try:
             payload["persistent_tasks"] = runtime.snapshot_for_scope(
@@ -464,7 +469,8 @@ async def judge_capabilities(
         "用户明确说唱歌、唱一首、唱给我听等才选择 voice；用户说来一首、放首歌、播放音乐、听歌等才选择 music。"
         "这两类动作互斥；仅提到歌曲、歌词或唱片不选择任何一类。\n"
         "schedule 表示通过真实 future_task 工具创建、修改或取消持久定时提醒，"
-        "这些执行操作选择 schedule 并用 route=task（同时闲聊可用 mixed）。"
+        "未提供task_management_available时，这些执行操作选择 schedule 并用 route=task（同时闲聊可用 mixed）。"
+        "task_management_available=true时，普通定时创建、修改和取消由Gemini直接通过pc_manage_tasks管理，选择task_manage=true、route=chat、actions=[]。"
         "例如明天早上7:30叫我起床、十分钟后提醒喝水、每周一提醒交作业、取消刚才的闹钟，都是定时操作；"
         "仅讨论闹钟、玩笑或否定提醒不代表授权创建。启用聊天/办事分工时，查询已有提醒由聊天层"
         "使用 pc_read_background 的 schedules 或 scripts 查看真实安排，不能只看任务摘要；"
@@ -503,6 +509,11 @@ async def judge_capabilities(
                     cache.pop(next(iter(cache)))
             hub_persona = cache[cache_key]
         prompt += (
+            "\n" + TASK_GUIDANCE + "\n"
+            "额外输出布尔值task_manage：管理已有任务的分类、暂停、继续、重试、取消、历史归档或删除，以及普通官方定时创建/修改，"
+            "且task_management_available=true时选true，route=chat、actions=[]且不产生task分段，让Gemini直接管理。"
+            "自定义脚本、修改脚本逻辑或同时包含新的实际执行工作时选false，保留task/mixed执行路由。"
+            "管理操作不等于只读查询，不能把用户的取消或删除要求吞成只查状态。\n"
             "\n额外输出 route，仅允许 chat/task/mixed。日常陪聊、斗嘴、情感交流选 chat；"
             "复杂计算、编程、研究分析、需要工具实际执行的工作选 task；两者并存选 mixed。"
             "不得输出模型 ID，也不得因为用户情绪强烈就把闲聊分到任务。\n"
@@ -517,7 +528,8 @@ async def judge_capabilities(
             "同时要求修改、继续执行、重试、取消或新增工作的消息必须为 false，不能把追加要求吞成状态查询。"
             "这些只读查看由聊天模型直接使用 pc_read_background 完成，不交给任务列表，"
             "不选workspace/search/schedule执行动作，也不需要新建查询任务。"
-            "创建、修改、重试和取消提醒仍属于执行工作。"
+            "创建、修改、重试和取消提醒不是只读查询；管理入口可用时按task_manage处理，"
+            "不可用或需要自定义脚本时才交后台执行。"
             "预计耗时不是实际超时，不得仅因等待久就判定任务失败。\n"
             "额外输出 emotion_event：kind 只能是 neutral/disagree/provoke/tease/apology/comfort/"
             "praise/play/topic_change；intensity/confidence 在 0 到 1，targets_bot 为布尔值，"
@@ -577,7 +589,7 @@ async def judge_capabilities(
         # 缺少本人上下文时只能澄清，不能通过任务分段绕过动作核对。
         decision = replace(
             decision, actions=(), route="chat", segments=(), estimated_seconds=0,
-            task_query=False, merge_messages=False, merge_event_ids=(), image_edit_requested=False,
+            task_query=False, task_manage=False, merge_messages=False, merge_event_ids=(), image_edit_requested=False,
             reply_candidate="询问当前用户具体要调用什么或执行哪项任务" if decision.reply else "",
             reason="ambiguous_group_task_followup",
         )

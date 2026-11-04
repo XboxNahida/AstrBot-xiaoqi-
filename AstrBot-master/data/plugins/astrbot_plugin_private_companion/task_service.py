@@ -542,6 +542,8 @@ class TaskService:
             ).fetchone()
             if not row:
                 return False
+            if json.loads(row["metadata"]).get("history_deleted"):
+                return False
             status = row["status"]
             attempts = row["attempts"]
             cycle = row["cycle"]

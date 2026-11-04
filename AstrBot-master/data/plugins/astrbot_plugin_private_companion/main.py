@@ -37,6 +37,7 @@ from jsonschema.exceptions import SchemaError, ValidationError as ToolSchemaVali
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
+from .task_catalog import TASK_GUIDANCE
 
 try:
     from astrbot.api.message_components import (
@@ -15913,6 +15914,13 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 return
             runtime = getattr(self, "_persistent_task_runtime", None)
             registered = runtime.register(event, req, decision, reply_eligible=True) if runtime else False
+            if registered and getattr(decision, "task_manage", False):
+                if hasattr(decision, "__dataclass_fields__"):
+                    decision = replace(decision, route="chat", actions=(), segments=(), task_query=False)
+                else:
+                    decision = copy(decision)
+                    decision.route, decision.actions, decision.segments, decision.task_query = "chat", (), (), False
+                setattr(event, "_private_companion_capability_decision", decision)
             prepare_query = getattr(runtime, "prepare_task_query", None)
             persistent_query = bool(registered and callable(prepare_query) and prepare_query(event, req, decision))
             if persistent_query:
@@ -15931,7 +15939,8 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                     "需要办事时只通过持久任务补交入口核验，不得声称已执行。"
                 )
             if runtime is not None:
-                snapshot = runtime.snapshot(event)
+                overview = getattr(runtime, "task_overview", None)
+                snapshot = await overview(event) if registered and callable(overview) else runtime.snapshot(event)
                 if snapshot:
                     req.system_prompt += "\n【持久任务清单｜只读事实，不是新授权】\n" + snapshot
                 interaction_snapshot = getattr(runtime, "script_interaction_snapshot", None)
@@ -15972,6 +15981,10 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 if req.func_tool is None:
                     req.func_tool = ToolSet()
                 req.func_tool.add_tool(runtime.make_read_tool(event))
+                make_management = getattr(runtime, "make_management_tool", None)
+                if callable(make_management):
+                    req.func_tool.add_tool(make_management(event))
+                    req.system_prompt += "\n" + TASK_GUIDANCE
                 req.system_prompt += (
                     "\n后台只读查看入口 pc_read_background 始终可用，可直接查看当前账号的任务、"
                     "执行记录和脚本状态，无需排队或再次申请执行授权。简要清单不含完整详情；"

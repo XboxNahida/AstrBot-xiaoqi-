@@ -16,6 +16,10 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
             register=MagicMock(return_value=True),
             submit=AsyncMock(return_value={"accepted": True, "task_id": "persisted"}),
             snapshot=MagicMock(return_value="持久任务：排队中"),
+            task_overview=AsyncMock(return_value='{"counts":{"long_term":1,"short_term":0,"background":0,"history":2},"total":1}'),
+            make_management_tool=MagicMock(return_value=FunctionTool(
+                name="pc_manage_tasks", description="Manage tasks", parameters={"type": "object"},
+            )),
             make_read_tool=MagicMock(return_value=FunctionTool(
                 name="pc_read_background", description="Read background", parameters={"type": "object"},
             )),
@@ -60,15 +64,30 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         req.func_tool = ToolSet()
         await self.invoke(plugin, event, req)
         self.assertIn("持久任务", req.system_prompt)
-        self.assertEqual(["pc_read_background", "pc_submit_task_intent"], [tool.name for tool in req.func_tool.tools])
+        self.assertEqual(["pc_read_background", "pc_manage_tasks", "pc_submit_task_intent"], [tool.name for tool in req.func_tool.tools])
+        self.assertIn("长期任务", req.system_prompt)
+        self.assertIn("短期任务", req.system_prompt)
+        self.assertIn("后台任务", req.system_prompt)
+        self.assertIn("历史任务", req.system_prompt)
+        self.assertIn("counts", req.system_prompt)
         runtime.submit.assert_not_awaited()
 
     async def test_read_tool_is_permanent_even_when_task_supplement_is_disabled(self):
         plugin, event, req, runtime = self.setup_route("chat")
         plugin.enable_reply_task_intents = False
         await self.invoke(plugin, event, req)
-        self.assertEqual(["pc_read_background"], [tool.name for tool in req.func_tool.tools])
+        self.assertEqual(["pc_read_background", "pc_manage_tasks"], [tool.name for tool in req.func_tool.tools])
         runtime.submit.assert_not_awaited()
+
+    async def test_existing_task_management_stays_with_gemini_without_background_query(self):
+        plugin, event, req, runtime = self.setup_route("task")
+        event.message_str = "把旧历史任务归档，保留明天的提醒"
+        event._private_companion_capability_decision.task_manage = True
+        configure = await self.invoke(plugin, event, req)
+        runtime.submit.assert_not_awaited()
+        event.stop_event.assert_not_called()
+        configure.assert_called_once()
+        self.assertIn("pc_manage_tasks", [tool.name for tool in req.func_tool.tools])
 
     async def test_actual_chat_provider_route_keeps_reader_and_persona_with_backup(self):
         plugin, event, req, runtime = self.setup_route("chat")
@@ -88,7 +107,7 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         await handler(plugin, event, req)
         self.assertEqual("gemini", req.provider_id)
         self.assertEqual(["deepseek"], req.fallback_provider_ids)
-        self.assertEqual(["pc_read_background"], [tool.name for tool in req.func_tool.tools])
+        self.assertEqual(["pc_read_background", "pc_manage_tasks"], [tool.name for tool in req.func_tool.tools])
         self.assertIn("当前人格和原有记忆", req.system_prompt)
         self.assertEqual("刚才的原始对话", req.contexts[0]["content"])
         runtime.submit.assert_not_awaited()

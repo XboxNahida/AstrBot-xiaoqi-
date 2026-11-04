@@ -155,6 +155,68 @@ async def test_background_reader_lists_empty_and_rejects_mutation(runtime):
 
 
 @pytest.mark.asyncio
+async def test_default_reader_and_hub_snapshot_separate_history_from_old_waiting_work(runtime):
+    e = event()
+    register(runtime, e)
+    active = runtime.service.submit(runtime.scope(e), "old-active", "main", "仍待用户补充", workdir=runtime.workspace)
+    with runtime.service._transaction() as db:
+        db.execute("UPDATE pt_tasks SET status='waiting_user' WHERE task_id=?", (active.task_id,))
+    for index in range(14):
+        old = runtime.service.submit(runtime.scope(e), str(index), "main", "历史正文不应默认注入", workdir=runtime.workspace)
+        with runtime.service._transaction() as db:
+            db.execute("UPDATE pt_tasks SET status='succeeded' WHERE task_id=?", (old.task_id,))
+    snapshot = json.loads(runtime.snapshot(e))
+    assert snapshot["counts"]["background"] == 1
+    assert snapshot["history_count"] == 14
+    assert snapshot["items"][0]["task_id"] == active.task_id
+    assert "历史正文" not in runtime.snapshot(e)
+    tool = runtime.make_read_tool(e)
+    current = json.loads(await tool.call(None))
+    assert current["total"] == 1 and current["tasks"][0]["task_id"] == active.task_id
+    history = json.loads(await tool.call(None, task_view="history", limit=6))
+    assert history["total"] == 14 and len(history["tasks"]) == 6 and history["next_offset"] == 6
+
+
+@pytest.mark.asyncio
+async def test_task_overview_keeps_complete_json_for_large_record_titles(runtime):
+    e = event()
+    register(runtime, e)
+    for index in range(6):
+        runtime.service.submit(runtime.scope(e), f"large-{index}", "main", "很长的任务" * 1000, workdir=runtime.workspace)
+    raw = await runtime.task_overview(e)
+    data = json.loads(raw)
+    assert len(raw) <= 12000
+    assert data["counts"]["background"] == 6
+    assert data["next_offset"] == len(data["items"]) < 6
+
+
+@pytest.mark.asyncio
+async def test_retried_archived_background_is_visible_in_default_reader(runtime):
+    e = event()
+    register(runtime, e)
+    old = runtime.service.submit(runtime.scope(e), "retry-archived", "main", "需修复", workdir=runtime.workspace)
+    with runtime.service._transaction() as db:
+        db.execute("UPDATE pt_tasks SET status='failed' WHERE task_id=?", (old.task_id,))
+    await runtime.catalog.change(runtime.scope(e), "background", old.task_id, "archive")
+    assert runtime.service.retry(old.task_id, runtime.scope(e))
+    data = json.loads(await runtime.make_read_tool(e).call(None))
+    assert data["total"] == 1 and data["tasks"][0]["task_id"] == old.task_id
+
+
+@pytest.mark.asyncio
+async def test_readonly_detail_does_not_resurrect_deleted_history(runtime):
+    e = event()
+    register(runtime, e)
+    old = runtime.service.submit(runtime.scope(e), "purged", "main", "旧正文", workdir=runtime.workspace)
+    with runtime.service._transaction() as db:
+        db.execute("UPDATE pt_tasks SET status='succeeded' WHERE task_id=?", (old.task_id,))
+        db.execute("UPDATE pt_outbox SET state='sent' WHERE task_id=?", (old.task_id,))
+    await runtime.catalog.change(runtime.scope(e), "background", old.task_id, "archive")
+    assert (await runtime.catalog.delete(runtime.scope(e), "background", old.task_id))["ok"]
+    assert json.loads(await runtime.make_read_tool(e).call(None, task_id=old.task_id))["code"] == "not_found"
+
+
+@pytest.mark.asyncio
 async def test_background_reader_releases_sqlite_handle_after_each_query(runtime, monkeypatch):
     e = event()
     register(runtime, e)
@@ -1084,7 +1146,7 @@ async def test_worker_and_sender_lifecycle_and_bounded_snapshot(runtime):
             runtime.scope(e), str(i), "main", "goal" * 500, runtime.workspace
         )
     snapshot = runtime.snapshot(e)
-    assert isinstance(json.loads(snapshot), list)
+    assert isinstance(json.loads(snapshot), dict)
     assert len(snapshot) <= 1600
     assert snapshot.count("task_id") <= 6
     latest = runtime.service.submit(

@@ -23,6 +23,21 @@ from astrbot_plugin_private_companion.passive_state_pipeline import (
 
 
 class CapabilityHubTests(unittest.TestCase):
+    def test_frontend_management_flag_preserves_chat_but_not_mixed_execution(self):
+        context = self._context("归档历史任务，保留明早提醒")
+        decision = parse_model_capability_decision(
+            json.dumps({"reply": True, "route": "chat", "actions": [], "task_manage": True}),
+            available_capabilities=("schedule", "workspace"), context=context,
+        )
+        self.assertTrue(getattr(decision, "task_manage", False))
+        mixed = parse_model_capability_decision(
+            json.dumps({"reply": True, "route": "mixed", "actions": ["workspace"], "task_manage": True,
+                        "segments": [{"kind": "task", "text": "运行新脚本"}]}),
+            available_capabilities=("schedule", "workspace"), context=context,
+        )
+        self.assertFalse(mixed.task_manage)
+        self.assertEqual("mixed", mixed.route)
+
     def _context(self, text: str, *, recent=(), scope="group:g1"):
         return build_capability_context(
             scope=scope,
