@@ -15981,6 +15981,16 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 if req.func_tool is None:
                     req.func_tool = ToolSet()
                 req.func_tool.add_tool(runtime.make_read_tool(event))
+                make_files = getattr(runtime, "make_file_tool", None)
+                file_tool = make_files(event) if callable(make_files) else None
+                if file_tool is not None:
+                    req.func_tool.add_tool(file_tool)
+                    req.system_prompt += (
+                        "\n已有文件可通过pc_task_send_files直接投递到本会话，无需新建后台查询任务。"
+                        "单文件原样发，多个文件或目录默认打包ZIP，可按用户要求选择逐个发送。"
+                        "仅按实际回执说明发送状态；不要用代码原文或服务器路径冒充附件交付。"
+                        "保护的是程序实际配置的密钥，普通配置、源码和业务信息完整保留。"
+                    )
                 make_management = getattr(runtime, "make_management_tool", None)
                 if callable(make_management):
                     req.func_tool.add_tool(make_management(event))

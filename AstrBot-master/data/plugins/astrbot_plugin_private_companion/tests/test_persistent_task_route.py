@@ -79,6 +79,16 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["pc_read_background", "pc_manage_tasks"], [tool.name for tool in req.func_tool.tools])
         runtime.submit.assert_not_awaited()
 
+    async def test_file_delivery_entry_survives_actual_gemini_chat_tool_filter(self):
+        plugin, event, req, runtime = self.setup_route("chat")
+        file_tool = FunctionTool(name="pc_task_send_files", description="文件投递", parameters={"type": "object"})
+        runtime.make_file_tool = MagicMock(return_value=file_tool)
+        await self.invoke(plugin, event, req)
+        self.assertIn(file_tool, req.func_tool.tools)
+        self.assertIn("pc_task_send_files", req.system_prompt)
+        self.assertIn("ZIP", req.system_prompt)
+        runtime.submit.assert_not_awaited()
+
     async def test_existing_task_management_stays_with_gemini_without_background_query(self):
         plugin, event, req, runtime = self.setup_route("task")
         event.message_str = "把旧历史任务归档，保留明天的提醒"

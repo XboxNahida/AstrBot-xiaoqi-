@@ -94,6 +94,56 @@ def register(rt, e, **kwargs):
 
 
 @pytest.mark.asyncio
+async def test_file_tool_is_available_to_backend_and_trusted_chat_without_shell(runtime):
+    e = event()
+    register(runtime, e)
+    assert hasattr(runtime, "make_file_tool"), "缺少文件投递接口"
+    tool = runtime.make_file_tool(e)
+    actor = runtime.actor(e)
+    registry = runtime._registry(e.unified_msg_origin, actor)
+    assert registry["pc_task_send_files"].name == tool.name
+    from astrbot_plugin_private_companion.task_execution import actor_workspace
+    path = actor_workspace(runtime.workspace, actor) / "结果.txt"
+    path.parent.mkdir(parents=True)
+    path.write_text("result", encoding="utf-8")
+    result = json.loads(await tool.call(None, paths=[str(path)]))
+    assert result["success"]
+    runtime.plugin.context.send_message.assert_awaited_once()
+    assert runtime.plugin.context.send_message.await_args.args[0] == e.unified_msg_origin
+    runtime.plugin.context.send_message.reset_mock()
+    e.message_obj.sender.user_id = "another"
+    assert json.loads(await tool.call(None, paths=[str(path)]))["code"] == "untrusted_event"
+    runtime.plugin.context.send_message.assert_not_awaited()
+
+
+def test_file_tool_does_not_grant_unauthorized_member_execution(runtime):
+    e = event(user="member")
+    register(runtime, e)
+    assert hasattr(runtime, "make_file_tool"), "缺少文件投递接口"
+    assert runtime.make_file_tool(e) is None
+    assert "pc_task_send_files" not in runtime._registry(e.unified_msg_origin, runtime.actor(e))
+
+
+@pytest.mark.asyncio
+async def test_file_tool_protects_only_actual_configured_keys_including_lists(runtime):
+    e = event()
+    register(runtime, e)
+    assert hasattr(runtime, "make_file_tool"), "缺少文件投递接口"
+    runtime.plugin.context.get_config = lambda **_: {"provider": [{"api_key": ["configured-key-12345"]}]}
+    from astrbot_plugin_private_companion.task_execution import actor_workspace
+    path = actor_workspace(runtime.workspace, runtime.actor(e)) / ".env"
+    path.parent.mkdir(parents=True)
+    path.write_text("API_KEY=business-key-12345", encoding="utf-8")
+    tool = runtime.make_file_tool(e)
+    assert json.loads(await tool.call(None, paths=[str(path)]))["success"]
+    runtime.plugin.context.send_message.reset_mock()
+    path.write_text("API_KEY=configured-key-12345", encoding="utf-8")
+    result = json.loads(await tool.call(None, paths=[str(path)]))
+    assert result["code"] == "file_access_denied"
+    runtime.plugin.context.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_background_reader_is_live_readonly_scoped_and_paginated(runtime):
     e = event()
     register(runtime, e)

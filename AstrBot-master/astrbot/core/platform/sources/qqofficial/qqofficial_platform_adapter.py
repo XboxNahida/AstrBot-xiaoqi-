@@ -332,7 +332,9 @@ class QQOfficialPlatformAdapter(Platform):
         self,
         session: MessageSesion,
         message_chain: MessageChain,
-    ) -> None:
+        *,
+        require_file_receipt: bool = False,
+    ):
         ensure_qq_client_active(self.client)
         message_chains = QQOfficialMessageEvent._split_message_chain_by_media(
             message_chain
@@ -374,6 +376,8 @@ class QQOfficialPlatformAdapter(Platform):
             and session.message_type != MessageType.FRIEND_MESSAGE
             and not allow_group_proactive_send
         ):
+            if require_file_receipt:
+                raise RuntimeError("file_session_unavailable: no usable group reply/proactive session")
             logger.warning(
                 "[QQOfficial] No cached msg_id for session: %s, skip send_by_session",
                 session.session_id,
@@ -385,6 +389,12 @@ class QQOfficialPlatformAdapter(Platform):
             payload["msg_id"] = msg_id
         ret: Any = None
         send_helper = SimpleNamespace(bot=self.client)
+        if require_file_receipt and (
+            not file_source
+            or session.message_type == MessageType.GROUP_MESSAGE and scene != "group"
+            or session.message_type not in {MessageType.GROUP_MESSAGE, MessageType.FRIEND_MESSAGE}
+        ):
+            raise RuntimeError("file_session_unsupported: this QQ scene cannot deliver file attachments")
 
         if session.message_type == MessageType.GROUP_MESSAGE:
             if scene == "group":
@@ -427,6 +437,8 @@ class QQOfficialPlatformAdapter(Platform):
                         file_name=file_name,
                         group_openid=session.session_id,
                     )
+                    if require_file_receipt and not media:
+                        raise RuntimeError("file_upload_empty: QQ returned no uploaded media")
                     if media:
                         payload["media"] = media
                         payload["msg_type"] = 7
@@ -487,6 +499,8 @@ class QQOfficialPlatformAdapter(Platform):
                     file_name=file_name,
                     openid=session.session_id,
                 )
+                if require_file_receipt and not media:
+                    raise RuntimeError("file_upload_empty: QQ returned no uploaded media")
                 if media:
                     payload["media"] = media
                     payload["msg_type"] = 7
@@ -504,9 +518,21 @@ class QQOfficialPlatformAdapter(Platform):
             return
 
         sent_message_id = self._extract_message_id(ret)
+        if require_file_receipt and not sent_message_id:
+            raise RuntimeError("file_delivery_unknown: QQ returned no message ID; do not resend blindly")
         if sent_message_id:
             self.remember_session_message_id(session.session_id, sent_message_id)
         await Platform.send_by_session(self, session, message_chain)
+        if require_file_receipt:
+            return {"status": "sent", "message_id": sent_message_id}
+
+    async def send_file_by_session(self, session, message_chain):
+        """投递一个文件并返回QQ消息ID，禁止静默跳过或将空上传当作成功。"""
+        if len(message_chain.chain) != 1 or not isinstance(message_chain.chain[0], File):
+            raise ValueError("Exactly one file attachment is required")
+        return await self._send_by_session_common(
+            session, message_chain, require_file_receipt=True
+        )
 
     def remember_session_message_id(self, session_id: str, message_id: str) -> None:
         if not session_id or not message_id:
