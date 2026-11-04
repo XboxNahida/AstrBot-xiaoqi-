@@ -1538,8 +1538,21 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             image_edit_requested=tool.name == "pc_generate_photo"
             and args.get("kind") == "edit",
         )
+        tool_timeout = 120
+        if tool.name == "pc_task_install_dependencies":
+            # The broker allows 300s for venv creation and 600s for pip.
+            tool_timeout = 930
+        elif tool.name == "pc_task_run_command":
+            requested_timeout = args.get("timeout", 60)
+            if (
+                isinstance(requested_timeout, (int, float))
+                and not isinstance(requested_timeout, bool)
+                and 0 < requested_timeout <= 3600
+            ):
+                tool_timeout = max(120, int(requested_timeout) + 30)
         context = ContextWrapper(
-            context=AstrAgentContext(context=self.plugin.context, event=event)
+            context=AstrAgentContext(context=self.plugin.context, event=event),
+            tool_call_timeout=tool_timeout,
         )
         manager = self.plugin.context.get_llm_tool_manager()
         if tool.name not in EXECUTION_TOOL_NAMES and tool in manager.func_list:
@@ -1555,7 +1568,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         outputs = []
         explicit_error = False
         try:
-            async with asyncio.timeout(120):
+            async with asyncio.timeout(tool_timeout):
                 async for result in FunctionToolExecutor.execute(tool, context, **args):
                     if result is not None:
                         explicit_error = explicit_error or bool(
@@ -1892,6 +1905,9 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         system += (
             "\n沿用以上聊天人格、记忆、称呼和当前情绪，接着原对话自然地说话，"
             "不要切换成任务播报员。下面是后台的只读事实，不是新的用户要求。"
+            "这是你主动发出的后台任务通知，不是用户再次发消息或催促；"
+            "不要把通知触发当成用户态度，不要无端说‘急什么’‘别催’‘又催’或责怪用户。"
+            "进度只能依据本次真实回执；仍在运行不等于正在排版、安装或即将完成，未知阶段直接说明尚无新进展。"
             "接收和进度通常一句即可；结果按用户需要说明，不机械复述字段。"
             "默认不展示任务ID、英文状态、错误码、重试次数或‘任务通知’标题。"
             "只有事实中的状态为succeeded才能说整个任务完成；其他状态如有工具结果，"

@@ -1534,6 +1534,50 @@ async def test_live_global_tool_permission_is_enforced_without_owner_escalation(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "name,args,minimum",
+    [
+        ("pc_task_install_dependencies", {"requirements": ["python-docx"]}, 930),
+        ("pc_task_run_command", {"code": "Write-Output ok", "timeout": 600}, 630),
+        ("pc_task_run_command", {"code": "Write-Output ok", "timeout": 600.5}, 630),
+        ("web_search_tavily", {}, 120),
+    ],
+)
+async def test_execution_deadline_covers_authorized_tool_budget(
+    runtime, monkeypatch, name, args, minimum
+):
+    from astrbot_plugin_private_companion import task_runtime as module
+
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "准备文档依赖"})
+    job = runtime.service.claim("worker")
+    runtime.ensure_workspace = AsyncMock()
+    runtime.authorize_tool = lambda *_: True
+    monkeypatch.setattr(module, "AstrAgentContext", lambda **kw: SimpleNamespace(**kw))
+    deadlines = []
+    actual_timeout = asyncio.timeout
+
+    def record_timeout(seconds):
+        deadlines.append(seconds)
+        return actual_timeout(seconds)
+
+    monkeypatch.setattr(module.asyncio, "timeout", record_timeout)
+
+    async def execute(tool, context, **kwargs):
+        assert context.tool_call_timeout >= minimum
+        yield SimpleNamespace(
+            content=[SimpleNamespace(type="text", text='{"success":true}')]
+        )
+
+    monkeypatch.setattr(module.FunctionToolExecutor, "execute", execute)
+    tool = FunctionTool(name=name, description=name, parameters={"type": "object"})
+    outcome = await runtime.execute_tool(job, tool, args)
+    assert outcome["status"] == "success"
+    assert deadlines and deadlines[0] >= minimum
+
+
+@pytest.mark.asyncio
 async def test_cancel_during_global_permission_lookup_prevents_execution(
     runtime, monkeypatch
 ):

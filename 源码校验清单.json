@@ -7357,7 +7357,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_runtime.py",
-    "SHA256": "9c8cae94832643b4bd67995a4e43553dd597452bbf710613dedf8b5141bb9f42"
+    "SHA256": "3ec478c63998d17405a57446ea5ca2a9504a6efebadd93846a25621991106e04"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_service.py",
@@ -8861,7 +8861,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_runtime.py",
-    "SHA256": "403d1a8d5be48def0409123132f4833761a05230456cab232ca5ccac5f984dea"
+    "SHA256": "9ec37ad8cb38a596bedba66cb46f4fc912b12232e2a893af783cc7f707ab2723"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_task_service.py",
@@ -13449,7 +13449,7 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "ff48f75e3408724bb6e154c6df211904c4eac9ca1ca57c57f98f00b53e271c37"
+    "SHA256": "2305ad509ce5e2084872ac3bcc6e91b9c3a14325ec10c996d14c2b97128a4176"
   },
   {
     "路径": "deployment/配置受限任务执行.ps1",
@@ -13697,7 +13697,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "6eb2d38fe79e3d683d86e0189825c6ba7102ff0ecb84d876e56f26fe6ecf9ee1"
+    "SHA256": "6c759144fd4cdfb1ad18312e14132ca670748077da1c6574b375563313e41888"
   },
   {
     "路径": "第三方与发布说明.md",
