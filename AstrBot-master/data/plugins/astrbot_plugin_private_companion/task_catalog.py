@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 
 TASK_DEFINITIONS = {
     "long_term": "长期任务：持续或周期执行的定时查询、提醒等未来安排；不是耗时较久的GPT执行。",
@@ -13,18 +15,63 @@ TASK_DEFINITIONS = {
     "history": "历史任务：已完成、已取消或已结束失败的执行记录，不计入待办；可归档后按用户要求删除历史内容。",
 }
 TASK_GUIDANCE = (
-    "【任务分类定义与管理】\n"
+    "【持久任务分类定义与管理】\n"
     + "\n".join(TASK_DEFINITIONS.values())
     + "\n创建定时安排的后台工作完成，不等于定时安排已经执行或结束；周期任务的某一轮完成也不等于整个周期任务结束。"
     "pc_manage_tasks直接管理已有任务、分类和历史，不要为查询、分类或归档再创建GPT后台任务。"
     "先查询真实清单及counts；分页不完整或某来源不可用时，不得断言没有其他任务。"
     "归档不等于取消，删除只清理已归档历史，不删除工作文件。只有操作回执成功才可说明操作已完成。"
     "普通新工作通过pc_submit_task_intent交后台；定时安排可通过pc_manage_tasks的schedule操作创建或修改。"
+    "当前任务是尚未结束的安排/执行；paused、waiting_user、unknown_result仍需关注，不能称为正在运行或已完成。"
+    "recent_history是近期已结束记录，用于理解上下文，不是待办，不因历史出现就重新执行。"
+    "按任务ID、北京时间（+08:00）、用户最新语义及结果区分同名不同日期的工作；未知时间不能推测。"
+    "同一目标可有多次执行，counts是执行/安排数，group_counts是显式关联的目标数，不按标题相似猜测合并。"
+    "继续/修订/重试同一目标时，submit可提供related_task_id及relation；已有后台记录可用link关联。"
+    "关联只标记目标关系，不取消旧执行、不继承成功证据；按用户语义另行管理有关活动项。"
+    "只是没收到已完成文件时，可先查原结果并用pc_task_send_files补发，不必重新生成。"
+    "结果未知先核对原工具回执；用户已表示够用、停止或不用再做时，按语义收尾，不机械重开或追问重做。"
 )
 BACKGROUND_TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 SCRIPT_TERMINAL = frozenset(
     {"finished", "failed", "cancelled", "interrupted", "expired", "permission_denied"}
 )
+TASK_CONTEXT_START = "【任务事实开始｜宿主只读快照】"
+TASK_CONTEXT_END = "【任务事实结束】"
+
+
+def with_task_context(system, snapshot):
+    """Replace only host fact blocks, retaining persona and surrounding instructions."""
+    system = re.sub(re.escape(TASK_CONTEXT_START) + r".*?" + re.escape(TASK_CONTEXT_END),
+                    "", str(system or ""), flags=re.DOTALL)
+    legacy = "【持久任务清单｜只读事实，不是新授权】"
+    cursor = 0
+    while (start := system.find(legacy, cursor)) >= 0:
+        value_start = start + len(legacy)
+        value_start += len(system[value_start:]) - len(system[value_start:].lstrip())
+        try:
+            _, consumed = json.JSONDecoder().raw_decode(system[value_start:])
+        except ValueError:
+            cursor = value_start
+            continue
+        system = system[:start] + system[value_start + consumed:]
+        cursor = start
+    return system.rstrip() + "\n" + TASK_CONTEXT_START + "\n" + TASK_GUIDANCE + "\n" + snapshot + "\n" + TASK_CONTEXT_END
+
+
+def task_time(value):
+    """Render recorded epoch/UTC database time in Beijing time without guessing."""
+    if value is None or value == "":
+        return "未知（旧记录未保存）"
+    try:
+        if isinstance(value, (float, int)):
+            moment = datetime.fromtimestamp(value, timezone.utc)
+        else:
+            moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+        return moment.astimezone(timezone(timedelta(hours=8))).isoformat(timespec="seconds")
+    except (ValueError, TypeError, OverflowError, OSError):
+        return "未知（时间格式不可识别）"
 
 
 class TaskCatalog:
@@ -70,7 +117,7 @@ class TaskCatalog:
                 )
             }
             for row in db.execute(
-                "SELECT task_id,goal,status,error_kind,revision,created_at,next_run,metadata FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY created_at DESC,rowid DESC",
+                "SELECT task_id,goal,status,error_kind,revision,created_at,updated_at,finished_at,next_run,metadata,result FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY created_at DESC,rowid DESC",
                 identity,
             ):
                 metadata = json.loads(row["metadata"])
@@ -86,6 +133,12 @@ class TaskCatalog:
                         "error_kind": row["error_kind"],
                         "revision": row["revision"],
                         "created_at": row["created_at"],
+                        "updated_at": row["updated_at"],
+                        "finished_at": row["finished_at"],
+                        "group_id": metadata.get("task_group_id") or row["task_id"],
+                        "parent_task_id": metadata.get("parent_task_id"),
+                        "relation": metadata.get("task_relation"),
+                        "result_summary": str((json.loads(row["result"]) if row["result"] else {}).get("text", "")),
                         "next_run": row["next_run"],
                         "active": active,
                         "category": "background" if active else "history",
@@ -94,7 +147,7 @@ class TaskCatalog:
                     }
                 )
             for row in db.execute(
-                "SELECT s.id,s.path,s.status,s.run_at,s.error_code,c.id AS channel_id,c.metadata,c.status AS channel_status,c.expires_at FROM ic_scripts s JOIN ic_channels c ON s.channel_id=c.id WHERE c.bot_id=? AND c.session_key=? AND c.sender_id=? ORDER BY s.rowid DESC",
+                "SELECT s.id,s.path,s.status,s.run_at,s.finished_at,s.error_code,c.id AS channel_id,c.metadata,c.status AS channel_status,c.expires_at,(SELECT MAX(e.recorded_at) FROM ic_script_events e WHERE e.script_id=s.id) AS updated_at FROM ic_scripts s JOIN ic_channels c ON s.channel_id=c.id WHERE c.bot_id=? AND c.session_key=? AND c.sender_id=? ORDER BY s.rowid DESC",
                 identity,
             ):
                 active = row["status"] not in SCRIPT_TERMINAL
@@ -106,6 +159,9 @@ class TaskCatalog:
                         "title": row["path"],
                         "status": row["status"],
                         "next_run": row["run_at"],
+                        "created_at": None,
+                        "updated_at": row["updated_at"],
+                        "finished_at": row["finished_at"],
                         "active": active,
                         "category": "short_term" if active else "history",
                         "channel_id": row["channel_id"],
@@ -155,6 +211,10 @@ class TaskCatalog:
                         "enabled": enabled,
                         "run_once": once,
                         "cron_expression": getattr(job, "cron_expression", None),
+                        "created_at": getattr(job, "created_at", None),
+                        "updated_at": getattr(job, "updated_at", None),
+                        "last_run_at": getattr(job, "last_run_at", None),
+                        "finished_at": None,
                         "next_run": str(
                             getattr(job, "next_run_time", None)
                             or payload.get("run_at")
@@ -186,16 +246,23 @@ class TaskCatalog:
                 and label.get("category") in {"long_term", "short_term"}
             ):
                 item["category"] = label["category"]
+            for key in ("created_at", "updated_at", "finished_at", "last_run_at", "next_run"):
+                value = item.get(key)
+                if key == "next_run" and not value:
+                    item[key + "_text"] = "未安排"
+                else:
+                    item[key + "_text"] = task_time(value)
             # The directory exposes no raw metadata, arguments or channel tokens.
             for key, value in item.items():
                 if isinstance(value, str):
                     for secret in secrets:
                         value = value.replace(secret, "[密钥已隐藏]")
-                    item[key] = rt._safe_text(value, 4000)
+                    item[key] = rt._safe_text(value, 600 if key == "result_summary" else 4000)
         return [item for item in items if not item["deleted"]], unavailable
 
     async def read(
-        self, scope, *, category="active", offset=0, limit=20, include_archived=False
+        self, scope, *, category="active", offset=0, limit=20, include_archived=False,
+        history_limit=0,
     ):
         """Return complete counts with explicitly paged, current-state records.
 
@@ -205,6 +272,7 @@ class TaskCatalog:
             offset: Nonnegative record offset.
             limit: Page size from one to fifty.
             include_archived: Include archived history in this page.
+            history_limit: Independently include zero to ten recent terminal records.
 
         Returns:
             Classified facts, exact counts and source completeness.
@@ -216,9 +284,16 @@ class TaskCatalog:
             or type(limit) is not int
             or not 1 <= limit <= 50
             or type(include_archived) is not bool
+            or type(history_limit) is not int
+            or not 0 <= history_limit <= 10
         ):
             raise ValueError("invalid_catalog_query")
         items, unavailable = await self._records(scope)
+        # ISO timestamps have a common offset, allowing stable cross-source ordering.
+        items.sort(key=lambda item: max(
+            (item.get(key + "_text", "") for key in ("finished_at", "updated_at", "created_at")
+             if not item.get(key + "_text", "").startswith("未知")), default=""
+        ), reverse=True)
         counts = {
             key: sum(item["category"] == key for item in items)
             for key in TASK_DEFINITIONS
@@ -234,10 +309,20 @@ class TaskCatalog:
                 or item["category"] == category
             )
         ]
+        history = [item for item in items if not item["active"]
+                   and (include_archived or not item["archived"])]
+        def groups(records):
+            return len({(item["source"], item.get("group_id") or item["item_id"]) for item in records})
+        observed = self.runtime.service.clock()
         return {
             "ok": True,
             "definitions": TASK_DEFINITIONS,
             "counts": counts,
+            "group_counts": {
+                "all": groups(items),
+                "active": groups([item for item in items if item["active"]]),
+                "history": groups(history),
+            },
             "active_total": sum(
                 counts[key] for key in ("long_term", "short_term", "background")
             ),
@@ -246,7 +331,10 @@ class TaskCatalog:
             "items": filtered[offset : offset + limit],
             "offset": offset,
             "next_offset": offset + limit if offset + limit < len(filtered) else None,
-            "observed_at": self.runtime.service.clock(),
+            "recent_history": history[:history_limit],
+            "recent_history_next_offset": history_limit if history_limit < len(history) else None,
+            "observed_at": observed,
+            "observed_at_text": task_time(observed),
             "complete": not unavailable,
             "unavailable_sources": unavailable,
         }

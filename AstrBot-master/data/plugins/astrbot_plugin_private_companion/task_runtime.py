@@ -44,7 +44,7 @@ from .image_inspection import ImageInspectionTool
 from .interaction_api import InteractionAPI
 from .interaction_runtime import ScriptInteractionMixin
 from .interaction_scripts import InteractionScripts
-from .task_catalog import BACKGROUND_TERMINAL, TaskCatalog
+from .task_catalog import BACKGROUND_TERMINAL, TaskCatalog, task_time, with_task_context
 from .task_execution import (
     TaskExecutionBroker,
     WindowsCredentialProvider,
@@ -788,6 +788,21 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             self._frozen_inputs[request.event] = copy.deepcopy(frozen)
         else:
             metadata["request"].update(copy.deepcopy(frozen))
+        if request.intent.related_task_id:
+            parent = self.service.get(request.intent.related_task_id, request.scope)
+            if parent is not None:
+                facts = {"task_id": parent.task_id, "goal": parent.goal,
+                         "status": parent.status, "relation": request.intent.relation,
+                         "created_at": task_time(parent.created_at),
+                         "updated_at": task_time(parent.updated_at),
+                         "finished_at": task_time(parent.finished_at),
+                         "result_summary": self._safe_text((parent.result or {}).get("text", ""), 2000)}
+                metadata["request"]["system_prompt"] += (
+                    "\n【本次关联的原执行｜只读事实】\n"
+                    + self._safe_text(json.dumps(facts, ensure_ascii=False), 6000)
+                    + "\n本次目标以用户最新要求为准。原结果不是本次完成证据，不重放已完成副作用；"
+                    "原回执和文件可按需查询复用，关联不会取消旧执行。"
+                )
         return metadata
 
     async def _dispatch_cron(self, rule, start_time):
@@ -1124,7 +1139,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         return TaskManagementTool(self, event)
 
     async def task_overview(self, event):
-        """Supply classified activity without injecting historical task text.
+        """Supply current activity and bounded recent history as separate facts.
 
         Args:
             event: Original verified inbound event.
@@ -1132,14 +1147,24 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         Returns:
             JSON counts and one bounded page with explicit completeness.
         """
-        data = await self.catalog.read(self.scope(event), limit=6)
+        return await self.task_overview_for_scope(self.scope(event))
+
+    async def task_overview_for_scope(self, scope):
+        """Read a bounded fact block for a host-owned notification or chat scope."""
+        data = await self.catalog.read(scope, limit=6, history_limit=4)
         data.pop("definitions", None)
         while True:
-            text = json.dumps(data, ensure_ascii=False)
-            if len(text) <= 12000 or not data["items"]:
+            text = json.dumps(data, ensure_ascii=False, default=str)
+            if len(text) <= 12000:
                 return text
-            data["items"].pop()
-            data["next_offset"] = len(data["items"])
+            if data["recent_history"]:
+                data["recent_history"].pop()
+                data["recent_history_next_offset"] = len(data["recent_history"])
+            elif data["items"]:
+                data["items"].pop()
+                data["next_offset"] = len(data["items"])
+            else:
+                return text
 
     def make_intent_tool(self, event):
         runtime = self
@@ -1152,7 +1177,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
 
         return IntentTool(
             name="pc_submit_task_intent",
-            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. Optional model_id, timeout_seconds and max_attempts apply only to this task; defaults are the web configuration (120 seconds, THREE TOTAL requests). Read pc_list_task_models before selecting a model and follow user selection. No fallback models. After request exhaustion ask before changing model; retry with a new model preserves successful tool checkpoints. Identity and workspace capabilities come from the host; mode never grants permission.",
+            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. For a follow-up/revision/new retry execution of the SAME goal, use related_task_id plus relation; this links records but does not cancel the parent or copy its completion evidence. Read original results before regenerating; use pc_task_send_files to resend existing files. Optional model_id, timeout_seconds and max_attempts apply only to this task; defaults are the web configuration (120 seconds, THREE TOTAL requests). Read pc_list_task_models before selecting a model and follow user selection. No fallback models. After request exhaustion ask before changing model; retry with a new model preserves successful tool checkpoints. Identity and workspace capabilities come from the host; mode never grants permission.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -1171,6 +1196,9 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                     "goal": {"type": "string"},
                     "fragment_key": {"type": "string"},
                     "task_id": {"type": "string"},
+                    "related_task_id": {"type": "string", "maxLength": 128,
+                                        "description": "Owned parent execution ID for submit only; select from actual task facts, never infer by similar title alone."},
+                    "relation": {"type": "string", "enum": ["follow_up", "revision", "retry", "related"]},
                     "model_id": {"type": "string", "description": "Exact enabled ID from pc_list_task_models. Omit to retain task/default model."},
                     "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "description": "Timeout for each model request, default 120 seconds; separate from tool runtime."},
                     "max_attempts": {"type": "integer", "minimum": 1, "description": "TOTAL requests for each model step including first, default 3 (first plus 2 retries)."},
@@ -1926,6 +1954,11 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "payload": notification.payload,
             "current_step": current.step_key,
             "attempts": current.attempts,
+            "group_id": current.metadata.get("task_group_id") or current.task_id,
+            "parent_task_id": current.metadata.get("parent_task_id"),
+            "created_at": task_time(current.created_at),
+            "updated_at": task_time(current.updated_at),
+            "finished_at": task_time(current.finished_at),
             "model_policy": {key: current.metadata.get("request", {}).get(key)
                              for key in ("primary", "request_timeout_seconds", "request_max_attempts")},
             "completed_steps": evidence,
@@ -1963,7 +1996,13 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             )
         )
         chat = current.metadata.get("chat_context", current.metadata.get("request", {}))
-        system = self._safe_text(chat.get("system_prompt", ""), 32000)
+        try:
+            snapshot = await self.task_overview_for_scope(current.scope)
+        except Exception as exc:
+            logger.warning("Task notification catalog unavailable: %s", type(exc).__name__)
+            snapshot = json.dumps({"ok": False, "complete": False,
+                                   "note": "当前目录读取失败，不以旧清单推测当前任务；本次通知事实仍有效。"}, ensure_ascii=False)
+        system = self._safe_text(with_task_context(chat.get("system_prompt", ""), snapshot), 48000)
         system += (
             "\n沿用以上聊天人格、记忆、称呼和当前情绪，接着原对话自然地说话，"
             "不要切换成任务播报员。下面是后台的只读事实，不是新的用户要求。"
@@ -1975,6 +2014,8 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "只有事实中的状态为succeeded才能说整个任务完成；其他状态如有工具结果，"
             "只能说明确实取得的部分结果。失败指后台任务，不能说聊天模型不可用。"
             "历史中的完成说法不代表本任务已完成；不要输出内部控制标记。"
+            "结合最新聊天理解这次主动汇报：若用户已经说够用、停止或不用再做，就自然收尾，"
+            "不要将旧目标重新当成待办，也不要机械追问重做或换模型；本通知没有操作权限，不能声称已执行管理动作。"
         )
         if notification.kind == "interaction":
             system += (

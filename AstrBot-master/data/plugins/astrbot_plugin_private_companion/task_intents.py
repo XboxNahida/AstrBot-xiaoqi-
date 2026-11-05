@@ -24,6 +24,8 @@ class TaskIntent:
     goal: str = ""
     fragment_key: str = "main"
     task_id: str = ""
+    related_task_id: str = ""
+    relation: str = "follow_up"
 
 
 @dataclass(frozen=True)
@@ -139,6 +141,8 @@ class TaskIntentAdapter:
         goal = payload.get("goal", "")
         fragment = payload.get("fragment_key", "main")
         task_id = payload.get("task_id", "")
+        related_id = payload.get("related_task_id", "")
+        relation = payload.get("relation", "follow_up")
         if (
             not isinstance(action, str)
             or action not in {"submit", "query", "cancel", "pause", "retry", "resume", "revise"}
@@ -149,11 +153,19 @@ class TaskIntentAdapter:
             or len(fragment) > 64
             or not isinstance(task_id, str)
             or len(task_id) > 128
+            or not isinstance(related_id, str)
+            or len(related_id) > 128
+            or not isinstance(relation, str)
+            or relation not in {"follow_up", "revision", "retry", "related"}
+            or (bool(related_id) and action != "submit")
             or (action in {"submit", "revise"} and not goal.strip())
             or (action not in {"submit", "query"} and not task_id)
         ):
             return {**receipt, "code": "invalid_intent"}
-        intent = TaskIntent(action, goal.strip(), fragment, task_id)
+        intent = TaskIntent(action, goal.strip(), fragment, task_id, related_id, relation)
+        parent = self.service.get(related_id, scope) if related_id else None
+        if related_id and (parent is None or parent.metadata.get("history_deleted")):
+            return {**receipt, "code": "not_found"}
         task = self.service.get(task_id, scope) if task_id else None
         if action != "submit" and task_id and task is None:
             return {**receipt, "code": "not_found"}
@@ -209,6 +221,12 @@ class TaskIntentAdapter:
                 if not isinstance(supplied, Mapping):
                     raise ValueError("Host metadata must be a mapping")
                 metadata.update(supplied)
+            if parent is not None:
+                metadata.update(
+                    task_group_id=parent.metadata.get("task_group_id", parent.task_id),
+                    parent_task_id=parent.task_id,
+                    task_relation=relation,
+                )
             # Reserve fragment slots transactionally across adapters and restarts.
             # Reservation before submit also prevents a crash from granting a ninth
             # source fragment. The retry finds the same durable service identity.

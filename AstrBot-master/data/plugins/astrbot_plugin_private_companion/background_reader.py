@@ -11,6 +11,8 @@ import jsonschema
 
 from astrbot.core.agent.tool import FunctionTool
 
+from .task_catalog import task_time
+
 
 class BackgroundReadTool(FunctionTool):
     """Bind a read-only capability to one host-verified conversation identity.
@@ -78,6 +80,7 @@ class BackgroundReadTool(FunctionTool):
         offset, limit = kwargs.get("offset", 0), kwargs.get("limit", 6)
         identity = (scope.bot_id, scope.session_key, scope.sender_id)
         result = {"ok": True, "observed_at": rt.service.clock(), "resource": resource}
+        result["observed_at_text"] = task_time(result["observed_at"])
         path = (
             rt.service.path if resource == "tasks" else rt.interaction_api.channels.path
         )
@@ -109,11 +112,15 @@ class BackgroundReadTool(FunctionTool):
                                 "next_run_time",
                                 "last_run_at",
                                 "last_error",
+                                "created_at",
+                                "updated_at",
                             )
                         }
                         | {
                             "enabled": getattr(job, "enabled", False),
                             "note": payload.get("note", ""),
+                            **{key + "_text": task_time(getattr(job, key, None))
+                               for key in ("created_at", "updated_at", "last_run_at", "next_run_time")},
                         }
                     )
             with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as db:
@@ -147,8 +154,17 @@ class BackgroundReadTool(FunctionTool):
                                 "step_key",
                                 "error_kind",
                                 "attempts",
+                                "created_at",
+                                "updated_at",
+                                "finished_at",
                             )
                         }
+                        metadata = json.loads(row["metadata"])
+                        result["task"].update(
+                            group_id=metadata.get("task_group_id") or task_id,
+                            parent_task_id=metadata.get("parent_task_id"),
+                            relation=metadata.get("task_relation"),
+                        )
                         attempt = db.execute(
                             "SELECT provider,created_at FROM pt_attempts WHERE task_id=? ORDER BY attempt_id DESC LIMIT 1",
                             (task_id,),
@@ -214,7 +230,7 @@ class BackgroundReadTool(FunctionTool):
                         ).fetchone()[0]
                         result["task_view"] = view
                         rows = db.execute(
-                            "SELECT task_id,goal,status,revision,step_key,error_kind FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=?" + filters + " ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",
+                            "SELECT task_id,goal,status,revision,step_key,error_kind,created_at,updated_at,finished_at,COALESCE(json_extract(metadata,'$.task_group_id'),task_id) AS group_id,json_extract(metadata,'$.parent_task_id') AS parent_task_id,json_extract(metadata,'$.task_relation') AS relation FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=?" + filters + " ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",
                             (*identity, limit + 1, offset),
                         ).fetchall()
                         result["tasks"] = [dict(row) for row in rows[:limit]]
@@ -247,6 +263,13 @@ class BackgroundReadTool(FunctionTool):
             result.update(
                 offset=offset, next_offset=offset + limit if len(rows) > limit else None
             )
+            for task in [*result.get("tasks", []), *([result["task"]] if "task" in result else [])]:
+                for key in ("created_at", "updated_at", "finished_at"):
+                    task[key + "_text"] = task_time(task.get(key))
+            if resource == "scripts" and isinstance(raw_detail, list):
+                for script in raw_detail:
+                    for key in ("run_at", "finished_at"):
+                        script[key + "_text"] = task_time(script.get(key))
             if raw_detail is not None:
                 # Redact before slicing so a secret cannot straddle text pages.
                 detail = json.dumps(

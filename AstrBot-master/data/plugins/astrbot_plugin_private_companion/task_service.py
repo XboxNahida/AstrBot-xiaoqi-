@@ -45,6 +45,9 @@ class TaskJob:
     metadata: dict[str, Any]
     steps: dict[str, Any]
     result: dict[str, Any] | None
+    created_at: float | None = None
+    updated_at: float | None = None
+    finished_at: float | None = None
 
 
 @dataclass(frozen=True)
@@ -126,6 +129,10 @@ class TaskService:
                 CREATE INDEX IF NOT EXISTS pt_tasks_ready ON pt_tasks(status,next_run);
                 CREATE INDEX IF NOT EXISTS pt_outbox_ready ON pt_outbox(state,next_run);
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(pt_tasks)")}
+            for name in ("updated_at", "finished_at"):
+                if name not in columns:
+                    db.execute(f"ALTER TABLE pt_tasks ADD COLUMN {name} REAL")
 
     @contextmanager
     def _transaction(self):
@@ -167,6 +174,17 @@ class TaskService:
             json.loads(row["metadata"]),
             steps,
             json.loads(row["result"]) if row["result"] else None,
+            row["created_at"], row["updated_at"], row["finished_at"],
+        )
+
+    def _touch(self, db, task_id, *, record_finish=False):
+        """Record a factual mutation; legacy timestamps remain unknown until changed."""
+        now = self.clock()
+        db.execute(
+            "UPDATE pt_tasks SET updated_at=?,finished_at=CASE WHEN ?=0 THEN finished_at "
+            "WHEN status IN ('succeeded','failed','cancelled') "
+            "THEN COALESCE(finished_at,?) ELSE NULL END WHERE task_id=?",
+            (now, int(record_finish), now, task_id),
         )
 
     def _owned(self, db, job):
@@ -177,6 +195,7 @@ class TaskService:
         ).fetchone()
 
     def _notify(self, db, task_id, kind, payload, fingerprint=None):
+        self._touch(db, task_id, record_finish=kind in {"result", "state"})
         revision = db.execute(
             "SELECT revision FROM pt_tasks WHERE task_id=?", (task_id,)
         ).fetchone()[0]
@@ -278,6 +297,32 @@ class TaskService:
                 ).fetchone(),
             )
 
+    def link_tasks(self, task_id: str, scope: TaskScope, related_task_id: str) -> bool:
+        """Associate model-selected executions without changing execution status."""
+        with self._transaction() as db:
+            rows = db.execute(
+                "SELECT task_id,metadata FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=?",
+                (scope.bot_id, scope.session_key, scope.sender_id),
+            ).fetchall()
+            owned = {row["task_id"]: json.loads(row["metadata"]) for row in rows}
+            if any(key not in owned or owned[key].get("history_deleted")
+                   for key in (task_id, related_task_id)):
+                return False
+            previous = owned[task_id].get("task_group_id", task_id)
+            target = owned[related_task_id].get("task_group_id", related_task_id)
+            if previous == target:
+                return True
+            for key, metadata in owned.items():
+                if metadata.get("history_deleted") or metadata.get("task_group_id", key) != previous:
+                    continue
+                metadata["task_group_id"] = target
+                if key == task_id:
+                    metadata.update(parent_task_id=related_task_id, task_relation="related")
+                db.execute("UPDATE pt_tasks SET metadata=? WHERE task_id=?",
+                           (json.dumps(metadata), key))
+                self._touch(db, key)
+            return True
+
     def list(
         self, scope: TaskScope, *, limit: int = 50, latest: bool = False
     ) -> list[TaskJob]:
@@ -324,6 +369,7 @@ class TaskService:
                 "lease_until=?,attempts=attempts+1 WHERE task_id=?",
                 (worker_id, token, self.clock() + self.lease_seconds, row["task_id"]),
             )
+            self._touch(db, row["task_id"])
             db.execute(
                 "INSERT INTO pt_attempts(task_id,step_key,cycle,provider,lease_token,created_at) VALUES(?,?,?,?,?,?)",
                 (
@@ -390,6 +436,7 @@ class TaskService:
                 "UPDATE pt_tasks SET attempts=attempts+1 WHERE task_id=?",
                 (job.task_id,),
             )
+            self._touch(db, job.task_id)
             db.execute(
                 "INSERT INTO pt_attempts(task_id,step_key,cycle,provider,lease_token,created_at) VALUES(?,?,?,?,?,?)",
                 (
@@ -438,6 +485,7 @@ class TaskService:
                 "UPDATE pt_tasks SET revision=revision+1 WHERE task_id=?",
                 (job.task_id,),
             )
+            self._touch(db, job.task_id)
             return True
 
     def progress(
@@ -533,6 +581,7 @@ class TaskService:
                 "lease_token=NULL,lease_until=NULL,worker_id=NULL WHERE task_id=?",
                 (status, error_kind, next_run, job.task_id),
             )
+            self._touch(db, job.task_id, record_finish=True)
             db.execute(
                 "UPDATE pt_outbox SET state='superseded' WHERE task_id=? AND kind='progress' AND state='pending'",
                 (job.task_id,),

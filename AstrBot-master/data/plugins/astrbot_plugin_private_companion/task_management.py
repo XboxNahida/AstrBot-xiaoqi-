@@ -30,6 +30,7 @@ class TaskManagementTool(FunctionTool):
                 TASK_GUIDANCE
                 + "\nlist查询四类真实数量和分页清单；detail查询详情；classify只调整未来安排长期/短期属性；"
                 "archive/unarchive管理历史展示；delete只删除已归档的终态历史正文。"
+                "link使用background的item_id和related_item_id显式关联同目标执行，不改执行状态。"
                 "pause/resume/cancel/retry使用source和真实item_id；取消一个后台工作不会自动取消它创建的定时安排。"
                 "schedule复用官方future_task的create/edit操作，不创建GPT查询任务。"
                 "同一条定时创建使用稳定operation_key；同一消息的不同明确安排使用不同键。结果未知时先查询，不换键盲目重建。"
@@ -51,6 +52,7 @@ class TaskManagementTool(FunctionTool):
                             "cancel",
                             "retry",
                             "schedule",
+                            "link",
                         ],
                     },
                     "source": {
@@ -58,6 +60,7 @@ class TaskManagementTool(FunctionTool):
                         "enum": ["background", "script", "schedule"],
                     },
                     "item_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                    "related_item_id": {"type": "string", "minLength": 1, "maxLength": 128},
                     "category": {
                         "type": "string",
                         "enum": [
@@ -72,6 +75,7 @@ class TaskManagementTool(FunctionTool):
                     "offset": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 50},
                     "include_archived": {"type": "boolean"},
+                    "history_limit": {"type": "integer", "minimum": 0, "maximum": 10},
                     "operation_key": {
                         "type": "string",
                         "minLength": 1,
@@ -148,7 +152,7 @@ class TaskManagementTool(FunctionTool):
                 scope,
                 **{
                     key: args[key]
-                    for key in ("category", "offset", "limit", "include_archived")
+                    for key in ("category", "offset", "limit", "include_archived", "history_limit")
                     if key in args
                 },
             )
@@ -224,6 +228,13 @@ class TaskManagementTool(FunctionTool):
                 "code": "source_and_item_id_required",
                 "next_action": "先list获取真实来源和ID。",
             }
+        if action == "link":
+            if source != "background" or not args.get("related_item_id"):
+                return {"ok": False, "code": "background_and_related_item_id_required"}
+            linked = rt.service.link_tasks(item_id, scope, args["related_item_id"])
+            return {"ok": linked, "code": "linked" if linked else "not_found",
+                    "item_id": item_id, "related_item_id": args["related_item_id"],
+                    "note": "只关联目标，原执行状态、结果和检查点保留。"}
         if action in {"classify", "archive", "unarchive"}:
             return await rt.catalog.change(
                 scope, source, item_id, action, category=args.get("category")
