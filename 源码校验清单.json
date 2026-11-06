@@ -6941,7 +6941,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_route.py",
-    "SHA256": "b0b9b158ed719dc5fccceec7ef59820ca0b9d70227776764cba98a83d1854422"
+    "SHA256": "c3bfafe14c0fddf5b4c83d417681f8e966bbcb9fd0d83dc6354b351a2e355b54"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_task_state.py",
@@ -7969,7 +7969,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_conversation_route.py",
-    "SHA256": "c2d4e653309b379dc4c49b32b9be4113a19702d8f0ba44cc654613064c221e3b"
+    "SHA256": "5045b19b5ba8d585d1c0bad00e9d098408658659488a51ec5e327290d634281e"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_conversation_task_progress.py",
@@ -13821,7 +13821,7 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "121d93773bc0354887096a0bbfe95bf407197f474b7cfff6fa641c159aa4851e"
+    "SHA256": "632fdf91ecfde88e5df848337f6a65a22198504b9b2c20525ba3f4383380cceb"
   },
   {
     "路径": "deployment/配置受限任务执行.ps1",
@@ -13897,7 +13897,7 @@
   },
   {
     "路径": "人格/personas.json",
-    "SHA256": "832bef3b94dffb65631d0f5421b100993ee3471a306dd9b51bde3aeb7c0a789f"
+    "SHA256": "3930566627398abdb2d497395edd02153208b8bd8e41b13510f9539c4e471797"
   },
   {
     "路径": "人格/小七.md",
@@ -14065,7 +14065,7 @@
   },
   {
     "路径": "发布预设/data/data_v4.db",
-    "SHA256": "6041a4c978960ed83d8ee10346e0696d7dc49a9a9e89cf521224de3d7807f84c"
+    "SHA256": "0b081c0e24423a10c9d016470d7d8c1b0f9425f655b8fdaf16198cbc8d0994c6"
   },
   {
     "路径": "发布预设/data/mcp_server.json",
@@ -14085,7 +14085,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "c6e67b63945d86853e7af661545153297321ebe76fa77fc645cbe02c983ea4df"
+    "SHA256": "25bdff01810ccf1e0050f87dd1dc5aa4944138eeab4a741688693a4ddc264a3d"
   },
   {
     "路径": "第三方与发布说明.md",

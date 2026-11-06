@@ -59,6 +59,55 @@ class ConversationRouteTests(unittest.TestCase):
         self.assertIsNone(req.model)
         self.assertIsNone(req.func_tool)
 
+    def test_chat_keeps_enabled_knowledge_search_without_granting_work_tools(self):
+        from astrbot.core.agent.tool import FunctionTool, ToolSet
+        from astrbot.core.tools.knowledge_base_tools import KnowledgeBaseQueryTool
+
+        knowledge = KnowledgeBaseQueryTool()
+        tools = ToolSet()
+        tools.add_tool(knowledge)
+        tools.add_tool(FunctionTool(
+            name="pc_task_run_command", description="Run a task command",
+            parameters={"type": "object", "properties": {}},
+        ))
+        req = ProviderRequest(
+            prompt="这话是在玩谐音梗吗", system_prompt="当前人格：小七", func_tool=tools
+        )
+        self.event._private_companion_capability_decision = CapabilityDecision(
+            True, "text", "neutral", (), False, "test", route="chat"
+        )
+
+        route.configure_conversation_request(self.plugin, self.event, req)
+
+        self.assertIs(knowledge, req.func_tool.get_tool("astr_kb_search"))
+        self.assertIsNone(req.func_tool.get_tool("pc_task_run_command"))
+        self.assertTrue(req.system_prompt.startswith("当前人格：小七"))
+        self.assertIn("astr_kb_search", req.system_prompt)
+        self.assertIn("谐音", req.system_prompt)
+        self.assertIn("网络用语", req.system_prompt)
+        self.assertEqual((), req.required_tool_names)
+
+    def test_chat_does_not_restore_disabled_or_missing_knowledge_search(self):
+        from astrbot.core.agent.tool import ToolSet
+        from astrbot.core.tools.knowledge_base_tools import KnowledgeBaseQueryTool
+
+        for present in (False, True):
+            with self.subTest(present=present):
+                tools = ToolSet()
+                if present:
+                    knowledge = KnowledgeBaseQueryTool()
+                    knowledge.active = False
+                    tools.add_tool(knowledge)
+                req = ProviderRequest(prompt="你好", func_tool=tools)
+                self.event._private_companion_capability_decision = CapabilityDecision(
+                    True, "text", "neutral", (), False, "test", route="chat"
+                )
+
+                route.configure_conversation_request(self.plugin, self.event, req)
+
+                self.assertIsNone(req.func_tool)
+                self.assertNotIn("astr_kb_search", req.system_prompt)
+
     def test_route_diagnostics_use_astrbot_logger(self):
         with self.assertLogs("astrbot", level="INFO") as captured:
             self.request("task")
