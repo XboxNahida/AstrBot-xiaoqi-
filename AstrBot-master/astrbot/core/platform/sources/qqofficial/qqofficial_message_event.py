@@ -118,13 +118,22 @@ class QQOfficialMessageEvent(AstrMessageEvent):
         super().__init__(message_str, message_obj, platform_meta, session_id)
         self.bot = bot
         self.send_buffer = None
+        self._send_lock = asyncio.Lock()
 
     async def send(self, message: MessageChain) -> None:
-        ensure_qq_client_active(self.bot)
-        self.send_buffer = message
-        await self._post_send()
+        async with self._send_lock:
+            ensure_qq_client_active(self.bot)
+            self.send_buffer = message
+            try:
+                await self._post_send()
+            finally:
+                self.send_buffer = None
 
     async def send_streaming(self, generator, use_fallback: bool = False):
+        async with self._send_lock:
+            return await self._send_streaming_unlocked(generator, use_fallback)
+
+    async def _send_streaming_unlocked(self, generator, use_fallback: bool = False):
         """流式输出仅支持消息列表私聊（C2C），其他消息源退化为普通发送"""
         # Actual sends mark delivery; starting a generator does not prove delivery.
         ensure_qq_client_active(self.bot)
@@ -378,6 +387,8 @@ class QQOfficialMessageEvent(AstrMessageEvent):
                         self.VOICE_FILE_TYPE,
                         group_openid=source.group_openid,
                     )
+                    if not media:
+                        raise RuntimeError("voice_upload_failed: QQ语音上传未返回有效媒体")
                     if media:
                         payload["media"] = media
                         payload["msg_type"] = 7
@@ -433,6 +444,8 @@ class QQOfficialMessageEvent(AstrMessageEvent):
                         self.VOICE_FILE_TYPE,
                         openid=source.author.user_openid,
                     )
+                    if not media:
+                        raise RuntimeError("voice_upload_failed: QQ语音上传未返回有效媒体")
                     if media:
                         payload["media"] = media
                         payload["msg_type"] = 7

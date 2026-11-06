@@ -16075,7 +16075,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
             prompt_ratio = "3:4"
         elif re.search(r"\b(?:widescreen|ultrawide)\b|宽屏|超宽", prompt, flags=re.I):
             prompt_ratio = "16:9"
-        ratio = configured_ratio or inline_ratio or prompt_ratio or ratio
+        ratio = inline_ratio or configured_ratio or prompt_ratio or ratio
 
         exact = re.fullmatch(r"(\d{2,5})x(\d{2,5})", size)
         if exact and ratio:
@@ -18036,6 +18036,23 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
         old_values = {key: getattr(self, key, None) for key in self._external_image_api_runtime_keys()}
         try:
             self._apply_external_image_api_endpoint_runtime(endpoint)
+            ratio_override = getattr(self, "_request_aspect_ratio", "")
+            resolution_override = getattr(self, "_request_resolution", "")
+            if ratio_override or resolution_override:
+                raw_size = str(image_size or resolution_override or self.external_image_api_size or "1K")
+                ratio = ratio_override or self._normalize_agnes_image_ratio(self.external_image_api_ratio) or "1:1"
+                exact = re.fullmatch(r"(\d{2,5})x(\d{2,5})", raw_size.lower())
+                if self._resolved_external_image_api_platform() == "agnes":
+                    self.external_image_api_ratio = "" if exact and not ratio_override else ratio
+                    image_size = raw_size
+                else:
+                    if exact and not ratio_override:
+                        image_size = raw_size
+                    else:
+                        tier = re.fullmatch(r"([1-4])[kK]", raw_size)
+                        longest = max(map(int, exact.groups())) if exact else (int(tier[1]) * 1024 if tier else 1024)
+                        width, height = map(int, ratio.split(":"))
+                        image_size = f"{round(longest * width / max(width, height) / 8) * 8}x{round(longest * height / max(width, height) / 8) * 8}"
             outcome = self._coerce_external_photo_generation_outcome(
                 await self._run_external_photo_generation_once(
                     endpoint_prompt_text,
@@ -21879,7 +21896,16 @@ class ImageGenerationRuntime(ProactiveMessageMixin):
         return state
 
     async def generate(self, request: dict[str, Any]) -> tuple[str, str, str]:
-        return await self._generate_photo_image_legacy(**dict(request or {}))
+        request = dict(request or {})
+        ratio = str(request.pop("aspect_ratio", "") or "").strip()
+        resolution = str(request.pop("resolution", "") or "").strip()
+        if ratio and not self._normalize_agnes_image_ratio(ratio):
+            return "参数校验", "", "图片比例无效，请使用1:1、9:16、16:9等受支持比例。"
+        if resolution and not re.fullmatch(r"[1-4][kK]|\d{2,5}x\d{2,5}", resolution):
+            return "参数校验", "", "图片分辨率无效，请使用1K至4K或像素尺寸。"
+        self._request_aspect_ratio = self._normalize_agnes_image_ratio(ratio)
+        self._request_resolution = resolution
+        return await self._generate_photo_image_legacy(**request)
 
 
 _IMAGE_SETTING_UNSET = object()

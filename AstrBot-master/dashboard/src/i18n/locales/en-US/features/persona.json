@@ -3,6 +3,8 @@
     "description": "Manage and configure chat bot personality settings"
   },
   "buttons": {
+    "fromTemplate": "Create from existing persona",
+    "copyTemplate": "Copy into this form",
     "create": "Create Persona",
     "createFirst": "Create First Persona",
     "edit": "Edit",
@@ -21,6 +23,10 @@
     "updatedAt": "Updated At"
   },
   "form": {
+    "templatePersona": "Template persona (all folders)",
+    "templateHelp": "Selecting a persona automatically loads its prompt, all examples and capabilities into this form. Rename and save independently; the original stays unchanged.",
+    "templateLoaded": "Loaded: {characters} prompt characters and {pairs} example pairs.",
+    "copyName": "{name}_copy",
     "personaId": "Persona ID",
     "systemPrompt": "System Prompt",
     "customErrorMessage": "Custom Error Reply Message (Optional)",

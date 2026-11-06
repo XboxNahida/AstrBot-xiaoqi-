@@ -689,6 +689,23 @@ async def test_hub_chat_filter_does_not_hide_safe_registry_tools(runtime):
     task = runtime.service.get(accepted["task_id"], runtime.scope(e))
     assert "web_search_tavily" in task.metadata["request"]["tool_names"]
     assert "localShell" not in task.metadata["request"]["tool_names"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_music_task_has_search_and_final_delivery_tools(runtime):
+    runtime.test_tools.extend(
+        FunctionTool(name=name, description=name, parameters={"type": "object"})
+        for name in ("find_music", "search_music", "deliver_music")
+    )
+    e = event()
+    runtime.test_request.func_tool = None
+    assert register(runtime, e)
+    accepted = await runtime.submit(e, {"goal": "搜索并发送用户点的歌曲"})
+    assert accepted["accepted"]
+    task = runtime.service.get(accepted["task_id"], runtime.scope(e))
+    assert {"find_music", "search_music", "deliver_music"}.issubset(task.metadata["request"]["tool_names"])
+    tool = runtime._registry(e.unified_msg_origin)["deliver_music"]
+    assert runtime.authorize_tool(task, tool, {"search_id": "bound", "position": 1})
     runtime.plugin.context.get_config = lambda **_: {
         "provider_settings": {"web_search": False}
     }

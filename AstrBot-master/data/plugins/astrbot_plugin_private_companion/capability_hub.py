@@ -157,6 +157,7 @@ class CapabilityDecision:
     image_edit_requested: bool = False
     task_mode: str = ""
     task_manage: bool = False
+    media_managed_by_chat: bool = False
 
 
 def parse_model_capability_decision(
@@ -517,6 +518,8 @@ async def judge_capabilities(
             "\n额外输出 route=chat、task_mode为空、segments=[]。中枢仅判断参与、预处理及队列合并；"
             "完整文字和图片交给Gemini理解，由Gemini决定直接回答或通过接口派发管理后台任务。"
             "不得拆分或派发用户任务，也不决定模型ID或工具执行权限；actions只作语境建议。"
+            "生图、改图、图片参数、语音、唱歌和点歌全部由Gemini理解并选择，"
+            "这些媒体动作不要审批或派发，不要给出必须发语音或禁止媒体的内容方向。"
             "当前用户说‘已经调整好了，你可以试试’或‘再重试一下’，若上下文是本人尚未完成的实际任务，"
             "应保留这条补充与原任务的语境供Gemini处理，不能因旧助手曾说没有接口而关闭工具。\n"
             "额外输出布尔值 task_query：用户只查看已有后台任务、脚本互动或持久定时提醒的"
@@ -1064,6 +1067,11 @@ def decision_action_allowed(decision: Any, action: str) -> bool:
     listed action set is authoritative for gated external actions.
     """
     if decision is None:
+        return True
+    if getattr(decision, "media_managed_by_chat", False) is True and action in {
+        "image_generate", "image_edit", "image_history", "image_read",
+        "chat_history_read", "media_send", "emoji", "voice", "music",
+    }:
         return True
     allowed_actions = {
         str(item).strip().lower()

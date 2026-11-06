@@ -27,6 +27,49 @@
           {{ tm("form.createInFolder", { folder: folderDisplayName }) }}
         </v-alert>
 
+        <div v-if="!editingPersona" class="mb-4">
+          <v-btn variant="tonal" @click="showTemplatePicker = !showTemplatePicker">
+            {{ tm("buttons.fromTemplate") }}
+          </v-btn>
+          <div v-if="showTemplatePicker" class="mt-3">
+            <v-autocomplete
+              v-model="selectedTemplateId"
+              :items="templatePersonas"
+              item-title="persona_id"
+              item-value="persona_id"
+              :label="tm('form.templatePersona')"
+              :loading="loadingTemplateList"
+              :disabled="loadingTemplateList"
+              variant="outlined"
+              hide-details
+              clearable
+              @update:model-value="applyPersonaTemplate"
+            />
+            <p class="text-body-2 text-medium-emphasis my-2">
+              {{ tm("form.templateHelp") }}
+            </p>
+            <v-btn
+              variant="tonal"
+              :disabled="!selectedTemplateId || loadingTemplateList"
+              @click="applyPersonaTemplate()"
+            >
+              {{ tm("buttons.copyTemplate") }}
+            </v-btn>
+            <v-alert
+              v-if="selectedTemplateId && personaForm.system_prompt"
+              type="success"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              {{ tm("form.templateLoaded", {
+                characters: personaForm.system_prompt.length,
+                pairs: personaForm.begin_dialogs.length / 2,
+              }) }}
+            </v-alert>
+          </div>
+        </div>
+
         <v-form v-model="formValid">
           <v-row class="persona-form-layout">
             <v-col cols="12" md="6" class="persona-basic-col">
@@ -217,6 +260,11 @@ const availableSkills = ref([]);
 const loadingTools = ref(false);
 const loadingSkills = ref(false);
 const existingPersonaIds = ref([]);
+const templatePersonas = ref([]);
+const selectedTemplateId = ref(null);
+const showTemplatePicker = ref(false);
+const loadingTemplateList = ref(false);
+let personaListRequest = 0;
 const personaForm = reactive({
   persona_id: "",
   system_prompt: "",
@@ -308,15 +356,36 @@ async function loadSkills() {
 }
 
 async function loadExistingPersonaIds() {
+  const request = ++personaListRequest;
+  loadingTemplateList.value = true;
   try {
     const response = await personaApi.list();
-    existingPersonaIds.value =
-      response.data?.status === "ok"
-        ? (response.data?.data || []).map((persona) => persona.persona_id)
-        : [];
+    if (request !== personaListRequest) return;
+    if (response.data?.status !== "ok") throw new Error("Persona list unavailable");
+    templatePersonas.value = response.data?.data || [];
+    existingPersonaIds.value = templatePersonas.value.map((persona) => persona.persona_id);
   } catch {
+    if (request !== personaListRequest) return;
     existingPersonaIds.value = [];
+    templatePersonas.value = [];
+    emit("error", tm("messages.loadError"));
+  } finally {
+    if (request === personaListRequest) loadingTemplateList.value = false;
   }
+}
+
+function applyPersonaTemplate(personaId = selectedTemplateId.value) {
+  if (props.editingPersona) return;
+  const template = templatePersonas.value.find(
+    (persona) => persona.persona_id === personaId,
+  );
+  if (!template) return;
+  const baseName = tm("form.copyName", { name: template.persona_id });
+  let name = baseName;
+  for (let suffix = 2; existingPersonaIds.value.includes(name); suffix += 1) {
+    name = `${baseName}_${suffix}`;
+  }
+  initializeForm({ ...template, persona_id: name, folder_id: props.currentFolderId });
 }
 
 async function savePersona() {
@@ -416,6 +485,10 @@ function getDialogRules(index) {
 watch(
   () => props.modelValue,
   (open) => {
+    personaListRequest += 1;
+    showTemplatePicker.value = false;
+    selectedTemplateId.value = null;
+    templatePersonas.value = [];
     if (!open) {
       return;
     }

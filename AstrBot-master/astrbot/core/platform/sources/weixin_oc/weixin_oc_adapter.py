@@ -109,6 +109,7 @@ class WeixinOCAdapter(Platform):
     IMAGE_UPLOAD_TYPE = 1
     VIDEO_UPLOAD_TYPE = 2
     FILE_UPLOAD_TYPE = 3
+    VOICE_UPLOAD_TYPE = 4
     RECENT_MESSAGE_CACHE_SIZE = 100
     REPLY_MATCH_WINDOW_MS = 60_000
     RECENT_SESSION_CACHE_TTL_S = 1_800
@@ -728,6 +729,12 @@ class WeixinOCAdapter(Platform):
                 },
             }
 
+        if item_type == self.VOICE_ITEM_TYPE:
+            return {
+                "type": self.VOICE_ITEM_TYPE,
+                "voice_item": {"media": media_payload},
+            }
+
         file_len = str(raw_size)
         return {
             "type": self.FILE_ITEM_TYPE,
@@ -846,11 +853,17 @@ class WeixinOCAdapter(Platform):
         return None
 
     async def _resolve_media_file_path(
-        self, segment: Image | Video | File
+        self, segment: Image | Video | File | Record
     ) -> Path | None:
         try:
             if isinstance(segment, File):
                 path = await segment.get_file()
+            elif isinstance(segment, Record):
+                path = await MediaResolver(
+                    segment.file or segment.url,
+                    media_type="audio",
+                    default_suffix=".wav",
+                ).to_path(target_format="mp3")
             elif isinstance(segment, (Image, Video)):
                 path = await segment.convert_to_file_path()
             else:
@@ -891,6 +904,7 @@ class WeixinOCAdapter(Platform):
                 user_id,
             )
             return False
+        media_types = [item.get("type") for item in item_list if item.get("type") != 1]
         payload = await self.client.request_json(
             "POST",
             "ilink/bot/sendmessage",
@@ -911,7 +925,21 @@ class WeixinOCAdapter(Platform):
             token_required=True,
             headers={},
         )
-        if not self._is_successful_api_payload(payload):
+        explicit_status = "ret" in payload or "errcode" in payload
+        has_message_id = bool(payload.get("message_id"))
+        if media_types:
+            logger.info(
+                "weixin_oc(%s): media send API acknowledgement types=%s ret=%s errcode=%s explicit_status=%s message_id_present=%s; client delivery unconfirmed",
+                self.meta().id,
+                media_types,
+                payload.get("ret"),
+                payload.get("errcode"),
+                explicit_status,
+                has_message_id,
+            )
+        if not (
+            explicit_status or has_message_id
+        ) or not self._is_successful_api_payload(payload):
             logger.warning(
                 "weixin_oc(%s): sendmessage failed for %s: %s",
                 self.meta().id,
@@ -991,7 +1019,7 @@ class WeixinOCAdapter(Platform):
     async def _send_media_segment(
         self,
         user_id: str,
-        segment: Image | Video | File,
+        segment: Image | Video | File | Record,
         text: str | None = None,
     ) -> bool:
         if not self.token:
@@ -1012,7 +1040,7 @@ class WeixinOCAdapter(Platform):
         if isinstance(segment, Video):
             item_type = self.VIDEO_ITEM_TYPE
             upload_media_type = self.VIDEO_UPLOAD_TYPE
-        elif isinstance(segment, File):
+        elif isinstance(segment, (File, Record)):
             item_type = self.FILE_ITEM_TYPE
             upload_media_type = self.FILE_UPLOAD_TYPE
 
@@ -1021,6 +1049,9 @@ class WeixinOCAdapter(Platform):
             if isinstance(segment, File) and segment.name
             else media_path.name
         )
+        if isinstance(segment, Record):
+            # Native voice gets an API message_id but is not displayed by iLink clients.
+            file_name = "语音回复.mp3"
         try:
             media_item = await self._prepare_media_item(
                 user_id,
@@ -1653,7 +1684,7 @@ class WeixinOCAdapter(Platform):
                 pending_text += segment.text
                 continue
 
-            if isinstance(segment, (Image, Video, File)):
+            if isinstance(segment, (Image, Video, File, Record)):
                 has_supported_segment = True
                 sent = await self._send_media_segment(
                     target_user,

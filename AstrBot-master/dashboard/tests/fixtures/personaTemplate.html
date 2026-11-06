@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="UTF-8">
+<title>人格模板界面验收（合成数据）</title>
+<div id="app"></div>
+<script type="module">
+import { createApp, h } from 'vue';
+import { createVuetify } from 'vuetify';
+import * as components from 'vuetify/components';
+import * as directives from 'vuetify/directives';
+import 'vuetify/styles';
+import PersonaForm from '/src/components/shared/PersonaForm.vue';
+import { personaApi, skillApi, toolApi } from '/src/api/v1.ts';
+import { initI18n } from '/src/i18n/composables.ts';
+await initI18n('zh-CN');
+personaApi.list = async () => ({ data: { status: 'ok', data: [
+  { persona_id: '合成小七', system_prompt: '这是用于测试人格复制的完整说明文本。',
+    custom_error_message: '暂时没连上，等我一下。', begin_dialogs: ['哦哦', ''],
+    tools: null, skills: [], folder_id: 'source' },
+] } });
+toolApi.list = skillApi.list = async () => ({ data: { status: 'ok', data: [] } });
+personaApi.create = async (payload) => {
+  document.getElementById('result').textContent = JSON.stringify(payload);
+  return { data: { status: 'ok' } };
+};
+createApp({ render: () => h(components.VApp, null, { default: () => [
+  h(PersonaForm, { modelValue: true, currentFolderId: 'target', currentFolderName: '测试文件夹',
+    onError: (message) => { document.getElementById('result').textContent = message; } }),
+  h('pre', { id: 'result' }),
+] }) }).use(createVuetify({ components, directives })).mount('#app');
+</script>
+</html>

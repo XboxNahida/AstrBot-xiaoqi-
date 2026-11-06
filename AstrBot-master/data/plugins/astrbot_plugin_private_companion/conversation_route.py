@@ -6,6 +6,8 @@ import asyncio
 import json
 import re
 import time
+from copy import copy
+from dataclasses import replace
 from typing import Any
 
 from astrbot.api import logger
@@ -483,10 +485,17 @@ def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
     )
     setattr(event, "_private_companion_conversation_request", req)
     if route == "chat":
+        if hasattr(decision, "__dataclass_fields__"):
+            decision = replace(decision, media_managed_by_chat=True)
+        else:
+            decision = copy(decision)
+            decision.media_managed_by_chat = True
+        setattr(event, "_private_companion_capability_decision", decision)
         req.provider_id = ids[0]
         req.fallback_provider_ids = ids[1:]
         req.final_response_only = False
         expressive_tools = {
+            "pc_generate_photo": "image_generate",
             "pc_find_reaction_image": "emoji",
             "pc_send_current_media": "media_send",
             "pc_image_history": "image_history",
@@ -494,7 +503,7 @@ def configure_conversation_request(plugin: Any, event: Any, req: Any) -> None:
         tools = ToolSet()
         for tool in tuple(getattr(getattr(req, "func_tool", None), "tools", ()) or ()):
             action = expressive_tools.get(str(getattr(tool, "name", "")))
-            if action and action in decision.actions:
+            if action and getattr(tool, "active", True):
                 tools.add_tool(tool)
         req.func_tool = tools if tools.tools else None
     else:

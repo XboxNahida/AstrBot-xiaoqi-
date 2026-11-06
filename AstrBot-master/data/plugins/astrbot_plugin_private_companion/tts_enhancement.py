@@ -1903,6 +1903,8 @@ class TtsEnhancementMixin:
         return max(0.0, min(1.0, override_value if override_value >= 0 else probability))
 
     def _tts_session_interval_remaining(self, event: Any) -> float:
+        if self._tts_chat_model_manages_media(event):
+            return 0.0
         if getattr(self, "tts_frequency_control_mode", "global") == "legacy":
             return 0.0
         hub_decision = getattr(event, "_private_companion_capability_decision", None)
@@ -2087,6 +2089,8 @@ class TtsEnhancementMixin:
         return any(re.search(pattern, compact, flags=re.IGNORECASE) for pattern in patterns)
 
     def _tts_trigger_probability_allows(self, event: Any, *, reason: str) -> bool:
+        if self._tts_chat_model_manages_media(event):
+            return True
         hub_decision = getattr(event, "_private_companion_capability_decision", None)
         if hub_decision is not None:
             allowed = decision_action_allowed(hub_decision, "voice")
@@ -2419,7 +2423,7 @@ TTS 朗读文本：
     def _build_tts_rule_prompt(self, provider_kind: str = "generic", *, event: Any = None) -> str:
         voice_lang = self._tts_voice_language_for_event(event)
         lang = self._tts_language_label(voice_language=voice_lang)
-        mode = getattr(self, "tts_generation_mode", "fast_tag")
+        mode = self._tts_mode_for_event(event)
         frequency_mode = getattr(self, "tts_frequency_control_mode", "global")
         delivery_mode = getattr(self, "tts_delivery_mode", "voice_and_text")
         foreign_text_mode = getattr(self, "tts_foreign_text_mode", "translation")
@@ -2512,6 +2516,12 @@ TTS 朗读文本：
         )
         rules = [
             "【语音消息规则】",
+            (
+                "语音和唱歌由你结合用户本轮及上下文选择，不受中枢媒体动作建议约束。"
+                "演唱时用<pc_tts>(唱歌)歌词</pc_tts>，会自动使用独立唱歌音色；"
+                "点歌或播放默认交给后台搜索歌曲，不能用朗读歌词冒充演唱。"
+                if self._tts_chat_model_manages_media(event) else ""
+            ),
             (
                 f"用户本轮明确要求使用{lang}回复；本轮语音正文必须服从这个临时语种，"
                 "不要沿用长期 TTS 语种。该要求只作用于当前回复。"
@@ -2664,7 +2674,7 @@ TTS 朗读文本：
         user_requested_tts = self._event_explicitly_requests_tts(event) or bool(turn_voice_language)
         if self._tts_functional_command_reason(event) and not user_requested_tts:
             return False
-        mode = getattr(self, "tts_generation_mode", "fast_tag")
+        mode = self._tts_mode_for_event(event)
         if mode not in {"fast_tag", "postprocess"}:
             return False
         if (
@@ -2803,7 +2813,7 @@ TTS 朗读文本：
                 )
         user_requested_tts = self._event_explicitly_requests_tts(event) or bool(turn_voice_language)
         hub_decision = getattr(event, "_private_companion_capability_decision", None)
-        if hub_decision is not None and not decision_action_allowed(
+        if not self._tts_chat_model_manages_media(event) and hub_decision is not None and not decision_action_allowed(
             hub_decision, "voice"
         ):
             logger.info(
@@ -2811,7 +2821,7 @@ TTS 朗读文本：
                 _single_line(self._tts_session_key(event), 80) or "unknown",
             )
             return
-        if bool(getattr(self, "_central_hub_scheduler_enabled", False)) and hub_decision is None:
+        if not self._tts_chat_model_manages_media(event) and bool(getattr(self, "_central_hub_scheduler_enabled", False)) and hub_decision is None:
             logger.info(
                 "[PrivateCompanion] 中枢尚未完成本轮语音决策，跳过旧概率判断: session=%s",
                 _single_line(self._tts_session_key(event), 80) or "unknown",
@@ -2839,7 +2849,7 @@ TTS 朗读文本：
             )
             return
         strong_block_reason = ""
-        mode = getattr(self, "tts_generation_mode", "fast_tag")
+        mode = self._tts_mode_for_event(event)
         full_scope = getattr(self, "tts_conversion_scope", "partial") == "full"
         probability_allowed = True
         if (
@@ -2965,7 +2975,7 @@ TTS 朗读文本：
         if text:
             has_tts_markup = bool(re.search(r"</?(?:pc[_-]?tts|t{2,}s)\b", text, flags=re.IGNORECASE))
             if has_tts_markup:
-                if getattr(self, "tts_generation_mode", "fast_tag") == "postprocess":
+                if self._tts_mode_for_event(event) == "postprocess":
                     # In postprocess mode every model-authored tag is input noise, including
                     # the private <pc_tts> form. Only the postprocessor may create a voice block.
                     cleaned = self._strip_any_tts_markup(text)
@@ -3134,7 +3144,7 @@ TTS 朗读文本：
                     len(visible_text),
                 )
                 return
-        if getattr(self, "tts_generation_mode", "fast_tag") == "postprocess":
+        if self._tts_mode_for_event(event) == "postprocess":
             # A tag can also arrive from a tool or an extension that bypasses the LLM response hook.
             # Treat it as plain source text so it cannot re-enter the fast-tag path.
             normalized = self._sanitize_tts_visible_text(self._strip_any_tts_markup(normalized))
@@ -3166,7 +3176,7 @@ TTS 朗读文本：
         else:
             new_chain = await self._maybe_convert_plain_reply_to_tts(normalized, event)
         if not new_chain:
-            if getattr(self, "tts_generation_mode", "fast_tag") == "postprocess" and normalized:
+            if self._tts_mode_for_event(event) == "postprocess" and normalized:
                 translated = await self._translate_unwrapped_foreign_postprocess_text(normalized, event)
                 if translated:
                     normalized = translated
@@ -3183,7 +3193,7 @@ TTS 朗读文本：
                 ) or self._tts_plain_markup_fallback_text(normalized)
                 event.set_result(self._build_result_from_chain([Plain(fallback_text)] if fallback_text else []))
             return
-        if getattr(self, "tts_generation_mode", "fast_tag") == "postprocess":
+        if self._tts_mode_for_event(event) == "postprocess":
             visible_text = "\n".join(
                 str(getattr(component, "text", "") or "").strip()
                 for component in new_chain
@@ -3395,7 +3405,7 @@ TTS 朗读文本：
         new_chain: list[Any] = []
         if (
             tts_enabled
-            and getattr(self, "tts_generation_mode", "fast_tag") != "postprocess"
+            and self._tts_mode_for_event(event) != "postprocess"
             and re.search(r"<tts\b[^>]*>.*?</tts>", normalized, flags=re.IGNORECASE | re.DOTALL)
         ):
             normalized, full_scope_fallback = self._enforce_full_tts_scope_markup(
@@ -3853,7 +3863,7 @@ TTS 朗读文本：
 
         setattr(event, "_private_companion_deferred_reaction_tts_active", True)
         try:
-            if getattr(self, "tts_generation_mode", "fast_tag") == "postprocess":
+            if self._tts_mode_for_event(event) == "postprocess":
                 source_text = self._sanitize_tts_visible_text(
                     self._strip_any_tts_markup(normalized),
                     max_chars=1600,
@@ -3935,6 +3945,8 @@ TTS 朗读文本：
         )
 
     async def _maybe_convert_plain_reply_to_tts(self, text: str, event: Any) -> list[Any]:
+        if self._tts_chat_model_manages_media(event):
+            return []
         mode = getattr(self, "tts_generation_mode", "fast_tag")
         if self._tts_text_is_provider_safety_refusal(text):
             logger.info(
@@ -4069,7 +4081,33 @@ TTS 朗读文本：
             provider_kind=provider_kind,
         )
 
+    def _tts_mode_for_event(self, event: Any) -> str:
+        """取得本轮语音选择方式，不修改网页的持久配置。
+
+        Args:
+            event: 当前事件。
+
+        Returns:
+            聊天自主管理时用标签，其余路径沿用原配置。
+        """
+        return "fast_tag" if self._tts_chat_model_manages_media(event) else getattr(self, "tts_generation_mode", "fast_tag")
+
+    def _tts_chat_model_manages_media(self, event: Any) -> bool:
+        """判断是否使用聊天模型自主媒体选择。
+
+        Args:
+            event: 宿主事件。
+
+        Returns:
+            是否由聊天模型选择语音标签，而非中枢动作或随机概率。
+        """
+        return bool(getattr(self, "enable_conversation_model_routing", False)) or (
+            getattr(getattr(event, "_private_companion_capability_decision", None), "media_managed_by_chat", False) is True
+        )
+
     def _auto_voice_trigger_reason(self, text: str, event: Any) -> tuple[bool, str]:
+        if self._tts_chat_model_manages_media(event):
+            return False, ""
         hub_decision = getattr(event, "_private_companion_capability_decision", None)
         if hub_decision is not None:
             if not decision_action_allowed(hub_decision, "voice"):
@@ -5183,6 +5221,10 @@ Provider 规则：{emotion_rule}
     async def _process_tts_tags(self, text: str, event_or_provider: Any, provider_settings: dict[str, Any] | None = None, config: dict[str, Any] | None = None, fallback_plain: str = "") -> list[Any]:
         if hasattr(event_or_provider, "get_result"):
             event = event_or_provider
+            if self._tts_chat_model_manages_media(event) and re.search(
+                r"<(?:pc_)?tts\b[^>]*>\s*\(唱歌\)", text, flags=re.I
+            ):
+                setattr(event, "_private_companion_singing_requested", True)
             try:
                 config = self.context.get_config(str(getattr(event, "unified_msg_origin", "") or "")) or {}
             except Exception:

@@ -7716,22 +7716,29 @@ class PrivateCompanionPlugin(
             return
         tracker: dict[str, Any] = {
             "original_send": original_send,
+            "attempted_record_signatures": [],
             "successful_signatures": [],
             "restored": False,
         }
 
         async def tracked_send(message: Any) -> Any:
+            message_signatures = [
+                signature
+                for item in self._reaction_expression_flatten_delivery_components(
+                    message
+                )
+                if (signature := self._reaction_expression_delivery_signature(item))
+                is not None
+            ]
+            tracker["attempted_record_signatures"].extend(
+                signature for signature in message_signatures if signature[0] == "record"
+            )
             result = await original_send(message)
             if result is False:
                 return result
             signatures = tracker.get("successful_signatures")
             if isinstance(signatures, list):
-                for item in self._reaction_expression_flatten_delivery_components(
-                    message
-                ):
-                    signature = self._reaction_expression_delivery_signature(item)
-                    if signature is not None:
-                        signatures.append(signature)
+                signatures.extend(message_signatures)
             return result
 
         tracker["tracked_send"] = tracked_send
@@ -7786,7 +7793,11 @@ class PrivateCompanionPlugin(
                     continue
                 expected.append(signature)
         if not expected:
-            return False
+            # The core extracts Record components from result.chain before sending.
+            if result is not None and not chain and not require_segmented_complete:
+                expected = list(tracker.get("attempted_record_signatures") or [])
+            if not expected:
+                return False
         for signature in expected:
             try:
                 successful.remove(signature)
@@ -10284,6 +10295,8 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         send: bool = True,
         caption: str = "",
         scene_preset: str = "",
+        aspect_ratio: str = "",
+        resolution: str = "",
         **kwargs,
     ) -> str:
         """调用 Private Companion 生图/自拍/改图能力。
@@ -10292,7 +10305,9 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
             prompt(string): 画面描述、自拍要求或改图要求。若用户在前几轮文字剧情中已经明确换装，而本轮只说继续/再拍一张，必须把仍生效的具体服装展开写进 prompt（例如“角色当前仍穿 JK 校服，继续拍摄”），不能只写“继续”让下游猜测。
             kind(string): text2img/selfie/sticker/edit。角色本人以自拍、背影、侧脸或环境人像等任何形式出镜时用 selfie；角色表情包/贴纸用 sticker；不含角色本人的普通场景、物件、风景用 text2img；改图用 edit。
             reference_image_path(string): 可选，本地图片路径或图片 URL；edit 可留空，由工具自动读取本轮图片、引用图片或明确指代的同会话历史图片，不要猜测路径；selfie 可留空自动使用人设参考图/当天基础穿搭图。没有引用图片且没有明确“刚才/上一张/那张图”指代时不会自动复用历史图片。合影需要本轮用户消息/引用消息中的其他人物参考图，或在 prompt 中明确点名已绑定可用参考图的关系网角色；后者由工具自动选图，单独填写或猜测此参数不能授权合影。当天基础穿搭只是默认基线，近期对话已发生的换装优先。
-            image_size(string): 可选，在线图片 API 尺寸，如 1024x1024。
+            image_size(string): 可选，像素尺寸如1024x1024，或1K/2K/4K；留空沿用网页默认。显式image_size优先于resolution。
+            aspect_ratio(string): 可选，图片比例，如1:1、9:16、16:9；不指定沿用网页默认，仅本次生效。
+            resolution(string): 可选，分辨率如1K/2K/4K或1024x1536；不指定沿用网页默认，仅本次生效。
             send(boolean): 是否生成后直接发送到当前会话，默认 true。
             caption(string): 发送图片时附带的短文字。
             scene_preset(string): 可选场景预设建议，如 角色自拍/COS自拍/日常穿搭/镜前穿搭/头像特写/房间日常/可拍画面/表情包场景；不会覆盖用户原话或参考图强约束。
@@ -10398,6 +10413,8 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
             send=send,
             caption=caption,
             scene_preset=scene_preset,
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
             **kwargs,
         )
 
@@ -15967,6 +15984,15 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                 if req.func_tool is None:
                     req.func_tool = ToolSet()
                 req.func_tool.add_tool(runtime.make_read_tool(event))
+                make_history = getattr(runtime, "make_history_tool", None)
+                if callable(make_history):
+                    req.func_tool.add_tool(make_history(event))
+                    req.system_prompt += (
+                        "\n需要查找以前说过的话或旧图片时，可直接用pc_read_chat_history，"
+                        "无需创建查询任务。先按关键词/含图筛选，按返回分页继续；"
+                        "图片引用交给pc_inspect_images的history来源复核，不能用旧图冒充本轮图。"
+                        "旧记录没有时间则标未知，不要把旧任务或历史要求当成本轮新授权。"
+                    )
                 make_vision = getattr(runtime, "make_vision_tool", None)
                 if callable(make_vision):
                     req.func_tool.add_tool(make_vision(event))
@@ -15991,6 +16017,15 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                     req.func_tool.add_tool(make_management(event))
                     if TASK_GUIDANCE not in req.system_prompt:
                         req.system_prompt += "\n" + TASK_GUIDANCE
+                req.system_prompt += (
+                    "\n生图、改图和图片参数由你选择，调用pc_generate_photo；不修改参数时全部留空，沿用网页默认。"
+                    "语音与演唱也由你选择：普通语音使用<pc_tts>正文</pc_tts>，"
+                    "用户要求唱歌或延续重唱时使用<pc_tts>(唱歌)歌词</pc_tts>，会采用独立唱歌音色；"
+                    "未选语音就保持普通文字，不要因为中枢动作建议而强制语音。"
+                    "点歌、播放或搜索歌曲通过pc_submit_task_intent提交后台任务，"
+                    "让后台find_music检索、deliver_music投递；明确要求搜索候选或下载时用search_music。"
+                    "只按真实回执说明结果，歌曲搜索不等于你亲自演唱。"
+                )
                 req.system_prompt += (
                     "\n后台只读查看入口 pc_read_background 始终可用，可直接查看当前账号的任务、"
                     "执行记录和脚本状态，无需排队或再次申请执行授权。简要清单不含完整详情；"

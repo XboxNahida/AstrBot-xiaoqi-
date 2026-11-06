@@ -2815,6 +2815,8 @@ class LlmToolActionsMixin:
             "reference_image_path",
             "reference_image_paths",
             "image_size",
+            "aspect_ratio",
+            "resolution",
             "caption",
             "scene_preset",
         }
@@ -4696,6 +4698,8 @@ class LlmToolActionsMixin:
             "reference_image_path": reference_path,
             "reference_image_paths": list(resolved_reference_paths),
             "image_size": _single_line(image_size or kwargs.get("size"), 40),
+            "aspect_ratio": _single_line(kwargs.get("aspect_ratio"), 20),
+            "resolution": _single_line(kwargs.get("resolution"), 40),
             "requested_scene_preset": preset_text,
             "suggested_scene_preset": preset_text,
             "workflow_default_scene_preset": workflow_default_preset,

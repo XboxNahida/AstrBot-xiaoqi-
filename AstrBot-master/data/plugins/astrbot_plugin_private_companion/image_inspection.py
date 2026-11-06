@@ -25,6 +25,7 @@ class ImageInspectionTool(FunctionTool):
             description=(
                 "按需调用独立识图主备模型，细读本轮图片、公式、表情包或核对视觉细节。"
                 "常规图文已经直接交给你，无需每次调用。source=current读取本轮附件，recent读取最近一条含图用户历史。"
+                "history配合pc_read_chat_history返回的image_refs读取指定旧图。"
                 "只能读取当前会话/任务已绑定的图片，不接受文件路径、他人账号或任务ID。"
                 "image_indices从0开始；省略则读取该来源全部图片。返回视觉事实，不代表后台任务已完成。"
             ),
@@ -32,7 +33,12 @@ class ImageInspectionTool(FunctionTool):
                 "type": "object",
                 "properties": {
                     "question": {"type": "string", "minLength": 1, "maxLength": 4000},
-                    "source": {"type": "string", "enum": ["current", "recent"]},
+                    "source": {"type": "string", "enum": ["current", "recent", "history"]},
+                    "image_refs": {
+                        "type": "array", "items": {"type": "string", "maxLength": 64},
+                        "minItems": 1, "maxItems": 5, "uniqueItems": True,
+                        "description": "source=history时使用pc_read_chat_history返回的image_ref，不能传路径或URL。",
+                    },
                     "image_indices": {
                         "type": "array",
                         "items": {"type": "integer", "minimum": 0},
@@ -81,6 +87,10 @@ class ImageInspectionTool(FunctionTool):
                 return json.dumps({"success": False, "code": "untrusted_event"})
             request = job.metadata.get("request", {})
         source = kwargs.get("source", "current")
+        if source == "history" and self.event is None:
+            return json.dumps({"success": False, "code": "history_requires_bound_chat"})
+        if source != "history" and kwargs.get("image_refs"):
+            return json.dumps({"success": False, "code": "invalid_arguments"})
         candidates = (
             [request.get("current_input", {})]
             if source == "current"
@@ -92,7 +102,13 @@ class ImageInspectionTool(FunctionTool):
         )
         images = []
         try:
-            for item in materialize_images(candidates, request):
+            history_map = rt._events[event].get("history_images", {}) if self.event is not None else {}
+            if source == "history":
+                refs = kwargs.get("image_refs", [])
+                if not refs or any(ref not in history_map for ref in refs):
+                    return json.dumps({"success": False, "code": "history_image_not_in_scope"})
+                images = [history_map[ref] for ref in refs]
+            for item in (() if source == "history" else materialize_images(candidates, request)):
                 parts = item.get("content", ())
                 if isinstance(parts, list):
                     images = [

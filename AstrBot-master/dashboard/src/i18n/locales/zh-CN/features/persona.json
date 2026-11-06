@@ -3,6 +3,8 @@
     "description": "管理人格角色设定"
   },
   "buttons": {
+    "fromTemplate": "从现有人格创建",
+    "copyTemplate": "复制到当前表单",
     "create": "创建人格",
     "createFirst": "创建第一个人格",
     "edit": "编辑",
@@ -21,6 +23,10 @@
     "updatedAt": "更新时间"
   },
   "form": {
+    "templatePersona": "选择模板人格（全部文件夹）",
+    "templateHelp": "选中后自动载入该人格的说明、全部示例对话和能力设置，替换当前表单。改名保存为独立新人格，原人格不变。",
+    "templateLoaded": "当前已载入：{characters} 字人格说明、{pairs} 对示例对话。",
+    "copyName": "{name}_副本",
     "personaId": "人格 ID",
     "systemPrompt": "系统提示词",
     "customErrorMessage": "自定义报错回复信息（可选）",

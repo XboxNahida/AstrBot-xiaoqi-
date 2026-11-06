@@ -10,7 +10,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from astrbot.api.message_components import Image, Plain
+from astrbot.api.message_components import Image, Plain, Record
 from astrbot_plugin_private_companion.llm_tool_actions import (
     LlmToolActionsMixin,
     PHOTO_TOOL_SILENT_SENTINEL,
@@ -146,6 +146,7 @@ class _OwnedReactionLibraryAdapter:
         scope: str = "private",
         selection_preferences: object = None,
         selection_signature: str = "",
+        allow_generic_fallback: bool = False,
     ):
         self.selection_calls.append(
             {
@@ -1321,6 +1322,27 @@ class SmartImageChatIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         tracker = second_pending["delivery_tracker"]
         self.assertIn(("plain", "第二次"), tracker["successful_signatures"])
+
+    async def test_extracted_voice_requires_actual_successful_send(self) -> None:
+        for outcome in (True, False, RuntimeError("synthetic upload failure")):
+            with self.subTest(outcome=outcome):
+                harness = _ReactionHarness(_FakeSmartImageAPI(self.image_path))
+                voice = Record(file="synthetic-voice.wav")
+                event = _FakeResultEvent([voice])
+                event.send = AsyncMock(
+                    side_effect=outcome if isinstance(outcome, Exception) else None,
+                    return_value=outcome,
+                )
+                harness._install_reaction_expression_delivery_tracker(event, {})
+                event.get_result().chain.clear()
+                try:
+                    await event.send(event.chain_result([voice]))
+                except RuntimeError:
+                    pass
+                self.assertEqual(
+                    outcome is True,
+                    harness._reaction_expression_primary_reply_confirmed(event),
+                )
 
     async def test_reaction_tool_marks_collision_and_remembers_sent_image(self) -> None:
         api = _FakeSmartImageAPI(self.image_path)
@@ -3028,7 +3050,7 @@ class SmartImageChatIntegrationTests(unittest.IsolatedAsyncioTestCase):
         event = _FakeEvent()
         event.message_str = "PRIVATE_MESSAGE_CANARY_7F31"
         private_query = "PRIVATE_QUERY_CANARY_7F31"
-        private_context = r"PRIVATE_CONTEXT_CANARY_7F31 PUBLIC_USER_HOME\reaction.png"
+        private_context = r"PRIVATE_CONTEXT_CANARY_7F31 C:\Users\secret\reaction.png"
 
         with patch(
             "astrbot_plugin_private_companion.llm_tool_actions.logger.info"
@@ -3162,7 +3184,7 @@ class SmartImageChatIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self,
     ) -> None:
         query_canary = "PRIVATE_EXCEPTION_QUERY_CANARY_91BD"
-        path_canary = r"PUBLIC_USER_HOME\reaction-private.png"
+        path_canary = r"C:\Users\secret\reaction-private.png"
         harness = _ReactionHarness(_FakeSmartImageAPI(self.image_path))
 
         def fail_lookup(*_args, **_kwargs):

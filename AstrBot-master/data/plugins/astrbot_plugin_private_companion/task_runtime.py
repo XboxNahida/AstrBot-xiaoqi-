@@ -39,6 +39,7 @@ from .background_reader import BackgroundReadTool
 from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
 from .capability_hub import CapabilityDecision
 from .conversation_route import _task_chat_text
+from .chat_history_reader import ChatHistoryReadTool
 from .helpers import _redact_outbound_secrets
 from .image_inspection import ImageInspectionTool
 from .interaction_api import InteractionAPI
@@ -79,6 +80,7 @@ TOOL_CAPABILITIES = {
     "pc_send_current_media": "media",
     "find_music": "search",
     "search_music": "search",
+    "deliver_music": "media",
     "pc_task_read_file": "read",
     "pc_task_write_file": "write",
     "pc_task_run_command": "shell",
@@ -899,7 +901,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 name
                 for name in self._registry(umo)
                 if TOOL_CAPABILITIES[name] == "search"
-                and name not in {"find_music", "search_music"}
+                and name not in {"find_music", "search_music", "deliver_music"}
             ]
             if monitor
             else []
@@ -1126,6 +1128,17 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             A read-only tool independent of task execution grants.
         """
         return BackgroundReadTool(self, event)
+
+    def make_history_tool(self, event):
+        """创建仅绑定当前真实会话的只读历史工具。
+
+        Args:
+            event: 已注册的真实聊天事件。
+
+        Returns:
+            无需后台任务的历史查询工具。
+        """
+        return ChatHistoryReadTool(self, event)
 
     def make_management_tool(self, event):
         """Bind direct management to the original verified chat event.
