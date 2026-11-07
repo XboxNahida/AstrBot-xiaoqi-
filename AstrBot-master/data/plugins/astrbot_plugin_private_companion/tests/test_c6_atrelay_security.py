@@ -84,6 +84,28 @@ class AtRelaySecurityTests(unittest.TestCase):
         allowed, _ = self._bind(_Harness(owner=True), "_atrelay_tool_authorization")(event)
         self.assertTrue(allowed)
 
+    def test_content_review_off_skips_keyword_rejection_and_confirmation(self):
+        from astrbot_plugin_private_companion.atrelay import AtRelayMixin
+
+        harness = types.SimpleNamespace(atrelay_sensitive_confirm=False)
+        for name in ("_atrelay_boundary_reason", "_atrelay_sensitive_reason"):
+            setattr(harness, name, types.MethodType(getattr(AtRelayMixin, name), harness))
+        self.assertEqual(AtRelayMixin._atrelay_boundary_guard(harness, "气死了，闭嘴！"), "")
+        self.assertEqual(AtRelayMixin._atrelay_confirmation_guard(
+            harness, "转告他我喜欢你", relay_mode="original", sensitive_confirmed=False,
+        ), "")
+
+    def test_content_review_enabled_retains_existing_behavior(self):
+        from astrbot_plugin_private_companion.atrelay import AtRelayMixin
+
+        harness = types.SimpleNamespace(atrelay_sensitive_confirm=True)
+        for name in ("_atrelay_boundary_reason", "_atrelay_sensitive_reason"):
+            setattr(harness, name, types.MethodType(getattr(AtRelayMixin, name), harness))
+        self.assertIn("发送失败", AtRelayMixin._atrelay_boundary_guard(harness, "气死了，闭嘴！"))
+        self.assertIn("需要先确认", AtRelayMixin._atrelay_confirmation_guard(
+            harness, "转告他我喜欢你", relay_mode="original", sensitive_confirmed=False,
+        ))
+
     def test_blacklist_takes_precedence_over_whitelist(self):
         harness = _Harness(whitelist={"100"}, blacklist={"100"})
         harness._atrelay_known_group_ids = self._bind(harness, "_atrelay_known_group_ids")

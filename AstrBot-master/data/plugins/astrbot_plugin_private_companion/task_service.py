@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 import sqlite3
@@ -668,6 +669,34 @@ class TaskService:
 
     def retry(self, task_id: str, scope: TaskScope, *, request_patch=None) -> bool:
         return self._control(task_id, scope, "retry", request_patch)
+
+    def recover_with_guidance(self, task_id, scope, expected_revision, guidance):
+        """前台纠正原失败任务；原子保留检查点、权限来源及模型请求策略。"""
+        if type(expected_revision) is not int or not isinstance(guidance, str) or not guidance.strip() or len(guidance) > 4000:
+            return False
+        with self._transaction() as db:
+            row = db.execute(
+                "SELECT * FROM pt_tasks WHERE task_id=? AND bot_id=? AND session_key=? AND sender_id=?",
+                (task_id, scope.bot_id, scope.session_key, scope.sender_id),
+            ).fetchone()
+            if row is None or row["revision"] != expected_revision or row["lease_token"] is not None or row["status"] not in {"failed", "waiting_user"}:
+                return False
+            if row["error_kind"] in {"provider_unavailable", "unknown_result", "lease_lost", "delivery_unknown"}:
+                return False
+            metadata = json.loads(row["metadata"])
+            if metadata.get("history_deleted"):
+                return False
+            key = hashlib.sha256((str(row["error_kind"]) + "\0" + guidance.strip()).encode()).hexdigest()
+            if metadata.get("feedback_recovery_key") == key:
+                return False
+            metadata["feedback_recovery_key"] = key
+            metadata.setdefault("request", {})["recovery_guidance"] = guidance.strip()
+            db.execute(
+                "UPDATE pt_tasks SET status='queued',metadata=?,revision=revision+1,attempts=0,cycle=cycle+1,next_run=0,error_kind=NULL,finished_at=NULL WHERE task_id=?",
+                (json.dumps(metadata, ensure_ascii=False), task_id),
+            )
+            self._touch(db, task_id)
+            return True
 
     def reconcile(
         self,

@@ -52,6 +52,89 @@ class _MalformedStreamingErrorRunner(_StreamingErrorRunner):
         yield AgentResponse(type="err", data={})
 
 
+class _MultiStepRunner:
+    streaming = False
+
+    def __init__(self, *, autonomous):
+        self.req = SimpleNamespace(model_managed_loop=autonomous, func_tool=object())
+        self.count = 0
+        self.aborted = False
+        self.event = _FakeEvent()
+        self.event.set_result = lambda _: None
+        self.event.clear_result = lambda: None
+        self.run_context = SimpleNamespace(context=SimpleNamespace(event=self.event), messages=[])
+
+    def done(self):
+        return self.count >= 35 or self.aborted
+
+    def request_stop(self):
+        self.aborted = True
+
+    async def step(self):
+        self.count += 1
+        if self.count in (2, 35):
+            yield AgentResponse(type="llm_result", data={"chain": MessageChain().message(f"阶段{self.count}")})
+        await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_model_managed_chat_can_continue_without_forced_tool_removal_and_emit_early():
+    runner = _MultiStepRunner(autonomous=True)
+    output = []
+    async for chain in run_agent(runner, max_step=2, buffer_intermediate_messages=True):
+        output.append((runner.count, chain.get_plain_text()))
+    assert output == [(2, "阶段2"), (35, "阶段35")]
+    assert runner.req.func_tool is not None
+    assert not runner.run_context.messages
+
+
+@pytest.mark.asyncio
+async def test_regular_agent_still_obeys_its_original_step_bound():
+    runner = _MultiStepRunner(autonomous=False)
+    _ = [chain async for chain in run_agent(runner, max_step=2)]
+    assert runner.count == 3
+    assert runner.req.func_tool is None
+
+
+@pytest.mark.asyncio
+async def test_model_managed_agent_still_stops_on_user_cancellation():
+    runner = _MultiStepRunner(autonomous=True)
+    runner.event.is_stopped = lambda: runner.count >= 2
+    output = [chain async for chain in run_agent(runner)]
+    assert output == [], "用户停止后不得再发送刚产生的中间正文"
+    assert runner.count == 2 and runner.aborted
+
+
+@pytest.mark.asyncio
+async def test_model_managed_agent_cancel_closes_stop_watcher(monkeypatch):
+    import astrbot.core.astr_agent_run_util as util
+
+    entered, cleaned = asyncio.Event(), asyncio.Event()
+
+    async def watcher(*_):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cleaned.set()
+
+    class WaitingRunner(_MultiStepRunner):
+        async def step(self):
+            await entered.wait()
+            await asyncio.Event().wait()
+            yield
+
+    monkeypatch.setattr(util, "_watch_agent_stop_signal", watcher)
+    runner = WaitingRunner(autonomous=True)
+    stream = run_agent(runner)
+    advancing = asyncio.create_task(anext(stream))
+    await entered.wait()
+    advancing.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await advancing
+    assert runner.aborted and cleaned.is_set()
+
+
 @pytest.mark.asyncio
 async def test_run_agent_forwards_streaming_provider_error():
     error_text = (

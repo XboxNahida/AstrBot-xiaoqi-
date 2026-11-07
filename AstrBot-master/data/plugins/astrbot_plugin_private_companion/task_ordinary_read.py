@@ -38,14 +38,14 @@ class TaskOrdinaryReader:
             low = part.casefold()
             if (
                 ":" in part or part.rstrip(" .") != part
-                or low in {".ssh", ".aws", ".azure", ".git", ".codex", "appdata", "config.msi"}
-                or low in {"sam", "security", "system", "ntuser.dat", "login data", "web data", "local state"}
-                or low == ".env" or low.startswith((".env.", ".interaction-", "id_rsa", "id_ed25519"))
-                or re.fullmatch(r"(?:credentials?|secrets?|passwords?|cookies?|tokens?)(?:\.[^.]+)?", low)
+                or low in {".ssh", ".aws", ".azure", ".codex"}
+                or low in {"ntuser.dat", "login data", "web data", "local state"}
+                or low.startswith((".interaction-", "id_rsa", "id_ed25519"))
                 or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?", low)
             ):
                 raise PermissionError("sensitive_path")
-        if path.suffix.casefold() in {".key", ".pem", ".pfx", ".p12", ".kdbx", ".dpapi", ".db", ".sqlite", ".sqlite3"}:
+        windows = Path(os.environ.get("SystemRoot", "C:/Windows"))
+        if os.name == "nt" and path.is_relative_to(windows / "System32/config"):
             raise PermissionError("sensitive_path")
         if any(path.is_relative_to(root) for root in self.sensitive) and not any(
             path.is_relative_to(root) for root in self.readable_source_roots
@@ -86,26 +86,6 @@ class TaskOrdinaryReader:
     def _clean(self, text):
         if "\0" in text:
             raise ValueError("utf8_text_required")
-        if re.search(r"-----BEGIN (?:[A-Z ]*PRIVATE KEY|OPENSSH PRIVATE KEY)-----", text):
-            raise PermissionError("private_key_content")
-        secret = re.compile(r"(?i)(?:api[_ -]?key|(?:access|refresh|auth)[_ -]?token|token|password|passwd|authorization|cookie|secret|密钥|令牌|口令)")
-        try:
-            value = json.loads(text)
-        except ValueError:
-            value = None
-        if isinstance(value, (dict, list)):
-            def scrub(item):
-                if isinstance(item, dict):
-                    return {key: "[REDACTED]" if secret.search(key) else scrub(child) for key, child in item.items()}
-                if isinstance(item, list):
-                    return [scrub(child) for child in item]
-                return item
-            text = json.dumps(scrub(value), ensure_ascii=False)
-        else:
-            text = re.sub(
-                r"""(?im)((?:api[_ -]?key|(?:access|refresh|auth)[_ -]?token|token|password|passwd|authorization|cookie|secret|密钥|令牌|口令)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;\r\n]+)""",
-                r'\1"[REDACTED]"', text,
-            )
         return self.redact(text, 12000)
 
     def _query(self, actor, action, path, offset):

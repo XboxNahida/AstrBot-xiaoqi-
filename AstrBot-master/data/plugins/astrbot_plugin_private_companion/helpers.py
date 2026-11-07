@@ -373,7 +373,7 @@ def _group_link_message_context(text: Any, limit: int = 260) -> tuple[str, bool]
 
 
 _SECRET_FIELD_PATTERN = re.compile(
-    r"(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|authorization|auth[_ -]?token|secret|password|passwd|cookie|密钥|令牌|口令)",
+    r"(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|authorization|auth[_ -]?token|secret|password|passwd|cookie|密钥|令牌|口令)|^(?:key|token)$",
     flags=re.IGNORECASE,
 )
 
@@ -383,7 +383,11 @@ def _runtime_secret_values(owner: Any) -> list[str]:
     values: set[str] = set()
 
     def add(value: Any) -> None:
-        if isinstance(value, (str, bytes)):
+        if isinstance(value, (list, tuple)):
+            for item in value[:100]:
+                if isinstance(item, (str, bytes)):
+                    add(item)
+        elif isinstance(value, (str, bytes)):
             text = value.decode("utf-8", errors="ignore") if isinstance(value, bytes) else value
             text = text.strip()
             if len(text) >= 6:
@@ -433,29 +437,27 @@ def _runtime_secret_values(owner: Any) -> list[str]:
                     walk(child, depth + 1)
 
     walk(getattr(owner, "config", None))
+    get_config = getattr(getattr(owner, "context", None), "get_config", None)
+    if callable(get_config):
+        try:
+            walk(get_config())
+        except Exception:
+            pass
+    manager = getattr(getattr(owner, "context", None), "provider_manager", None)
+    instances = getattr(manager, "inst_map", {})
+    if isinstance(instances, dict):
+        for provider in list(instances.values()):
+            walk(getattr(provider, "provider_config", None))
     return sorted(values, key=len, reverse=True)
 
 
 def _redact_outbound_secrets(text: Any, owner: Any = None) -> str:
-    """Redact credentials from chat-bound text while preserving the useful reply."""
+    """Redact only actual configured credentials, preserving business examples."""
     cleaned = str(text or "")
     if not cleaned:
         return ""
     for secret in _runtime_secret_values(owner) if owner is not None else []:
         cleaned = cleaned.replace(secret, "[密钥已隐藏]")
-    patterns = (
-        (r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", "Bearer [密钥已隐藏]"),
-        (r"(?i)\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{10,}", "[密钥已隐藏]"),
-        (r"\bAIza[A-Za-z0-9_-]{20,}\b", "[密钥已隐藏]"),
-        (r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b", "[密钥已隐藏]"),
-        (r"(?i)([?&](?:api[_-]?key|access_token|refresh_token|token|secret|key)=)[^&#\s]+", r"\1[密钥已隐藏]"),
-        (
-            r"(?i)((?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|authorization|auth[_ -]?token|secret|password|passwd|密钥|令牌|口令)[\"']?\s*(?::|：|=)\s*[\"']?)[^\s,，;；\"']{6,}",
-            r"\1[密钥已隐藏]",
-        ),
-    )
-    for pattern, replacement in patterns:
-        cleaned = re.sub(pattern, replacement, cleaned)
     return cleaned
 
 

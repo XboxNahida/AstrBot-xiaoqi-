@@ -17,6 +17,30 @@ class Clock:
 
 
 class TaskServiceTests(unittest.TestCase):
+    def test_feedback_recovery_keeps_identity_goal_and_rejects_stale_or_duplicate_repairs(self):
+        task = self.submit()
+        job = self.service.claim("worker")
+        self.service.fail(job, "task_incomplete", retryable=False)
+        failed = self.service.get(task.task_id, self.scope)
+        self.assertTrue(self.service.recover_with_guidance(task.task_id, self.scope, failed.revision, "使用已导入的附件路径"))
+        recovered = self.service.get(task.task_id, self.scope)
+        self.assertEqual(recovered.status, "queued")
+        self.assertEqual(recovered.goal, task.goal)
+        self.assertEqual(recovered.metadata["request"]["recovery_guidance"], "使用已导入的附件路径")
+        self.assertFalse(self.service.recover_with_guidance(task.task_id, self.scope, failed.revision, "旧通知"))
+        job = self.service.claim("worker")
+        self.service.fail(job, "task_incomplete", retryable=False)
+        failed = self.service.get(task.task_id, self.scope)
+        self.assertFalse(self.service.recover_with_guidance(task.task_id, self.scope, failed.revision, "使用已导入的附件路径"))
+
+    def test_feedback_recovery_never_replays_unknown_results_or_provider_exhaustion(self):
+        for code in ("provider_unavailable", "unknown_result"):
+            task = self.submit(fragment=code)
+            job = self.service.claim("worker")
+            self.service.fail(job, code, retryable=False)
+            failed = self.service.get(task.task_id, self.scope)
+            self.assertFalse(self.service.recover_with_guidance(task.task_id, self.scope, failed.revision, "再试一遍"))
+
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

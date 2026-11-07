@@ -744,6 +744,8 @@ class AtRelayMixin:
         return ""
 
     def _atrelay_boundary_guard(self, text: str) -> str:
+        if not getattr(self, "atrelay_sensitive_confirm", True):
+            return ""
         reason = self._atrelay_boundary_reason(text)
         if not reason:
             return ""

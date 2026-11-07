@@ -128,6 +128,11 @@ async def run_agent(
     final_only = bool(
         getattr(getattr(agent_runner, "req", None), "final_response_only", False)
     )
+    model_managed = getattr(getattr(agent_runner, "req", None), "model_managed_loop", False) is True
+    if model_managed:
+        buffer_intermediate_messages = False
+        show_tool_use = False
+        show_tool_call_result = False
     if final_only:
         show_tool_use = False
         show_tool_call_result = False
@@ -136,10 +141,13 @@ async def run_agent(
         stream_to_general,
         agent_runner,
     )
-    while step_idx < max_step + 1:
+    while model_managed or step_idx < max_step + 1:
+        if _should_stop_agent(astr_event):
+            agent_runner.request_stop()
+            return
         step_idx += 1
 
-        if step_idx == max_step + 1:
+        if not model_managed and step_idx == max_step + 1:
             logger.warning(
                 f"Agent reached max steps ({max_step}), forcing a final response."
             )
@@ -330,6 +338,9 @@ async def run_agent(
             if agent_runner.done():
                 break
 
+        except asyncio.CancelledError:
+            agent_runner.request_stop()
+            raise
         except Exception as e:
             if "stop_watcher" in locals() and not stop_watcher.done():
                 stop_watcher.cancel()
@@ -367,6 +378,10 @@ async def run_agent(
             else:
                 astr_event.set_result(MessageEventResult().message(err_msg))
             return
+        finally:
+            if not stop_watcher.done():
+                stop_watcher.cancel()
+                await asyncio.gather(stop_watcher, return_exceptions=True)
 
 
 async def _watch_agent_stop_signal(agent_runner: AgentRunner, astr_event) -> None:

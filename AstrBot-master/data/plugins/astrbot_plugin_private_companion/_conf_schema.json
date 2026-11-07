@@ -3099,7 +3099,7 @@
     "invisible": true
   },
   "atrelay_sensitive_confirm": {
-    "description": "Legacy flat config: 敏感转述发送前确认",
+    "description": "Legacy flat config: 转述内容二次审核与确认",
     "type": "bool",
     "default": true,
     "invisible": true
@@ -9384,9 +9384,9 @@
         }
       },
       "atrelay_sensitive_confirm": {
-        "description": "敏感转述发送前确认",
+        "description": "转述内容二次审核与确认",
         "type": "bool",
-        "hint": "开启后，私密、强情绪、告白、金钱、健康等内容不会被直接跨会话发送；Bot 会先询问原样带过去还是委婉转述。",
+        "hint": "开启后执行转述关键词复核，并对私密、强情绪、告白、金钱、健康等内容先询问确认；关闭后不做插件内容复核，由上游模型审核。账号授权、目标会话权限和程序密钥保护始终保留。",
         "default": true,
         "condition": {
           "enable_atrelay_tools": true

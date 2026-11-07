@@ -1178,7 +1178,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
     ) -> T.AsyncGenerator[AgentResponse, None]:
         """Process steps until the agent is done."""
         step_count = 0
-        while not self.done() and step_count < max_step:
+        model_managed = getattr(self.req, "model_managed_loop", False) is True
+        while not self.done() and (model_managed or step_count < max_step):
             step_count += 1
             async for resp in self.step():
                 yield resp

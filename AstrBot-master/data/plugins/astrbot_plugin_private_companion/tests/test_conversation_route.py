@@ -18,6 +18,15 @@ def fake_provider(identity):
 
 
 class ConversationRouteTests(unittest.TestCase):
+    def test_autonomous_reply_keeps_persona_and_removes_old_final_only_rule(self):
+        req = ProviderRequest(system_prompt="当前人格：小七\n原聊天记忆\n\n<!-- private_companion_passive_reply_tool_boundary_v1 -->\n请直接输出一次最终正文；普通文字不要调用工具。\n其他正常约定")
+        route.enable_model_managed_chat(req)
+        self.assertTrue(req.model_managed_loop)
+        self.assertNotIn("请直接输出一次最终正文", req.system_prompt)
+        self.assertIn("原聊天记忆", req.system_prompt)
+        self.assertIn("其他正常约定", req.system_prompt)
+        self.assertIn("不要为正常任务持续等待", req.system_prompt)
+
     def setUp(self):
         self.providers = {
             name: fake_provider(name)

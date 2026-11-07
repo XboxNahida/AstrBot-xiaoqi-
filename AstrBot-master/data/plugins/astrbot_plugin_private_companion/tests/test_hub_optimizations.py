@@ -401,6 +401,136 @@ class HubOptimizationTests(unittest.IsolatedAsyncioTestCase):
         )
         return plugin, event
 
+    async def test_hub_failure_is_rejudged_on_the_same_event_with_reuse_on_or_off(self):
+        from astrbot_plugin_private_companion.passive_state_pipeline import (
+            append_capability_guidance,
+        )
+
+        for enabled in (False, True):
+            with self.subTest(reuse=enabled):
+                plugin, event = self.reuse_case(trigger="at_bot")
+                plugin.enable_hub_decision_reuse = enabled
+                plugin._llm_call.return_value = "not-json"
+                await append_capability_guidance(plugin, event, None)
+                failed = event._private_companion_capability_decision
+                self.assertEqual("hub_unavailable", failed.reason)
+                self.assertEqual((), failed.actions)
+                plugin._llm_call.return_value = '{"reply":true,"actions":["search"]}'
+                await append_capability_guidance(plugin, event, None)
+                recovered = event._private_companion_capability_decision
+                self.assertEqual(("search",), recovered.actions)
+                self.assertNotEqual("hub_unavailable", recovered.reason)
+                self.assertEqual(3, plugin._llm_call.await_count)
+                await append_capability_guidance(plugin, event, None)
+                self.assertEqual(3, plugin._llm_call.await_count)
+
+    async def test_new_available_tool_rejudges_but_removal_only_filters_actions(self):
+        from astrbot_plugin_private_companion.passive_state_pipeline import (
+            append_capability_guidance,
+        )
+
+        plugin, event = self.reuse_case(trigger="at_bot")
+        event.message_str = "查一下天气"
+        plugin._llm_call.return_value = '{"reply":true,"actions":["search"]}'
+        request = SimpleNamespace(system_prompt="", func_tool=None)
+        await append_capability_guidance(plugin, event, request)
+        self.assertEqual((), event._private_companion_capability_decision.actions)
+        request.func_tool = SimpleNamespace(tools=[SimpleNamespace(name="AIsearch")])
+        await append_capability_guidance(plugin, event, request)
+        self.assertEqual(("search",), event._private_companion_capability_decision.actions)
+        self.assertEqual(2, plugin._llm_call.await_count)
+        await append_capability_guidance(plugin, event, request)
+        self.assertEqual(2, plugin._llm_call.await_count)
+        request.func_tool = None
+        await append_capability_guidance(plugin, event, request)
+        self.assertEqual((), event._private_companion_capability_decision.actions)
+        self.assertEqual(2, plugin._llm_call.await_count)
+
+    async def test_successful_correction_is_reused_without_a_second_task_judgment(self):
+        from astrbot_plugin_private_companion.passive_state_pipeline import (
+            append_capability_guidance,
+        )
+
+        plugin, event = self.reuse_case(trigger="at_bot")
+        plugin._llm_call.side_effect = [
+            "not-json", '{"reply":true,"actions":["search"],"route":"task"}',
+        ]
+        await append_capability_guidance(plugin, event, None)
+        decision = event._private_companion_capability_decision
+        self.assertEqual("task", decision.route)
+        request = SimpleNamespace(
+            system_prompt="", func_tool=SimpleNamespace(tools=[SimpleNamespace(name="AIsearch")]),
+        )
+        await append_capability_guidance(plugin, event, request)
+        self.assertIs(decision, request._private_companion_capability_decision)
+        self.assertEqual(("search",), decision.actions)
+        self.assertEqual(2, plugin._llm_call.await_count)
+
+    async def test_missing_batch_item_repairs_only_that_original_message(self):
+        from astrbot_plugin_private_companion.capability_hub import judge_capabilities
+
+        plugin = self.plugin()
+        plugin._llm_call.side_effect = [
+            '{"decisions":[{"message_id":"m1","reply":false,"actions":[]}]}',
+            '{"reply":true,"actions":[]}',
+        ]
+        first, second = await asyncio.gather(*(
+            judge_capabilities(
+                plugin, self.context(), available_capabilities=(),
+                scene={"message_id": identity, "trigger": "group_message", "sender_identity": {"kind": "human"}},
+            )
+            for identity in ("m1", "m2")
+        ))
+        self.assertFalse(first.reply)
+        self.assertTrue(second.reply)
+        self.assertEqual(2, plugin._llm_call.await_count)
+        correction_prompt = plugin._llm_call.await_args.args[0]
+        self.assertIn('"message_id":"m2"', correction_prompt)
+        self.assertNotIn('"message_id":"m1"', correction_prompt)
+
+    async def test_preflight_capability_removal_keeps_one_successful_request(self):
+        from astrbot_plugin_private_companion.passive_state_pipeline import (
+            append_capability_guidance,
+        )
+
+        plugin, event = self.reuse_case(trigger="at_bot")
+        plugin._llm_call.return_value = '{"reply":true,"actions":["search"]}'
+        await append_capability_guidance(plugin, event, None)
+        self.assertEqual(("search",), event._private_companion_capability_decision.actions)
+        request = SimpleNamespace(system_prompt="", func_tool=None)
+        await append_capability_guidance(plugin, event, request)
+        self.assertEqual((), event._private_companion_capability_decision.actions)
+        plugin._llm_call.assert_awaited_once()
+
+    async def test_event_snapshot_failure_omits_context_without_granting_workspace(self):
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+
+        from astrbot_plugin_private_companion.passive_state_pipeline import (
+            append_capability_guidance,
+        )
+        from astrbot_plugin_private_companion.task_permissions import TaskActor
+
+        plugin, event = self.reuse_case(trigger="at_bot")
+        event.unified_msg_origin = "bot1:GroupMessage:g1"
+        plugin._persistent_task_runtime = SimpleNamespace(
+            workspace=Path("C:/AstrBotTasks"),
+            actor=lambda _: TaskActor("bot1", "g1", "u1", False),
+            permissions=SimpleNamespace(check=Mock(return_value=False)),
+            snapshot=Mock(side_effect=RuntimeError("api_key=private-value")),
+            snapshot_for_scope=Mock(return_value=""),
+        )
+        plugin._llm_call.return_value = '{"reply":true,"actions":["workspace"]}'
+        with patch("astrbot.api.logger.warning") as warning:
+            await append_capability_guidance(plugin, event, None)
+        decision = getattr(event, "_private_companion_capability_decision", None)
+        self.assertIsNotNone(decision)
+        self.assertTrue(decision.reply)
+        self.assertEqual((), decision.actions)
+        plugin._llm_call.assert_awaited_once()
+        self.assertIn("RuntimeError", str(warning.call_args))
+        self.assertNotIn("private-value", str(warning.call_args))
+
     async def test_first_group_judgment_gets_recipient_before_any_request(self):
         from astrbot_plugin_private_companion.passive_state_pipeline import (
             append_capability_guidance,

@@ -40,7 +40,7 @@ async def test_relative_read_and_nonsecret_hidden_file_are_allowed(reader):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("name", [".env", ".env.local", "id_rsa", "certificate.key", "auth.pem", "login.db", ".interaction-one.json", "credentials.json", "cookies.txt"])
+@pytest.mark.parametrize("name", [".interaction-one.json", "id_rsa", "id_ed25519", "ntuser.dat", "Login Data"])
 async def test_sensitive_names_are_denied_even_in_own_workspace(reader, name):
     service, own, _, _, _, _ = reader
     (own / name).write_text("private", encoding="utf-8")
@@ -62,15 +62,17 @@ async def test_protected_root_and_links_do_not_expose_secrets(reader):
 
 
 @pytest.mark.asyncio
-async def test_mixed_document_redacts_fields_and_configured_values(reader):
+async def test_mixed_document_preserves_business_fields_and_redacts_actual_values(reader):
     service, own, _, _, _, _ = reader
     (own / "notes.json").write_text(json.dumps({
         "normal": "普通内容", "api_key": "abc", "nested": {"password": "xyz"},
         "note": "configured-private-value",
     }), encoding="utf-8")
     text = (await service.call("owner", action="read", path="notes.json"))["stdout"]
-    assert "abc" not in text and "xyz" not in text and "configured-private-value" not in text
-    assert "普通内容" in text
+    assert json.loads(text) == {
+        "normal": "普通内容", "api_key": "abc", "nested": {"password": "xyz"},
+        "note": "[REDACTED]",
+    }
 
 
 @pytest.mark.asyncio
@@ -78,13 +80,41 @@ async def test_directory_pages_hide_sensitive_entries_and_preserve_json(reader):
     service, own, _, _, _, _ = reader
     for index in range(70):
         (own / f"笔记{index:03}.txt").write_text("text", encoding="utf-8")
-    (own / ".env").write_text("private", encoding="utf-8")
+    (own / ".interaction-one.json").write_text("private", encoding="utf-8")
     first = await service.call("owner", action="list", path=".")
     names = json.loads(first["stdout"])
     assert len(names) == 50 and first["next_offset"] == 50
     second = await service.call("owner", action="list", path=".", offset=50)
     assert len(json.loads(second["stdout"])) == 20 and second["next_offset"] is None
-    assert ".env" not in first["stdout"] + second["stdout"]
+    assert ".interaction-one.json" not in first["stdout"] + second["stdout"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", [
+    ".env", ".env.local", "certificate.key", "auth.pem", "business.db",
+    "business.sqlite", "business.sqlite3", "credentials.json", "cookies.txt",
+    "passwords.txt", "tokens.txt", "AppData/example.txt", ".git/example.txt",
+])
+async def test_business_filenames_are_readable_without_extension_guessing(reader, name):
+    service, own, _, _, _, _ = reader
+    path = own / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = "password=business-example; token=business-value"
+    path.write_text(text, encoding="utf-8")
+    assert (await service.call("owner", action="read", path=name))["stdout"] == text
+
+
+@pytest.mark.asyncio
+async def test_real_database_is_listed_but_binary_read_is_format_error(reader):
+    import sqlite3
+
+    service, own, _, _, _, _ = reader
+    with sqlite3.connect(own / "business.db") as db:
+        db.execute("create table reports (value text)")
+    page = await service.call("owner", action="list")
+    assert "business.db" in {item["name"] for item in json.loads(page["stdout"])}
+    with pytest.raises(ValueError, match="utf8_text_required"):
+        await service.call("owner", action="read", path="business.db")
 
 
 @pytest.mark.asyncio

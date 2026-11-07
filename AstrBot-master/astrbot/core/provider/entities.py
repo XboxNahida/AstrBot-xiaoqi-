@@ -124,6 +124,8 @@ class ProviderRequest:
     """Buffer this request when its final response needs postprocessing."""
     final_response_only: bool = False
     """Hide intermediate assistant text and reasoning during task execution."""
+    model_managed_loop: bool = False
+    """Host opt-in: let this request decide tool turns and emit useful intermediate text."""
     required_tool_names: tuple[str, ...] = ()
     """Tools that must be requested before accepting a final assistant response."""
 

@@ -28,16 +28,15 @@ class OutboundSecretRedactionTests(unittest.TestCase):
         self.assertIn("provider-secret-xyz987", values)
         self.assertNotIn("senova-u1-fast", values)
 
-    def test_screenshot_style_sk_key_is_redacted_but_model_and_endpoint_remain(self) -> None:
+    def test_unconfigured_key_example_and_model_endpoint_remain(self) -> None:
         fake_key = "sk-" + "testonly00000000000000000000000000"
         text = f"{fake_key} 这是key，模型是senova-u1-fast，api地址是POST https://token.example/v1/images/generations"
         cleaned = _redact_outbound_secrets(text, self.owner)
-        self.assertNotIn(fake_key, cleaned)
-        self.assertIn("[密钥已隐藏]", cleaned)
+        self.assertEqual(cleaned, text)
         self.assertIn("senova-u1-fast", cleaned)
         self.assertIn("https://token.example/v1/images/generations", cleaned)
 
-    def test_known_key_bearer_query_and_jwt_are_redacted(self) -> None:
+    def test_only_known_key_is_redacted_and_business_credentials_remain(self) -> None:
         jwt = "eyJabcdefghijk.abcdefghijklmnop.abcdefghijklmnop"
         text = (
             "api_key=custom-secret-value-123456\n"
@@ -46,12 +45,41 @@ class OutboundSecretRedactionTests(unittest.TestCase):
             f"jwt={jwt}"
         )
         cleaned = _redact_outbound_secrets(text, self.owner)
-        for secret in ("custom-secret-value-123456", "abcdefghijklmnopqrstuvwxyz", "query-secret-123456", jwt):
-            self.assertNotIn(secret, cleaned)
+        self.assertNotIn("custom-secret-value-123456", cleaned)
+        for value in ("abcdefghijklmnopqrstuvwxyz", "query-secret-123456", jwt):
+            self.assertIn(value, cleaned)
+
+    def test_business_password_cookie_and_example_without_owner_are_preserved(self) -> None:
+        text = 'password=example-password; cookie=session-example; api_key="sample-key-value"'
+        self.assertEqual(_redact_outbound_secrets(text, self.owner), text)
+        self.assertEqual(_redact_outbound_secrets(text), text)
+
+    def test_real_core_provider_key_lists_and_platform_tokens_are_protected(self) -> None:
+        self.owner.context = SimpleNamespace(get_config=lambda: {
+            "provider": [{"key": ["core-provider-secret-one", "core-provider-secret-two"]}],
+            "platform": [{"token": "bot-platform-token-value"}],
+        })
+        values = ("core-provider-secret-one", "core-provider-secret-two", "bot-platform-token-value")
+        text = " / ".join(values) + " password=business-example"
+        cleaned = _redact_outbound_secrets(text, self.owner)
+        for value in values:
+            self.assertNotIn(value, cleaned)
+        self.assertIn("password=business-example", cleaned)
 
     def test_normal_discussion_of_api_keys_is_not_destroyed(self) -> None:
         text = "这个 API Key 为什么返回 403？模型地址需要带 /v1 吗？"
         self.assertEqual(_redact_outbound_secrets(text, self.owner), text)
+
+    def test_loaded_provider_resolved_key_is_protected(self) -> None:
+        self.owner.context = SimpleNamespace(provider_manager=SimpleNamespace(
+            inst_map={"configured": SimpleNamespace(provider_config={
+                "key": ["resolved-environment-key-value"],
+            })},
+        ))
+        text = "resolved-environment-key-value api_key=business-example"
+        cleaned = _redact_outbound_secrets(text, self.owner)
+        self.assertNotIn("resolved-environment-key-value", cleaned)
+        self.assertIn("api_key=business-example", cleaned)
 
     def test_send_message_tool_plain_text_is_redacted(self) -> None:
         class Harness(TtsToolSanitizerMixin):

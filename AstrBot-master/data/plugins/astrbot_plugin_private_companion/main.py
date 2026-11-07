@@ -15162,7 +15162,7 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
             "【工具调用协议】当前模型兼容接口会严格核对每个 tool_call_id 与工具结果。"
             "需要使用多个工具时，请按顺序逐个调用：每条 assistant 消息只发起一个工具调用，"
             "拿到该工具结果后再决定是否调用下一个；不要并行或批量发起 tool_calls。"
-            "回复当前会话的普通文字时，直接输出最终回复，不要调用 send_message_to_user；"
+            "回复当前会话的普通文字时，直接输出assistant正文，不要调用 send_message_to_user；"
             "确需使用该工具发送媒体或主动消息时，plain 文本不得为空，调用同一轮不要额外输出可见正文。"
         )
         req.system_prompt = f"{current_prompt}\n\n{marker}\n{instruction}".strip()
@@ -15176,6 +15176,8 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         images, records and videos that the current turn needs to deliver.
         """
         if req is None:
+            return []
+        if getattr(req, "model_managed_loop", False) is True:
             return []
         if callable(getattr(self, "_event_requires_direct_same_session_tool_delivery", None)):
             if self._event_requires_direct_same_session_tool_delivery(event):
@@ -15980,6 +15982,9 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
                     if channels:
                         req.system_prompt += "\n【仍在运行或等待的脚本互动通道｜只读事实】\n" + channels
             configure_conversation_request(self, event, req)
+            if registered:
+                from .conversation_route import enable_model_managed_chat
+                enable_model_managed_chat(req)
             if runtime is not None and registered:
                 if req.func_tool is None:
                     req.func_tool = ToolSet()

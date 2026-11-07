@@ -20,6 +20,22 @@ from astrbot.core.provider import Provider
 from .helpers import _redact_outbound_secrets, _strip_outbound_control_blocks
 
 
+def enable_model_managed_chat(req):
+    """对已由宿主登记的聊天请求启用自主轮数，沿用原回复链路。"""
+    req.model_managed_loop = True
+    marker = "<!-- private_companion_passive_reply_tool_boundary_v1 -->"
+    req.system_prompt = re.sub(re.escape(marker) + r"\n[^\n]*(?:\n|$)", "", req.system_prompt)
+    req.system_prompt += (
+        "\n【当前会话自主反馈】\n"
+        "由你判断本轮需要多少次工具调用，以及何时已有值得告诉用户的内容；不必等后台任务完成。"
+        "需要先说明时，可以输出普通assistant正文并在同一轮继续调用工具，正文会沿用当前人格、记忆和正式回复链路发出。"
+        "只想继续查工具时不输出可见正文；已发送的内容不在结尾重复。普通文字无需调用send_message_to_user。"
+        "提交任务后可用pc_read_background(task_id, wait_seconds)短暂确认启动；确认正常运行且暂无错误即可结束本轮检查。"
+        "不要为正常任务持续等待或反复请求，不用固定发几句；后续错误会触发反馈，由你按需上报或在原授权内调整。"
+        "工具报错是供你判断和修正的事实，只有接收回执不能说任务完成；停止、隔离和敏感凭据保护仍生效。"
+    )
+
+
 def _task_chat_text(text: Any) -> str:
     """Clean a generated chat sentence before direct platform delivery.
 
