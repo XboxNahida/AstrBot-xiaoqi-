@@ -7,19 +7,23 @@ import copy
 import inspect
 import json
 import re
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
 import jsonschema
 
+from astrbot.core import logger
 from astrbot.core.agent.tool import ToolSet
 
 try:
     from .task_model_policy import request_policy
+    from .task_model_stream import collect_task_model_response
     from .task_multimodal import materialize_images
     from .task_service import TaskFailure, TaskJob, TaskService
 except ImportError:
     from task_model_policy import request_policy
+    from task_model_stream import collect_task_model_response
     from task_multimodal import materialize_images
     from task_service import TaskFailure, TaskJob, TaskService
 
@@ -277,22 +281,30 @@ class TaskAgentExecutor:
                 if not reserved and not self.service.begin_attempt(job, provider_id):
                     raise TaskFailure("attempt_limit")
                 reserved = False
+                started = time.monotonic()
+                logger.info(
+                    "后台模型流式请求开始: task=%s provider=%s step=%s idle_timeout=%ss total_boundary=600s",
+                    job.task_id, provider_id, current.step_key, policy.timeout_seconds,
+                )
                 try:
                     provider = await self._resolve(self.resolve_provider, provider_id)
                     modalities = getattr(provider, "provider_config", {}).get("modalities")
                     outgoing = materialize_images(contexts, request, supports_image=not modalities or "image" in modalities)
-                    async with asyncio.timeout(policy.timeout_seconds):
-                        response = await provider.text_chat(
-                            prompt=None,
-                            system_prompt=system_prompt,
-                            contexts=outgoing,
-                            func_tool=toolset,
-                            tool_choice="auto",
-                            request_max_retries=0,
-                            timeout=policy.timeout_seconds,
-                        )
-                except Exception:
+                    response = await collect_task_model_response(
+                        provider, timeout=policy.timeout_seconds, prompt=None, system_prompt=system_prompt,
+                        contexts=outgoing, func_tool=toolset, tool_choice="auto",
+                    )
+                except asyncio.CancelledError:
+                    logger.info("后台模型流式请求取消: task=%s provider=%s elapsed=%.2fs",
+                                job.task_id, provider_id, time.monotonic() - started)
+                    raise
+                except Exception as exc:
+                    logger.warning("后台模型流式请求失败: task=%s provider=%s elapsed=%.2fs error_type=%s",
+                                   job.task_id, provider_id, time.monotonic() - started, type(exc).__name__)
                     raise TaskFailure("provider_unavailable", retryable=True) from None
+                logger.info("后台模型流式请求接收完成: task=%s provider=%s elapsed=%.2fs role=%s tool_calls=%s",
+                            job.task_id, provider_id, time.monotonic() - started,
+                            getattr(response, "role", "unknown"), len(getattr(response, "tools_call_name", []) or []))
                 if not self.service.heartbeat(job):
                     raise TaskFailure("lease_lost")
                 if getattr(response, "role", "assistant") == "err":

@@ -1081,9 +1081,9 @@ class ForwardMessageMixin:
                     ),
                 )
                 if timeout > 0:
-                    result = await asyncio.wait_for(provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=260), timeout=timeout)
+                    result = await provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=260, timeout=timeout)
                 else:
-                    result = await provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=260)
+                    result = await provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=260, timeout=timeout)
                 text = str(getattr(result, "completion_text", result) or "").strip()
                 cleaned_text = _single_line(_strip_internal_message_blocks(text), 900)
                 if not cleaned_text:

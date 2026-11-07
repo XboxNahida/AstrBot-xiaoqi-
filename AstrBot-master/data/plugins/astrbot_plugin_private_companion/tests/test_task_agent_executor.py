@@ -43,6 +43,9 @@ class Provider:
             raise response
         return response
 
+    async def text_chat_stream(self, **kwargs):
+        yield await self.text_chat(**kwargs)
+
 
 class ExecutorTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -127,7 +130,7 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("auto", self.primary.requests[0]["tool_choice"])
         self.assertEqual("auto", self.primary.requests[1]["tool_choice"])
         self.assertTrue(
-            all(r["request_max_retries"] == 0 for r in self.primary.requests)
+            all(r["request_max_retries"] == 1 and r["timeout"] == 60 for r in self.primary.requests)
         )
         self.assertEqual(self.scope, self.executions[0][0])
         self.assertEqual(1, len(self.permissions))

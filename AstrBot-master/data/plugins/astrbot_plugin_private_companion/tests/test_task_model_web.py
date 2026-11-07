@@ -18,7 +18,7 @@ def test_task_model_web_defaults_roundtrip_and_disable_fallback():
     page = PrivateCompanionPageApi.__new__(PrivateCompanionPageApi)
     page.plugin = SimpleNamespace(config={}, conversation_task_fallback_provider_id="legacy")
     page._schema_key_index_cache = None
-    for key, value in (("task_model_timeout_seconds", 120), ("task_model_max_attempts", 3)):
+    for key, value in (("task_model_timeout_seconds", 60), ("task_model_max_attempts", 3)):
         assert key in page._allowed_setting_keys()
         normalized = page._normalize_setting_value(key, value)
         page._set_config_value(key, normalized)
@@ -39,7 +39,7 @@ const inputs = {'[data-task-model-timeout]': {value:'180'}, '[data-task-model-at
 const context = {state:{overview:{settings:{task_model_timeout_seconds:120,task_model_max_attempts:3}}},
  document:{querySelector:(key)=>inputs[key]}};
 const result=window.PrivateCompanionProviderTree.currentTaskModelValues(context);
-if(result.task_model_timeout_seconds!==180 || result.task_model_max_attempts!==3) throw Error('wrong budget');
+if(result.task_model_timeout_seconds!==60 || result.task_model_max_attempts!==3) throw Error('wrong budget');
 inputs['[data-task-model-attempts]'].value='0';
 let rejected=false;
 try {window.PrivateCompanionProviderTree.currentTaskModelValues(context);} catch(e){rejected=true;}
@@ -55,18 +55,22 @@ async def test_task_sdk_timeout_overrides_provider_35_seconds_without_shared_mut
 
     async def transport(request):
         observed.append(request.extensions["timeout"]["read"])
-        return httpx.Response(200, json={"id": "test", "object": "chat.completion", "created": 0,
-            "model": "gpt-test", "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"},
-                                                "finish_reason": "stop"}]})
+        assert json.loads(request.content)["stream"] is True
+        chunk = {"id": "test", "object": "chat.completion.chunk", "created": 0,
+            "model": "gpt-test", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "ok"},
+                                                "finish_reason": "stop"}]}
+        return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                              content="data: " + json.dumps(chunk) + "\n\ndata: [DONE]\n\n")
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(transport))
     monkeypatch.setattr(ProviderOpenAIOfficial, "_create_http_client", lambda *_: client)
     provider = ProviderOpenAIOfficial({"id": "test", "type": "openai_chat_completion", "model": "gpt-test",
                                      "key": ["fake-key"], "api_base": "https://test.example/v1", "timeout": 35}, {})
     try:
-        await asyncio.gather(*(provider.text_chat(prompt="test", timeout=timeout, request_max_retries=0)
-                               for timeout in (120, 240)))
-        assert sorted(observed) == [120, 240]
+        await asyncio.gather(*(provider.text_chat(prompt="test", request_max_retries=0,
+                                                  **({"timeout": timeout} if timeout else {}))
+                               for timeout in (120, 240, 10, None)))
+        assert sorted(observed) == [10, 35, 60, 60]
         assert provider.timeout == 35 and provider.client.timeout == 35
     finally:
         await provider.client.close()

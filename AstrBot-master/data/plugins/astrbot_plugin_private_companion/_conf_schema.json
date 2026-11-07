@@ -4944,10 +4944,10 @@
         "_special": "select_provider"
       },
       "task_model_timeout_seconds": {
-        "description": "后台模型单次请求超时（秒）",
+        "description": "后台模型流式无响应超时（秒，最多60）",
         "type": "int",
-        "default": 120,
-        "hint": "新任务默认单次模型请求预算，独立于工具执行耗时；Gemini可按任务指定覆盖值，不改变其他任务。"
+        "default": 60,
+        "hint": "统一流式，沿用原超时作为连续无数据的等待时间，大于60秒按60秒；正文、推理和工具参数分片均刷新计时。单次模型请求总边界600秒，整体任务和工具执行另行计时。"
       },
       "task_model_max_attempts": {
         "description": "后台模型最多请求次数（包含首次）",

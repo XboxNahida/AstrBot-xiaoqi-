@@ -8,6 +8,7 @@ import subprocess
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from astrbot_plugin_private_companion.token_budget import (
     TokenBudgetMixin,
@@ -82,6 +83,50 @@ class _UsageToolSet:
 
 
 class ModelFallbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_hub_has_three_attempts_per_model_and_request_local_deadline(self):
+        harness = _FallbackHarness({"primary": RuntimeError("down"), "backup": "ok"})
+        harness.model_fallback_overrides = {"CONVERSATION_HUB_PROVIDER_ID": "backup"}
+        harness.model_timeout_overrides = {"CONVERSATION_HUB_PROVIDER_ID": 120}
+        result = await harness._llm_call(
+            "judge", provider_id="primary", task="astrbot_reply",
+            timeout_key="CONVERSATION_HUB_PROVIDER_ID", timeout_seconds=180,
+        )
+        self.assertEqual(result, "ok")
+        self.assertEqual(harness.context.calls, ["primary"] * 3 + ["backup"])
+        for kwargs in harness.context.kwargs:
+            self.assertEqual(kwargs["timeout"], 30)
+            self.assertEqual(kwargs["request_max_retries"], 1)
+
+    async def test_hub_exhausts_each_model_without_hidden_retry_or_global_change(self):
+        harness = _FallbackHarness({"primary": RuntimeError("down"), "backup": ""})
+        harness.model_fallback_overrides = {"CONVERSATION_HUB_PROVIDER_ID": "backup"}
+        result = await harness._llm_call(
+            "judge", provider_id="primary", task="astrbot_reply",
+            timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+        )
+        self.assertIsNone(result)
+        self.assertEqual(harness.context.calls, ["primary"] * 3 + ["backup"] * 3)
+        harness.context.responses["primary"] = "chat"
+        await harness._llm_call("chat", provider_id="primary", task="chat")
+        self.assertNotIn("request_max_retries", harness.context.kwargs[-1])
+        self.assertNotIn("timeout", harness.context.kwargs[-1])
+
+    async def test_hub_legacy_short_timeout_does_not_cut_off_stream(self):
+        harness = _FallbackHarness({"primary": "unused"})
+        harness.model_timeout_overrides = {"CONVERSATION_HUB_PROVIDER_ID": 10}
+        deadlines = []
+        async def expired(coro, *, timeout):
+            deadlines.append(timeout)
+            coro.close()
+            raise asyncio.TimeoutError()
+        with patch("astrbot_plugin_private_companion.token_budget.asyncio.wait_for", expired):
+            result = await harness._llm_call(
+                "judge", provider_id="primary", timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+            )
+        self.assertEqual(result, "unused")
+        self.assertEqual(deadlines, [])
+        self.assertEqual(harness.context.kwargs[0]["timeout"], 10)
+
     async def test_tool_call_uses_the_budgeted_primary_provider_path(self) -> None:
         response = SimpleNamespace(
             role="assistant",

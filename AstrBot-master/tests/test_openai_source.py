@@ -26,10 +26,54 @@ class _ErrorWithBody(Exception):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("truncated", [False, True])
+async def test_task_stream_reports_tool_chunk_activity_and_closes_transport(monkeypatch, truncated):
+    from astrbot.core.agent.tool import ToolSet
+
+    provider = _make_provider()
+    events, closed = [], []
+    chunks = [
+        {"delta": {"role": "assistant", "tool_calls": [{"index": 0, "id": "call-1", "type": "function",
+          "function": {"name": "read", "arguments": '{"path":'}}]}, "finish_reason": None},
+        {"delta": {"tool_calls": [{"index": 0, "function": {"arguments": '"x"}'}}]}, "finish_reason": None},
+    ]
+    if not truncated:
+        chunks.append({"delta": {}, "finish_reason": "tool_calls"})
+    async def raw_stream():
+        try:
+            for choice in chunks:
+                yield ChatCompletionChunk.model_validate({"id": "task", "object": "chat.completion.chunk",
+                    "created": 0, "model": "gpt-test", "choices": [{"index": 0, **choice}]})
+        finally:
+            closed.append(True)
+    async def create(**kwargs):
+        assert kwargs["stream"] is True
+        assert "stream_activity_callback" not in str(kwargs)
+        return raw_stream()
+    monkeypatch.setattr(provider.client.chat.completions, "create", create)
+    async def run():
+        return [r async for r in provider.text_chat_stream(prompt="test", func_tool=ToolSet(), request_max_retries=1,
+                    stream_activity_callback=lambda: events.append(True))]
+    try:
+        if truncated:
+            with pytest.raises(RuntimeError, match="incomplete"):
+                await run()
+        else:
+            results = await run()
+            assert results[-1].is_chunk is False
+            assert results[-1].tools_call_args == [{"path": "x"}]
+        assert len(events) == len(chunks)
+        assert closed == [True]
+    finally:
+        await provider.terminate()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("streaming", [False, True])
 @pytest.mark.parametrize(
     "budget,successful_call,expected_calls",
-    [(0, None, 1), (0, 1, 1), (None, 10, 10), (None, None, 10)],
+    [(0, None, 1), (0, 1, 1), (1, None, 1), (1, 1, 1),
+     (None, 10, 10), (None, None, 10)],
 )
 async def test_outer_request_budget_and_last_attempt_success(
     monkeypatch, streaming, budget, successful_call, expected_calls
@@ -83,6 +127,27 @@ class _ErrorWithResponse(Exception):
     def __init__(self, message: str, response_text: str):
         super().__init__(message)
         self.response = SimpleNamespace(text=response_text)
+
+
+@pytest.mark.asyncio
+async def test_complete_chat_uses_stream_with_uniform_read_timeout(monkeypatch):
+    provider = _make_provider({"timeout": 35})
+    seen = []
+    async def create(**kwargs):
+        seen.append(kwargs)
+        async def chunks():
+            yield ChatCompletionChunk.model_validate({"id": "uniform", "object": "chat.completion.chunk",
+                "created": 0, "model": "gpt-test", "choices": [{"index": 0,
+                    "delta": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]})
+        return chunks()
+    monkeypatch.setattr(provider.client.chat.completions, "create", create)
+    try:
+        result = await provider.text_chat(prompt="test", timeout=120, request_max_retries=1)
+        assert result.completion_text == "ok"
+        assert seen[0]["stream"] is True and seen[0]["timeout"] == 60
+        assert provider.timeout == 35 and provider.client.timeout == 35
+    finally:
+        await provider.terminate()
 
 
 def _make_provider(overrides: dict | None = None) -> ProviderOpenAIOfficial:
@@ -255,12 +320,12 @@ async def test_text_chat_passes_request_max_retries_to_query():
     async def fake_prepare_chat_payload(*args, **kwargs):
         return {"messages": [], "model": "gpt-4o-mini"}, []
 
-    async def fake_query(payloads, func_tool, *, request_max_retries=None):
+    async def fake_query(payloads, func_tool, *, request_max_retries=None, stream_activity_callback=None):
         captured["request_max_retries"] = request_max_retries
-        return LLMResponse(role="assistant", completion_text="ok")
+        yield LLMResponse(role="assistant", completion_text="ok")
 
     provider._prepare_chat_payload = fake_prepare_chat_payload
-    provider._query = fake_query
+    provider._query_stream = fake_query
 
     await provider.text_chat(prompt="hello", request_max_retries=2)
 

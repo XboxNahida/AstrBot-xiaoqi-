@@ -188,10 +188,7 @@ async def _send_task_notice(plugin: Any, event: Any, kind: str) -> bool:
                 family = f"{identity} {provider.get_model()} {provider.provider_config.get('model', '')}".casefold()
                 if any(name in family for name in ("gpt", "claude")):
                     continue
-                response = await asyncio.wait_for(
-                    provider.text_chat(prompt=json.dumps(payload, ensure_ascii=False), system_prompt=system, contexts=contexts, func_tool=None, max_tokens=180),
-                    timeout=60,
-                )
+                response = await provider.text_chat(prompt=json.dumps(payload, ensure_ascii=False), system_prompt=system, contexts=contexts, func_tool=None, max_tokens=180, timeout=60)
                 candidate = _task_chat_text(getattr(response, "completion_text", ""))
                 invalid_claim = bool(re.search(r"(?:已经|全部|顺利).{0,8}(?:完成|成功|搞定|跑完)|(?:完成|成功|搞定|跑完)了|\d+\s*[%％]|百分之", candidate)) if kind in {"ack", "progress", "failure"} or state.status in {"running", "progress", "queued", "failed", "timeout"} else False
                 if kind == "failure":
@@ -693,16 +690,12 @@ async def present_task_response(plugin: Any, event: Any, resp: Any) -> None:
             family = f"{identity} {provider.get_model()} {provider.provider_config.get('model', '')}".casefold()
             if any(name in family for name in ("gpt", "claude")):
                 continue
-            response = await asyncio.wait_for(
-                provider.text_chat(
+            response = await provider.text_chat(
                     prompt=prompt,
                     system_prompt=system,
                     contexts=contexts,
                     func_tool=None,
-                    max_tokens=140,
-                ),
-                timeout=60,
-            )
+                    max_tokens=140, timeout=60)
             candidate = _task_chat_text(getattr(response, "completion_text", ""))
             if (
                 getattr(response, "role", "") != "assistant"

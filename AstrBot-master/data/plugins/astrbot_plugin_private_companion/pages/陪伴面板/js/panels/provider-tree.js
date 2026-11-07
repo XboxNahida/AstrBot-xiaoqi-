@@ -12,13 +12,13 @@ window.PrivateCompanionProviderTree = (() => {
   function normalizeTimeoutValue(value) {
     if (value === null || value === undefined || String(value).trim() === "") return "";
     const parsed = Math.round(Number(value));
-    return Number.isFinite(parsed) && parsed >= 5 && parsed <= 600 ? parsed : "";
+    return Number.isFinite(parsed) && parsed >= 5 && parsed <= 600 ? Math.min(60, parsed) : "";
   }
 
   function currentTaskModelValues(context) {
     const { document, state } = context;
     const source = { ...(state.overview?.settings || {}), ...(state.taskModelDraft || {}) };
-    const timeout = Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 120);
+    const timeout = Math.min(60, Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 120));
     const attempts = Number(document.querySelector("[data-task-model-attempts]")?.value ?? source.task_model_max_attempts ?? 3);
     if (!Number.isInteger(timeout) || timeout < 1 || !Number.isInteger(attempts) || attempts < 1) {
       throw new Error("后台模型超时和最多请求次数必须是至少1的整数；次数包含首次请求");
@@ -401,9 +401,9 @@ window.PrivateCompanionProviderTree = (() => {
           </label>
           ${embeddingProvider ? "" : `<div class="provider-limit-grid">
             <label class="provider-field provider-limit-field provider-timeout-field">
-              <span>请求超时</span>
+              <span>${embeddingProviderKeys.has(key) ? "请求超时" : "流式无响应超时"}</span>
               <span class="provider-limit-control provider-timeout-control">
-                ${taskProvider ? `<input type="number" min="1" step="1" data-task-model-timeout value="${escapeHtml(timeoutValue)}" aria-label="后台模型单次请求超时秒数" />` : `<input type="number" min="5" max="600" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="默认" aria-label="${escapeHtml(label)}请求超时秒数" />`}
+                ${taskProvider ? `<input type="number" min="1" max="60" step="1" data-task-model-timeout value="${escapeHtml(timeoutValue)}" aria-label="后台模型连续无响应超时秒数" />` : `<input type="number" min="5" max="60" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="原提供器配置（最多60秒）" aria-label="${escapeHtml(label)}无响应超时秒数" />`}
                 <b>秒</b>
               </span>
             </label>
@@ -415,6 +415,7 @@ window.PrivateCompanionProviderTree = (() => {
               </span>
             </label>
           </div>`}
+          ${embeddingProvider ? "" : `<small>流式沿用原超时，大于60秒按60秒；分片刷新计时，单次请求总边界10分钟。中枢保留原30秒上限。</small>`}
           ${taskProvider ? `<label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-task-model-attempts value="${escapeHtml(taskValues.task_model_max_attempts)}" /><small>默认3次＝首次1次＋重试2次；固定当前模型，不自动使用备用。Gemini可按任务覆盖。</small></label>` : ""}
           ${embeddingProvider || taskProvider ? "" : `<label class="provider-field provider-fallback-field">
             <span>备用模型 <small>主模型失败、超时、Token 超限或空响应时尝试一次</small></span>

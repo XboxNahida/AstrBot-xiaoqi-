@@ -135,7 +135,8 @@ async def test_file_text_path_does_not_grant_attachment_access(runtime, tmp_path
 
 
 @pytest.mark.asyncio
-async def test_error_feedback_model_can_inspect_and_adjust_original_task(runtime):
+@pytest.mark.parametrize("tool_role", ["assistant", "tool"])
+async def test_error_feedback_model_can_inspect_and_adjust_original_task(runtime, tool_role):
     from astrbot.core.provider.entities import LLMResponse
 
     e = event(mid="repair-feedback")
@@ -145,8 +146,8 @@ async def test_error_feedback_model_can_inspect_and_adjust_original_task(runtime
     runtime.service.fail(job, "task_incomplete", retryable=False)
     failed = runtime.service.get(accepted["task_id"], runtime.scope(e))
     provider = SimpleNamespace(text_chat=AsyncMock(side_effect=[
-        LLMResponse(role="assistant", tools_call_name=["pc_read_background"], tools_call_args=[{"task_id":job.task_id}], tools_call_ids=["inspect"]),
-        LLMResponse(role="assistant", tools_call_name=["pc_recover_background"], tools_call_args=[{"expected_revision":failed.revision,"guidance":"附件已经持久导入，先检查清单并使用工作区输入副本。"}], tools_call_ids=["repair"]),
+        LLMResponse(role=tool_role, tools_call_name=["pc_read_background"], tools_call_args=[{"task_id":job.task_id}], tools_call_ids=["inspect"]),
+        LLMResponse(role=tool_role, tools_call_name=["pc_recover_background"], tools_call_args=[{"expected_revision":failed.revision,"guidance":"附件已经持久导入，先检查清单并使用工作区输入副本。"}], tools_call_ids=["repair"]),
         LLMResponse(role="assistant", completion_text="附件路径我重新交代给后台了，接着处理。"),
     ]))
     runtime.plugin.context.get_provider_by_id = lambda _: provider
@@ -194,23 +195,24 @@ async def test_request_failure_notifications_are_persona_rendered_and_offer_mode
 
 
 @pytest.mark.asyncio
-async def test_task_model_selection_is_persisted_and_does_not_change_other_tasks(runtime):
+@pytest.mark.parametrize("chosen_timeout,expected_timeout", [(180, 60), (20, 20)])
+async def test_task_model_selection_is_persisted_and_does_not_change_other_tasks(runtime, chosen_timeout, expected_timeout):
     runtime.plugin.context.get_provider_by_id = lambda pid: SimpleNamespace(
         provider_config={"id": pid, "model": pid, "enable": True}, text_chat=AsyncMock())
     e = event(mid="custom")
     register(runtime, e)
     selected = await runtime.submit(e, {"goal": "复杂计算", "model_id": "selected-model",
-                                        "timeout_seconds": 180, "max_attempts": 2})
+                                        "timeout_seconds": chosen_timeout, "max_attempts": 2})
     assert selected["accepted"]
     request = runtime.service.get(selected["task_id"], runtime.scope(e)).metadata["request"]
     assert (request["primary"], request["fallback"]) == ("selected-model", "")
-    assert (request["request_timeout_seconds"], request["request_max_attempts"]) == (180, 2)
+    assert (request["request_timeout_seconds"], request["request_max_attempts"]) == (expected_timeout, 2)
     other = event(mid="default")
     register(runtime, other)
     default = await runtime.submit(other, {"goal": "另一任务"})
     request = runtime.service.get(default["task_id"], runtime.scope(other)).metadata["request"]
     assert request["primary"] == "task-primary" and request["fallback"] == ""
-    assert request["request_timeout_seconds"] == 120 and request["request_max_attempts"] == 3
+    assert request["request_timeout_seconds"] == 60 and request["request_max_attempts"] == 3
 
 
 @pytest.mark.asyncio

@@ -521,7 +521,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
     def default_model_request(self):
         return request_policy({
             "primary": getattr(self.plugin, "conversation_task_provider_id", "") or "openai/gpt-6-sol",
-            "request_timeout_seconds": getattr(self.plugin, "task_model_timeout_seconds", 120),
+            "request_timeout_seconds": min(60, getattr(self.plugin, "task_model_timeout_seconds", 120)),
             "request_max_attempts": getattr(self.plugin, "task_model_max_attempts", 3),
         }).as_request()
 
@@ -1210,7 +1210,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
 
         return IntentTool(
             name="pc_submit_task_intent",
-            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. For a follow-up/revision/new retry execution of the SAME goal, use related_task_id plus relation; this links records but does not cancel the parent or copy its completion evidence. Read original results before regenerating; use pc_task_send_files to resend existing files. Optional model_id, timeout_seconds and max_attempts apply only to this task; defaults are the web configuration (120 seconds, THREE TOTAL requests). Read pc_list_task_models before selecting a model and follow user selection. No fallback models. After request exhaustion ask before changing model; retry with a new model preserves successful tool checkpoints. Identity and workspace capabilities come from the host; mode never grants permission.",
+            description="Submit/query/cancel/pause/retry/resume the current user's persistent task. Submission is acceptance, never completion. For a follow-up/revision/new retry execution of the SAME goal, use related_task_id plus relation; this links records but does not cancel the parent or copy its completion evidence. Read original results before regenerating; use pc_task_send_files to resend existing files. Optional model_id and max_attempts apply only to this task (default THREE TOTAL requests). All model calls use streaming: timeout_seconds is retained for compatibility but used as the NO STREAM ACTIVITY budget, capped at 60 seconds; text, reasoning and tool-argument fragments refresh the idle timer. Each model request has a 600-second total boundary; tool execution and whole-task runtime are separate. Read pc_list_task_models before selecting a model and follow user selection. No fallback models. After request exhaustion ask before changing model; retry with a new model preserves successful tool checkpoints. Identity and workspace capabilities come from the host; mode never grants permission.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -1233,7 +1233,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                                         "description": "Owned parent execution ID for submit only; select from actual task facts, never infer by similar title alone."},
                     "relation": {"type": "string", "enum": ["follow_up", "revision", "retry", "related"]},
                     "model_id": {"type": "string", "description": "Exact enabled ID from pc_list_task_models. Omit to retain task/default model."},
-                    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "description": "Timeout for each model request, default 120 seconds; separate from tool runtime."},
+                    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "description": "Legacy compatibility field, stream inactivity timeout, preserving prior settings with a 60-second cap. A single model request has a 600-second total boundary; separate from tool runtime."},
                     "max_attempts": {"type": "integer", "minimum": 1, "description": "TOTAL requests for each model step including first, default 3 (first plus 2 retries)."},
                     "mode": {"type": "string", "enum": ["tools", "reasoning"]},
                     "use_workspace": {
@@ -2147,8 +2147,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                         extra_user_content_parts=[TextPart(text=text) for text in chat.get("extra_text", []) if text],
                         request_max_retries=0,
                     )
-                response = await asyncio.wait_for(
-                    provider.text_chat(
+                response = await provider.text_chat(
                         prompt="根据以下后台事实接着原对话回复，不执行任务或调用工具：\n"
                         + self._safe_text(json.dumps(facts, ensure_ascii=False), 10000),
                         system_prompt=system,
@@ -2159,10 +2158,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                             if text
                         ],
                         func_tool=None,
-                        request_max_retries=0,
-                    ),
-                    timeout=60,
-                )
+                        request_max_retries=0, timeout=60)
                 text = _task_chat_text(
                     self._safe_text(getattr(response, "completion_text", ""), 4000)
                 )

@@ -16,6 +16,7 @@ from astrbot.core.agent.message import AudioURLPart, ContentPart, ImageURLPart, 
 from astrbot.core.exceptions import EmptyModelOutputError
 from astrbot.core.provider.entities import LLMResponse, TokenUsage
 from astrbot.core.provider.func_tool_manager import ToolSet
+from astrbot.core.provider.streaming import collect_model_response
 from astrbot.core.utils.media_utils import (
     describe_media_ref,
     resolve_media_ref_to_base64_data,
@@ -35,6 +36,7 @@ from .request_retry import retry_provider_request, retry_provider_request_contex
     "Anthropic Claude API 提供商适配器",
 )
 class ProviderAnthropic(Provider):
+    supports_stream_activity_callback = True
     _PROMPT_CACHE_CONTROL = {"type": "ephemeral"}
 
     @staticmethod
@@ -590,6 +592,7 @@ class ProviderAnthropic(Provider):
         tools: ToolSet | None,
         *,
         request_max_retries: int | None = None,
+        stream_activity_callback=None,
     ) -> AsyncGenerator[LLMResponse, None]:
         if tools:
             if tool_list := tools.get_func_desc_anthropic_style():
@@ -615,6 +618,7 @@ class ProviderAnthropic(Provider):
         self._apply_thinking_config(payloads)
         self._sanitize_assistant_messages(payloads)
 
+        completed = False
         async with retry_provider_request_context(
             "Anthropic",
             lambda: self.client.messages.stream(**payloads, extra_body=extra_body),
@@ -622,6 +626,10 @@ class ProviderAnthropic(Provider):
         ) as stream:
             assert isinstance(stream, anthropic.AsyncMessageStream)
             async for event in stream:
+                if stream_activity_callback is not None:
+                    stream_activity_callback()
+                if event.type == "message_stop":
+                    completed = True
                 if event.type == "message_start":
                     # the usage contains input token usage
                     id = event.message.id
@@ -709,6 +717,8 @@ class ProviderAnthropic(Provider):
                                 id=id,
                             )
                         except json.JSONDecodeError:
+                            if stream_activity_callback is not None:
+                                raise RuntimeError("incomplete model stream: invalid tool arguments") from None
                             # JSON 解析失败，跳过这个工具调用
                             logger.warning(f"工具调用参数 JSON 解析失败: {tool_info}")
 
@@ -719,6 +729,8 @@ class ProviderAnthropic(Provider):
                     if event.usage:
                         self._update_usage(usage, event.usage)
 
+        if stream_activity_callback is not None and (not completed or tool_use_buffer):
+            raise RuntimeError("incomplete model stream: missing finish marker")
         # 返回最终的完整结果
         final_response = LLMResponse(
             role="assistant",
@@ -760,62 +772,22 @@ class ProviderAnthropic(Provider):
         request_max_retries: int | None = None,
         **kwargs,
     ) -> LLMResponse:
-        if contexts is None:
-            contexts = []
-        new_record = None
-        if prompt is not None:
-            new_record = await self.assemble_context(
-                prompt or "",
-                image_urls,
-                audio_urls,
-                extra_user_content_parts,
-            )
-        context_query = self._ensure_message_to_dicts(contexts)
-        if new_record:
-            context_query.append(new_record)
-
-        if system_prompt:
-            context_query.insert(0, {"role": "system", "content": system_prompt})
-
-        for part in context_query:
-            if "_no_save" in part:
-                del part["_no_save"]
-
-        # tool calls result
-        if tool_calls_result:
-            if not isinstance(tool_calls_result, list):
-                context_query.extend(tool_calls_result.to_openai_messages())
-            else:
-                for tool_call_result in tool_calls_result:
-                    context_query.extend(tool_call_result.to_openai_messages())
-
-        system_prompt, new_messages = self._prepare_payload(context_query)
-
-        model = model or self.get_model()
-
-        payloads = {"messages": new_messages, "model": model}
-        if func_tool and not func_tool.empty():
-            payloads["tool_choice"] = tool_choice
-
-        # Anthropic has a different way of handling system prompts
-        if system_prompt:
-            payloads["system"] = (
-                [{"type": "text", "text": system_prompt}]
-                if isinstance(system_prompt, str)
-                else system_prompt
-            )
-
-        llm_response = None
-        try:
-            llm_response = await self._query(
-                payloads,
-                func_tool,
-                request_max_retries=request_max_retries,
-            )
-        except Exception as e:
-            raise e
-
-        return llm_response
+        return await collect_model_response(
+            self,
+            prompt=prompt,
+            session_id=session_id,
+            image_urls=image_urls,
+            audio_urls=audio_urls,
+            func_tool=func_tool,
+            contexts=contexts,
+            system_prompt=system_prompt,
+            tool_calls_result=tool_calls_result,
+            model=model,
+            extra_user_content_parts=extra_user_content_parts,
+            tool_choice=tool_choice,
+            request_max_retries=request_max_retries,
+            **kwargs,
+        )
 
     async def text_chat_stream(
         self,
@@ -877,12 +849,22 @@ class ProviderAnthropic(Provider):
                 else system_prompt
             )
 
-        async for llm_response in self._query_stream(
+        stream_options = {"request_max_retries": request_max_retries}
+        activity = kwargs.pop("stream_activity_callback", None)
+        if activity is not None:
+            stream_options["stream_activity_callback"] = activity
+        if "timeout" in kwargs:
+            payloads["timeout"] = kwargs["timeout"]
+        response_stream = self._query_stream(
             payloads,
             func_tool,
-            request_max_retries=request_max_retries,
-        ):
-            yield llm_response
+            **stream_options,
+        )
+        try:
+            async for llm_response in response_stream:
+                yield llm_response
+        finally:
+            await response_stream.aclose()
 
     def _detect_image_mime_type(self, data: bytes) -> str:
         """根据图片二进制数据的 magic bytes 检测 MIME 类型"""

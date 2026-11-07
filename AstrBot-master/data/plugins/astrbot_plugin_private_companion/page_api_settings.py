@@ -46,7 +46,7 @@ class PageSettingNormalizerMixin:
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
             if type(value) is not int or value < 1:
                 raise ValueError("后台模型超时和最多请求次数必须是至少1的整数")
-            return value
+            return min(60, value) if key == "task_model_timeout_seconds" else value
         if key == "hub_group_batch_seconds":
             try:
                 number = float(value)

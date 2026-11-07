@@ -542,6 +542,7 @@ async def judge_capabilities(
             + json.dumps({"current_persona": hub_persona,
                           "prior_short_emotion": dict(short_term_state or {})}, ensure_ascii=False)
         )
+    hub_request_attempts: dict[str, int] = {}
     try:
         raw = await call_hub_model(
             plugin,
@@ -552,6 +553,7 @@ async def judge_capabilities(
             max_tokens=600 if extended else 260,
             provider_id=provider_id,
             persona_revision=str(persona_prompt or ""),
+            hub_request_attempts=hub_request_attempts,
         )
     except Exception:
         return None
@@ -569,6 +571,7 @@ async def judge_capabilities(
                 provider_id=provider_id,
                 task="astrbot_reply",
                 timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+                hub_request_attempts=hub_request_attempts,
             )
         except Exception as exc:
             logger.warning("Capability hub structure correction unavailable: error=%s", type(exc).__name__)

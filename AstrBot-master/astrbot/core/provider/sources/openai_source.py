@@ -4,7 +4,7 @@ import inspect
 import json
 import random
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from typing import Any, Literal
 
 import httpx
@@ -29,6 +29,7 @@ from astrbot.core.agent.tool import ToolSet
 from astrbot.core.exceptions import EmptyModelOutputError
 from astrbot.core.message.message_event_result import MessageChain
 from astrbot.core.provider.entities import LLMResponse, TokenUsage, ToolCallsResult
+from astrbot.core.provider.streaming import collect_model_response
 from astrbot.core.utils.media_utils import (
     describe_media_ref,
     resolve_media_ref_to_base64_data,
@@ -49,6 +50,7 @@ from .request_retry import retry_provider_request
     "OpenAI API Chat Completion 提供商适配器",
 )
 class ProviderOpenAIOfficial(Provider):
+    supports_stream_activity_callback = True
     _ERROR_TEXT_CANDIDATE_MAX_CHARS = 4096
 
     @classmethod
@@ -594,6 +596,7 @@ class ProviderOpenAIOfficial(Provider):
         tools: ToolSet | None,
         *,
         request_max_retries: int | None = None,
+        stream_activity_callback: Callable[[], None] | None = None,
     ) -> AsyncGenerator[LLMResponse, None]:
         """流式查询API，逐步返回结果"""
         if tools:
@@ -640,55 +643,67 @@ class ProviderOpenAIOfficial(Provider):
 
         state = ChatCompletionStreamState()
 
-        async for chunk in stream:
-            choice = chunk.choices[0] if chunk.choices else None
-            delta = choice.delta if choice else None
+        completed = False
+        try:
+            async for chunk in stream:
+                if stream_activity_callback is not None:
+                    stream_activity_callback()
+                if any(choice.finish_reason is not None for choice in chunk.choices):
+                    completed = True
+                choice = chunk.choices[0] if chunk.choices else None
+                delta = choice.delta if choice else None
 
-            if delta and (dtcs := delta.tool_calls):
-                for idx, tc in enumerate(dtcs):
-                    # siliconflow workaround
-                    if tc.function and tc.function.arguments:
-                        tc.type = "function"
-                    # Fix for #6661: Add missing 'index' field to tool_call deltas
-                    # Gemini and some OpenAI-compatible proxies omit this field
-                    if not hasattr(tc, "index") or tc.index is None:
-                        tc.index = idx
-            # 跳过 delta=None 的 chunk，避免 SDK 内部 _convert_initial_chunk_into_snapshot
-            # 第 747 行 choice.delta.to_dict() 抛出 NoneType 错误。
-            # refs: AstrBot#6689 / openai-python#5069 / #5047
-            # 例外：流末尾的 usage chunk（choices=[]，delta=None 但有 usage 数据）
-            # 需要传给 state，否则最终 completion 会丢失 usage 信息
-            if delta is not None or chunk.usage:
-                try:
-                    state.handle_chunk(chunk)
-                except Exception as e:
-                    logger.error("Saving chunk state error: " + str(e))
-            # logger.debug(f"chunk delta: {delta}")
-            # handle the content delta
-            reasoning = self._extract_reasoning_content(chunk)
-            _y = False
-            llm_response.id = chunk.id
-            llm_response.reasoning_content = None
-            llm_response.completion_text = ""
-            if reasoning is not None:
-                llm_response.reasoning_content = reasoning
-                _y = True
-            if delta and delta.content:
-                # Don't strip streaming chunks to preserve spaces between words
-                completion_text = self._normalize_content(delta.content, strip=False)
-                llm_response.result_chain = MessageChain(
-                    chain=[Comp.Plain(completion_text)],
-                )
-                _y = True
-            if chunk.usage:
-                llm_response.usage = self._extract_usage(chunk.usage)
-            elif choice and (choice_usage := getattr(choice, "usage", None)):
-                # Workaround for some providers that only return usage in choices[].usage, e.g. MoonshotAI
-                # See https://github.com/AstrBotDevs/AstrBot/issues/6614
-                llm_response.usage = self._extract_usage(choice_usage)
-                state.current_completion_snapshot.usage = choice_usage
-            if _y:
-                yield llm_response
+                if delta and (dtcs := delta.tool_calls):
+                    for idx, tc in enumerate(dtcs):
+                        # siliconflow workaround
+                        if tc.function and tc.function.arguments:
+                            tc.type = "function"
+                        # Fix for #6661: Add missing 'index' field to tool_call deltas
+                        # Gemini and some OpenAI-compatible proxies omit this field
+                        if not hasattr(tc, "index") or tc.index is None:
+                            tc.index = idx
+                # 跳过 delta=None 的 chunk，避免 SDK 内部 _convert_initial_chunk_into_snapshot
+                # 第 747 行 choice.delta.to_dict() 抛出 NoneType 错误。
+                # refs: AstrBot#6689 / openai-python#5069 / #5047
+                # 例外：流末尾的 usage chunk（choices=[]，delta=None 但有 usage 数据）
+                # 需要传给 state，否则最终 completion 会丢失 usage 信息
+                if delta is not None or chunk.usage:
+                    try:
+                        state.handle_chunk(chunk)
+                    except Exception as e:
+                        logger.error("Saving chunk state error: " + str(e))
+                # logger.debug(f"chunk delta: {delta}")
+                # handle the content delta
+                reasoning = self._extract_reasoning_content(chunk)
+                _y = False
+                llm_response.id = chunk.id
+                llm_response.reasoning_content = None
+                llm_response.completion_text = ""
+                if reasoning is not None:
+                    llm_response.reasoning_content = reasoning
+                    _y = True
+                if delta and delta.content:
+                    # Don't strip streaming chunks to preserve spaces between words
+                    completion_text = self._normalize_content(delta.content, strip=False)
+                    llm_response.result_chain = MessageChain(
+                        chain=[Comp.Plain(completion_text)],
+                    )
+                    _y = True
+                if chunk.usage:
+                    llm_response.usage = self._extract_usage(chunk.usage)
+                elif choice and (choice_usage := getattr(choice, "usage", None)):
+                    # Workaround for some providers that only return usage in choices[].usage, e.g. MoonshotAI
+                    # See https://github.com/AstrBotDevs/AstrBot/issues/6614
+                    llm_response.usage = self._extract_usage(choice_usage)
+                    state.current_completion_snapshot.usage = choice_usage
+                if _y:
+                    yield llm_response
+        finally:
+            close = getattr(stream, "close", None) or getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
+        if stream_activity_callback is not None and not completed:
+            raise RuntimeError("incomplete task model stream: missing finish marker")
 
         try:
             final_completion = state.get_final_completion()
@@ -696,6 +711,8 @@ class ProviderOpenAIOfficial(Provider):
             yield llm_response
         except Exception as e:
             logger.error("get_final_completion error: " + str(e))
+            if stream_activity_callback is not None:
+                raise
             # 流式内容已通过 yield 发出，记录错误后正常结束即可
             return
 
@@ -1204,67 +1221,22 @@ class ProviderOpenAIOfficial(Provider):
         request_max_retries: int | None = None,
         **kwargs,
     ) -> LLMResponse:
-        payloads, context_query = await self._prepare_chat_payload(
-            prompt,
-            image_urls,
-            audio_urls,
-            contexts,
-            system_prompt,
-            tool_calls_result,
+        return await collect_model_response(
+            self,
+            prompt=prompt,
+            session_id=session_id,
+            image_urls=image_urls,
+            audio_urls=audio_urls,
+            func_tool=func_tool,
+            contexts=contexts,
+            system_prompt=system_prompt,
+            tool_calls_result=tool_calls_result,
             model=model,
             extra_user_content_parts=extra_user_content_parts,
+            tool_choice=tool_choice,
+            request_max_retries=request_max_retries,
             **kwargs,
         )
-        if func_tool and not func_tool.empty():
-            payloads["tool_choice"] = tool_choice
-
-        llm_response = None
-        max_retries = 1 if request_max_retries == 0 else 10
-        available_api_keys = self.api_keys.copy()
-        chosen_key = random.choice(available_api_keys)
-        image_fallback_used = False
-
-        last_exception = None
-        retry_cnt = 0
-        for retry_cnt in range(max_retries):
-            try:
-                self.client.api_key = chosen_key
-                llm_response = await self._query(
-                    payloads,
-                    func_tool,
-                    request_max_retries=request_max_retries,
-                )
-                break
-            except Exception as e:
-                last_exception = e
-                (
-                    success,
-                    chosen_key,
-                    available_api_keys,
-                    payloads,
-                    context_query,
-                    func_tool,
-                    image_fallback_used,
-                ) = await self._handle_api_error(
-                    e,
-                    payloads,
-                    context_query,
-                    func_tool,
-                    chosen_key,
-                    available_api_keys,
-                    retry_cnt,
-                    max_retries,
-                    image_fallback_used=image_fallback_used,
-                )
-                if success:
-                    break
-
-        if llm_response is None:
-            logger.error(f"API 调用失败，重试 {max_retries} 次仍然失败。")
-            if last_exception is None:
-                raise Exception("未知错误")
-            raise last_exception
-        return llm_response
 
     async def text_chat_stream(
         self,
@@ -1282,6 +1254,7 @@ class ProviderOpenAIOfficial(Provider):
         **kwargs,
     ) -> AsyncGenerator[LLMResponse, None]:
         """流式对话，与服务商交互并逐步返回结果"""
+        stream_activity_callback = kwargs.pop("stream_activity_callback", None)
         payloads, context_query = await self._prepare_chat_payload(
             prompt,
             image_urls,
@@ -1295,7 +1268,7 @@ class ProviderOpenAIOfficial(Provider):
         if func_tool and not func_tool.empty():
             payloads["tool_choice"] = tool_choice
 
-        max_retries = 1 if request_max_retries == 0 else 10
+        max_retries = 1 if request_max_retries in (0, 1) else 10
         available_api_keys = self.api_keys.copy()
         chosen_key = random.choice(available_api_keys)
         image_fallback_used = False
@@ -1305,12 +1278,19 @@ class ProviderOpenAIOfficial(Provider):
         for retry_cnt in range(max_retries):
             try:
                 self.client.api_key = chosen_key
-                async for response in self._query_stream(
+                stream_options = {"request_max_retries": request_max_retries}
+                if stream_activity_callback is not None:
+                    stream_options["stream_activity_callback"] = stream_activity_callback
+                response_stream = self._query_stream(
                     payloads,
                     func_tool,
-                    request_max_retries=request_max_retries,
-                ):
-                    yield response
+                    **stream_options,
+                )
+                try:
+                    async for response in response_stream:
+                        yield response
+                finally:
+                    await response_stream.aclose()
                 return
             except Exception as e:
                 last_exception = e

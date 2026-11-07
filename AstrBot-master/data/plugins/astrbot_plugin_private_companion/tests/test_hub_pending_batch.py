@@ -609,6 +609,42 @@ class HubPendingBatchTests(unittest.IsolatedAsyncioTestCase):
 
         await self.plugin.settle_pending_message_debounce(first, None)
 
+    async def test_intermediate_send_keeps_pending_until_final_model_reply(self) -> None:
+        # 工具调用轮可能没有正文，也可能先发送一句说明；两种都不是任务收尾。
+        for prefix in ("", "我查一下后台任务。"):
+            with self.subTest(prefix=prefix):
+                first = Event("确认任务开始了吗", "m-query")
+                first.send = AsyncMock(return_value=None)
+                self.plugin._install_reaction_expression_delivery_tracker = lambda *_: None
+                self.plugin._reaction_expression_primary_reply_confirmed = lambda _: bool(prefix)
+                self.plugin._message_debounce_mark_llm_pending(first)
+                key = self.plugin._message_debounce_pending_key(first)
+
+                # 对应run_agent工具轮的after_message_sent，最终on_llm_response尚未触发。
+                await self.plugin.confirm_pending_message_debounce_after_send(first)
+                self.assertIn(key, self.plugin._message_debounce_pending_llm)
+                self.assertIn("m-query", self.plugin._message_debounce_pending_llm[key]["active_events"])
+
+                response = SimpleNamespace(completion_text="任务已启动，正在处理文档。")
+                await self.plugin.settle_pending_message_debounce(first, response)
+                self.assertEqual("任务已启动，正在处理文档。", response.completion_text)
+                await first.send(SimpleNamespace(chain=[response.completion_text]))
+                self.plugin._reaction_expression_primary_reply_confirmed = lambda _: True
+                await self.plugin.confirm_pending_message_debounce_after_send(first)
+                self.assertNotIn(key, self.plugin._message_debounce_pending_llm)
+
+    async def test_repeated_tool_send_hooks_do_not_invalidate_later_answer(self) -> None:
+        first = Event("查询任务和最近结果", "m-many-tools")
+        self.plugin._message_debounce_mark_llm_pending(first)
+        key = self.plugin._message_debounce_pending_key(first)
+        self.plugin._reaction_expression_primary_reply_confirmed = lambda _: False
+        for _ in range(3):
+            await self.plugin.confirm_pending_message_debounce_after_send(first)
+        response = SimpleNamespace(completion_text="已查询，后台仍在运行。")
+        await self.plugin.settle_pending_message_debounce(first, response)
+        self.assertEqual("已查询，后台仍在运行。", response.completion_text)
+        self.assertIn(key, self.plugin._message_debounce_pending_llm)
+
     async def test_failed_send_releases_pending_without_marking_delivered(self) -> None:
         first = Event("小七在吗", "m1")
         self.plugin._message_debounce_mark_llm_pending(first)

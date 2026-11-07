@@ -47,6 +47,7 @@ from astrbot.core.provider.modalities import (
     sanitize_contexts_by_modalities,
 )
 from astrbot.core.provider.provider import Provider
+from astrbot.core.provider.streaming import iter_model_response
 
 from ..context.compressor import ContextCompressor
 from ..context.config import ContextConfig
@@ -583,7 +584,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             # For primary provider we keep explicit model selection if provided.
             payload["model"] = self.req.model
         if self.streaming:
-            stream = self.provider.text_chat_stream(**payload)
+            stream = iter_model_response(self.provider, **payload)
             try:
                 while True:
                     try:

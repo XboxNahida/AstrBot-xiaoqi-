@@ -4637,6 +4637,8 @@ Provider 规则：{emotion_rule}
             )
             async def request_text_chat():
                 request_kwargs: dict[str, Any] = {"prompt": prompt}
+                if timeout is not None:
+                    request_kwargs["timeout"] = timeout
                 if stable_system_prompt:
                     request_kwargs["system_prompt"] = stable_system_prompt
                 if max_tokens and max_tokens > 0:
@@ -4658,7 +4660,7 @@ Provider 规则：{emotion_rule}
 
             try:
                 request_call = request_text_chat()
-                resp = await asyncio.wait_for(request_call, timeout=timeout) if timeout is not None else await request_call
+                resp = await request_call if timeout is not None else await request_call
             except asyncio.TimeoutError as exc:
                 raise TimeoutError(f"TTS 文本模型超过 {timeout:.0f} 秒未返回") from exc
             elapsed_ms = int((time.time() - start) * 1000)

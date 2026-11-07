@@ -3505,17 +3505,14 @@ class CommandHandlersMixin:
                 answer_timeout = None
         answer_timeout = max(15.0, min(180.0, float(answer_timeout or 45.0)))
         try:
-            raw = await asyncio.wait_for(
-                caller(
+            raw = await caller(
                     prompt,
                     max_tokens=1400,
                     provider_id=provider_id,
                     task="companion_manual_diagnosis",
                     timeout_key="TROUBLESHOOTING_PROVIDER_ID",
                     timeout_seconds=answer_timeout,
-                ),
-                timeout=answer_timeout + 3.0,
-            )
+                )
         except asyncio.TimeoutError:
             logger.info("[PrivateCompanion] 陪伴答疑模型诊断超时,回退本地说明: question=%s", _single_line(question, 120))
             return ""

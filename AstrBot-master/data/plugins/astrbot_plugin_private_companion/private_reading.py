@@ -4,7 +4,6 @@ PrivateReadingMixin — 从 main.py 重新拆分出的私密阅读/书架
 """
 from __future__ import annotations
 
-import asyncio
 import base64
 import gc
 import hashlib
@@ -847,8 +846,8 @@ class PrivateReadingMixin:
                         if callable(timeout_getter)
                         else None
                     )
-                    request_call = provider.text_chat(prompt=prompt, image_urls=image_urls)
-                    result = await asyncio.wait_for(request_call, timeout=timeout) if timeout is not None else await request_call
+                    request_call = provider.text_chat(prompt=prompt, image_urls=image_urls, timeout=timeout)
+                    result = await request_call if timeout is not None else await request_call
                     text = str(getattr(result, "completion_text", result) or "").strip()
                     self._record_llm_usage(
                         provider_id=provider_id,

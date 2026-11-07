@@ -7629,15 +7629,11 @@ Character-specific bottom-line baseline (reference only; empty means use the con
         if timeout_override is not None:
             timeout_seconds = float(timeout_override)
         try:
-            raw = await asyncio.wait_for(
-                self._llm_call(
+            raw = await self._llm_call(
                     prompt,
                     max_tokens=100,
                     provider_id=provider_id,
-                    task="smart_silence",
-                ),
-                timeout=timeout_seconds,
-            ) or ""
+                    task="smart_silence", timeout_seconds=timeout_seconds) or ""
         except asyncio.TimeoutError:
             result = {"decision": "send", "reason": f"timeout>{timeout_seconds:.1f}s", "confidence": 0.0, "source": "timeout"}
             cache[cache_key] = {"ts": now, "result": result}

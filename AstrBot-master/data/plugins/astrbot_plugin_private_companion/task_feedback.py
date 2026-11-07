@@ -1,6 +1,5 @@
 """仅在持久任务异常时唤起前台，允许查证并纠正原任务。"""
 
-import asyncio
 import json
 
 import jsonschema
@@ -71,13 +70,12 @@ async def render_error_feedback(runtime, provider, job, **request):
             current = runtime.service.get(job.task_id, job.scope)
             if current is None or current.status in {"cancelled", "paused"}:
                 return FeedbackText("")
-            response = await asyncio.wait_for(
-                provider.text_chat(prompt=prompt, contexts=contexts, func_tool=tools, **request),
-                timeout=60,
-            )
-            if getattr(response, "role", "") != "assistant":
-                raise ValueError("invalid_feedback_response")
+            response = await provider.text_chat(prompt=prompt, contexts=contexts, func_tool=tools, **request, timeout=60)
             calls = getattr(response, "tools_call_name", [])
+            role = getattr(response, "role", "")
+            # 核心OpenAI适配器以tool标记模型工具调用；它仍是本轮模型的有效响应。
+            if role not in {"assistant", "tool"} or (role == "tool" and not calls):
+                raise ValueError("invalid_feedback_response")
             if not calls:
                 return FeedbackText(
                     runtime._safe_text(getattr(response, "completion_text", ""), 4000),

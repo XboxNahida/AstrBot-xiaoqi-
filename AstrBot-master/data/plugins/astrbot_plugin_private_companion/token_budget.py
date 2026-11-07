@@ -1328,17 +1328,19 @@ class TokenBudgetMixin:
                     timeout_key=provider_key or str(timeout_key or ""),
                     timeout_seconds=timeout_seconds,
                 )
+                if effective_timeout is not None:
+                    kwargs["timeout"] = min(effective_timeout, 60.0)
                 request_call = self.context.llm_generate(**kwargs)
                 try:
                     response = (
-                        await asyncio.wait_for(request_call, timeout=effective_timeout)
+                        await request_call
                         if effective_timeout is not None
                         else await request_call
                     )
                 except asyncio.TimeoutError as exc:
                     if effective_timeout is None:
                         raise TimeoutError(f"模型任务 {task_key} 调用超时") from exc
-                    raise TimeoutError(f"模型任务 {task_key} 超过 {effective_timeout:.0f} 秒未返回") from exc
+                    raise TimeoutError(f"模型任务 {task_key} 连续 {min(effective_timeout or 60, 60):.0f} 秒无分片或单次请求超过600秒") from exc
 
                 completion = str(getattr(response, "completion_text", "") or "").strip()
                 usage_completion = self._llm_tool_response_for_usage(response, completion)
@@ -1440,6 +1442,7 @@ class TokenBudgetMixin:
         timeout_seconds: float | None = None,
         token_limit: int | float | None = None,
         strict_provider: bool = False,
+        hub_request_attempts: dict[str, int] | None = None,
     ) -> str | None:
         selected_provider = self._resolve_chat_provider_id(provider_id)
         peak_router = getattr(self, "_apply_deepseek_peak_replacement", None)
@@ -1486,7 +1489,21 @@ class TokenBudgetMixin:
         candidates = ([fallback_provider] if token_routed else [selected_provider])
         if not token_routed and fallback_provider:
             candidates.append(fallback_provider)
+        is_hub = str(timeout_key or "") == "CONVERSATION_HUB_PROVIDER_ID"
+        hub_attempts = hub_request_attempts if hub_request_attempts is not None else {}
+        if is_hub:
+            # Budget by actual provider, shared with structural correction;
+            # never mutate the provider shared by chat and task requests.
+            candidates = [candidate for candidate in candidates for _ in range(3)]
         for attempt_index, attempt_provider in enumerate(candidates):
+            if is_hub:
+                if hub_attempts.get(attempt_provider, 0) >= 3:
+                    continue
+                hub_attempts[attempt_provider] = hub_attempts.get(attempt_provider, 0) + 1
+                logger.info(
+                    "[PrivateCompanion] 中枢流式请求: provider=%s attempt=%s/3 idle_timeout_max=30s total_boundary=600s",
+                    _single_line(attempt_provider, 120), hub_attempts[attempt_provider],
+                )
             start = time.time()
             resp = None
             try:
@@ -1503,14 +1520,19 @@ class TokenBudgetMixin:
                     timeout_key=provider_key or str(timeout_key or ""),
                     timeout_seconds=timeout_seconds,
                 )
+                if is_hub:
+                    effective_timeout = min(effective_timeout or 30.0, 30.0)
+                    kwargs.update(timeout=effective_timeout, request_max_retries=1)
+                if effective_timeout is not None:
+                    kwargs["timeout"] = min(effective_timeout, 60.0)
                 try:
                     request_call = self.context.llm_generate(**kwargs)
                     if effective_timeout is not None:
-                        resp = await asyncio.wait_for(request_call, timeout=effective_timeout)
+                        resp = await request_call
                     else:
                         resp = await request_call
                 except asyncio.TimeoutError as exc:
-                    raise TimeoutError(f"模型任务 {task_key} 超过 {effective_timeout:.0f} 秒未返回") from exc
+                    raise TimeoutError(f"模型任务 {task_key} 连续 {min(effective_timeout or 60, 60):.0f} 秒无分片或单次请求超过600秒") from exc
                 if resp and resp.completion_text:
                     completion = resp.completion_text.strip()
                     if completion:
@@ -1537,7 +1559,7 @@ class TokenBudgetMixin:
                             )
                             if attempt_index + 1 < len(candidates):
                                 logger.warning(
-                                    "[PrivateCompanion] 主模型返回 Provider 错误响应,尝试卡片备用模型: task=%s card=%s primary=%s fallback=%s kind=%s",
+                                    "[PrivateCompanion] 模型返回 Provider 错误响应,尝试下一次请求: task=%s card=%s provider=%s next=%s kind=%s",
                                     _single_line(task_key, 80) or "unknown",
                                     provider_key or "unknown",
                                     _single_line(attempt_provider, 120),
@@ -1562,7 +1584,7 @@ class TokenBudgetMixin:
                             resp=resp,
                             budget_exempt=budget_exempt,
                         )
-                        if attempt_index > 0 or token_routed:
+                        if (attempt_index > 0 and attempt_provider != selected_provider) or token_routed:
                             logger.info(
                                 "[PrivateCompanion] 备用模型调用成功: task=%s card=%s provider=%s estimated_tokens=%s",
                                 _single_line(task_key, 80) or "unknown",
@@ -1584,7 +1606,7 @@ class TokenBudgetMixin:
                 )
                 if attempt_index + 1 < len(candidates):
                     logger.warning(
-                        "[PrivateCompanion] 主模型返回空结果,尝试卡片备用模型: task=%s card=%s primary=%s fallback=%s",
+                        "[PrivateCompanion] 模型返回空结果,尝试下一次请求: task=%s card=%s provider=%s next=%s",
                         _single_line(task_key, 80) or "unknown",
                         provider_key or "unknown",
                         _single_line(attempt_provider, 120),
@@ -1603,7 +1625,7 @@ class TokenBudgetMixin:
                 )
                 if attempt_index + 1 < len(candidates):
                     logger.warning(
-                        "[PrivateCompanion] 主模型调用失败,尝试卡片备用模型: task=%s card=%s primary=%s fallback=%s error=%s",
+                        "[PrivateCompanion] 模型调用失败,尝试下一次请求: task=%s card=%s provider=%s next=%s error=%s",
                         _single_line(task_key, 80) or "unknown",
                         provider_key or "unknown",
                         _single_line(attempt_provider, 120) or "default",

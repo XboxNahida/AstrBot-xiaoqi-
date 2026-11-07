@@ -120,7 +120,7 @@ class HubOptimizationTests(unittest.IsolatedAsyncioTestCase):
                     )
                 else:
                     results = [await self.call(plugin, "m1")]
-                self.assertEqual(["hub", "gemini"], plugin.context.calls)
+                self.assertEqual(["hub"] * 3 + ["gemini"], plugin.context.calls)
                 self.assertTrue(
                     all(json.loads(result)["reply"] is False for result in results)
                 )
@@ -133,6 +133,37 @@ class HubOptimizationTests(unittest.IsolatedAsyncioTestCase):
             self.call(plugin, "m3", session="bot1:g2"),
         )
         self.assertEqual(3, plugin._llm_call.await_count)
+
+    async def test_structural_correction_shares_each_models_three_attempts(self):
+        from astrbot_plugin_private_companion.capability_hub import judge_capabilities
+        from astrbot_plugin_private_companion.tests.test_model_fallback import (
+            _FallbackHarness,
+        )
+
+        for batchable in (False, True):
+            with self.subTest(batchable=batchable):
+                plugin = _FallbackHarness({"primary": "invalid JSON", "backup": RuntimeError("down")})
+                original_generate = plugin.context.llm_generate
+                async def generate(**kwargs):
+                    result = await original_generate(**kwargs)
+                    plugin.context.responses["primary"] = RuntimeError("down")
+                    return result
+                plugin.context.llm_generate = generate
+                plugin.model_fallback_overrides = {"CONVERSATION_HUB_PROVIDER_ID": "backup"}
+                plugin.enable_hub_group_batching = batchable
+                plugin.hub_group_batch_seconds = 0
+                async def judge(identity):
+                    return await judge_capabilities(
+                        plugin, self.context(), available_capabilities=(),
+                        scene={"message_id": identity},
+                    )
+                results = await asyncio.gather(judge("m1"), judge("m2")) if batchable else [await judge("m1")]
+                self.assertTrue(all(result is None for result in results))
+                # Batch transport is shared; each message's correction retains
+                # the consumed transport attempts, rather than starting at zero.
+                self.assertEqual(plugin.context.calls.count("primary"), 5 if batchable else 3)
+                self.assertEqual(plugin.context.calls.count("backup"), 6 if batchable else 3)
+
 
     async def test_explicit_wakeup_and_task_controls_bypass_batch(self):
         for scene, text in [

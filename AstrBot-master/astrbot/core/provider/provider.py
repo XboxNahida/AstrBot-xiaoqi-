@@ -205,10 +205,7 @@ class Provider(AbstractProvider):
         return dicts
 
     async def test(self, timeout: float = 45.0) -> None:
-        await asyncio.wait_for(
-            self.text_chat(prompt="REPLY `PONG` ONLY"),
-            timeout=timeout,
-        )
+        await self.text_chat(prompt="REPLY `PONG` ONLY", timeout=timeout)
 
 
 class STTProvider(AbstractProvider):

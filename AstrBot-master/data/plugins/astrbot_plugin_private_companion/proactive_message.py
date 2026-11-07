@@ -5591,15 +5591,11 @@ Output:
         if timeout_override is not None:
             timeout_seconds = float(timeout_override)
         try:
-            raw = await asyncio.wait_for(
-                self._llm_call(
+            raw = await self._llm_call(
                     prompt,
                     max_tokens=220,
                     provider_id=review_provider_id,
-                    task="proactive_send_review",
-                ),
-                timeout=timeout_seconds,
-            )
+                    task="proactive_send_review", timeout_seconds=timeout_seconds)
         except Exception as exc:
             now = time.time()
             last_log_at = float(getattr(self, "_proactive_review_fallback_log_at", 0.0) or 0.0)

@@ -220,11 +220,11 @@ async def test_text_chat_wraps_string_system_prompt_as_list(monkeypatch):
 
     captured_payloads: dict[str, object] = {}
 
-    async def fake_query(payloads, tools, *, request_max_retries=None):
+    async def fake_query(payloads, tools, *, request_max_retries=None, stream_activity_callback=None):
         captured_payloads.update(payloads)
-        return LLMResponse(role="assistant", completion_text="ok")
+        yield LLMResponse(role="assistant", completion_text="ok")
 
-    monkeypatch.setattr(provider, "_query", fake_query)
+    monkeypatch.setattr(provider, "_query_stream", fake_query)
 
     await provider.text_chat(prompt="hello", system_prompt="You are helpful.")
 
@@ -247,11 +247,11 @@ async def test_text_chat_passes_through_list_system_prompt(monkeypatch):
 
     captured_payloads: dict[str, object] = {}
 
-    async def fake_query(payloads, tools, *, request_max_retries=None):
+    async def fake_query(payloads, tools, *, request_max_retries=None, stream_activity_callback=None):
         captured_payloads.update(payloads)
-        return LLMResponse(role="assistant", completion_text="ok")
+        yield LLMResponse(role="assistant", completion_text="ok")
 
-    monkeypatch.setattr(provider, "_query", fake_query)
+    monkeypatch.setattr(provider, "_query_stream", fake_query)
 
     structured_system = [
         {"type": "text", "text": "Persona block."},
@@ -664,6 +664,46 @@ class _FakeMessages:
     """模拟 AsyncAnthropic.messages 命名空间"""
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["complete", "truncated", "invalid_json"])
+async def test_anthropic_tool_stream_activity_completion_and_cleanup(monkeypatch, mode):
+    provider = _setup_provider_with_mock_client(monkeypatch)
+    activity = []
+    closed = []
+
+    class Events:
+        def __aiter__(self):
+            return self.events()
+
+        async def events(self):
+            yield SimpleNamespace(type="content_block_start", index=0,
+                                  content_block=SimpleNamespace(type="tool_use", id="call-1", name="read_file"))
+            for part in ('{"path":', '"test.txt"}'):
+                yield SimpleNamespace(type="content_block_delta", index=0,
+                                      delta=SimpleNamespace(type="input_json_delta", partial_json=part if mode != "invalid_json" else "{"))
+            if mode != "truncated":
+                yield SimpleNamespace(type="content_block_stop", index=0)
+                yield SimpleNamespace(type="message_stop")
+
+    class Manager:
+        async def __aenter__(self):
+            return Events()
+
+        async def __aexit__(self, *args):
+            closed.append(True)
+
+    monkeypatch.setattr(anthropic_source.anthropic, "AsyncMessageStream", Events)
+    provider.client.messages.stream = lambda **kwargs: Manager()
+    if mode == "complete":
+        result = await provider.text_chat(prompt="test", stream_activity_callback=lambda: activity.append(True))
+        assert result.tools_call_args == [{"path": "test.txt"}]
+        assert len(activity) == 5
+    else:
+        with pytest.raises(RuntimeError, match="incomplete"):
+            await provider.text_chat(prompt="test", stream_activity_callback=lambda: activity.append(True))
+    assert closed == [True]
+
+
 async def _capture_payloads_create(**kwargs):
     """捕获 payloads 并返回一个真实的 Message 实例"""
     from anthropic.types import Message, TextBlock, Usage
@@ -697,6 +737,28 @@ def _setup_provider_with_mock_client(monkeypatch) -> anthropic_source.ProviderAn
 
     fakeMessages = _FakeMessages()
     fakeMessages.create = _capture_payloads_create
+
+    class PayloadStream:
+        def __aiter__(self):
+            return self.events()
+
+        async def events(self):
+            yield SimpleNamespace(type="content_block_delta", delta=SimpleNamespace(type="text_delta", text="Hello"))
+            yield SimpleNamespace(type="message_stop")
+
+    class PayloadManager:
+        async def __aenter__(self):
+            return PayloadStream()
+        async def __aexit__(self, *args):
+            return False
+
+    def capture_stream(**kwargs):
+        _capture_payloads_create.last_kwargs = kwargs
+        return PayloadManager()
+
+    monkeypatch.setattr(anthropic_source.anthropic, "AsyncMessageStream", PayloadStream)
+    fakeMessages.stream = capture_stream
+
     provider.client.messages = fakeMessages
 
     return provider
@@ -727,7 +789,7 @@ async def test_query_handles_none_usage_when_content_filtered(monkeypatch):
     monkeypatch.setattr(anthropic_source, "Message", _FakeMessage)
     provider.client.messages.create = fake_create
 
-    llm_response = await provider.text_chat(prompt="test")
+    llm_response = await provider._query({"messages": [], "model": "claude-test"}, None)
 
     assert llm_response.completion_text == content_filter_message
     assert llm_response.usage is not None

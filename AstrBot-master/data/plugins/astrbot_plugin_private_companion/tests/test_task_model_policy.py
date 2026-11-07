@@ -18,7 +18,7 @@ except ImportError:
 def test_defaults_mean_three_total_requests():
     policy = request_policy({"primary": "gpt6", "fallback": "old-backup"})
     assert policy.provider_id == "gpt6"
-    assert policy.timeout_seconds == 120
+    assert policy.timeout_seconds == 60
     assert policy.max_attempts == 3
 
 
@@ -45,15 +45,16 @@ async def test_same_model_three_attempts_survive_restart_and_pass_sdk_timeout(tm
     })
     calls = []
 
-    async def text_chat(**kwargs):
+    async def text_chat_stream(**kwargs):
         calls.append(kwargs)
         raise TimeoutError("network fluctuation")
+        yield
 
     resolved = []
 
     def resolve(name):
         resolved.append(name)
-        return SimpleNamespace(text_chat=text_chat)
+        return SimpleNamespace(text_chat_stream=text_chat_stream)
 
     for attempt in range(1, 4):
         service = TaskService(path, clock=lambda: now[0])
@@ -70,7 +71,8 @@ async def test_same_model_three_attempts_survive_restart_and_pass_sdk_timeout(tm
         now[0] += 100
     assert service.claim("worker") is None
     assert resolved == ["gpt6"] * 3
-    assert all(call["timeout"] == 240 and call["request_max_retries"] == 0 for call in calls)
+    assert len(calls) == 3
+    assert all(call["timeout"] == 60 and call["request_max_retries"] == 1 for call in calls)
 
 
 def test_one_attempt_does_not_retry(tmp_path):

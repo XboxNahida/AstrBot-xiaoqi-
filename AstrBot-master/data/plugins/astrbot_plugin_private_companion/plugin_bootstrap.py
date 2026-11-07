@@ -527,7 +527,7 @@ def _initialize_world_and_model_config(self: Any, c: Any) -> None:
     self.conversation_chat_fallback_provider_id = self._cfg_str(c, "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "")
     self.conversation_task_provider_id = self._cfg_str(c, "CONVERSATION_TASK_PROVIDER_ID", "openai/gpt-6-sol") or "openai/gpt-6-sol"
     self.conversation_task_fallback_provider_id = ""  # 旧配置保留，后台不自动切换模型。
-    self.task_model_timeout_seconds = max(1, self._cfg_int(c, "task_model_timeout_seconds", 120))
+    self.task_model_timeout_seconds = min(60, max(1, self._cfg_int(c, "task_model_timeout_seconds", 120)))
     self.task_model_max_attempts = max(1, self._cfg_int(c, "task_model_max_attempts", 3))
     self.conversation_hub_provider_id = self._cfg_str(c, "CONVERSATION_HUB_PROVIDER_ID", "")
     self.enable_hub_group_batching = self._cfg_bool(c, "enable_hub_group_batching", True)

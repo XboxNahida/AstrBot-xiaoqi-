@@ -187,6 +187,17 @@ def try_capture_follow_up(event: AstrMessageEvent) -> FollowUpCapture | None:
     if not active_sender_id or active_sender_id != sender_id:
         return None
 
+    target_run_id = str(getattr(getattr(runner_event, "message_obj", None), "message_id", "") or "")
+    merged_messages = getattr(event, "_private_companion_hub_batch_messages", ())
+    if target_run_id and any(
+        isinstance(item, dict) and str(item.get("event_id", "")) == target_run_id
+        for item in merged_messages
+    ):
+        # 中枢已让新事件替代旧事件，旧runner的回复会被过期保护丢弃。
+        # 不再把新事件交给旧runner后停掉它，否则两个事件都无法回复。
+        logger.info("Hub replacement kept as an independent request, umo=%s", event.unified_msg_origin)
+        return None
+
     if runner_event.get_extra("agent_stop_requested"):
         return None
 
@@ -212,9 +223,7 @@ def try_capture_follow_up(event: AstrMessageEvent) -> FollowUpCapture | None:
         ticket=ticket,
         order_seq=order_seq,
         monitor_task=monitor_task,
-        target_run_id=str(runner_event.message_obj.message_id)
-        if getattr(runner_event.message_obj, "message_id", None) is not None
-        else None,
+        target_run_id=target_run_id or None,
     )
 
 

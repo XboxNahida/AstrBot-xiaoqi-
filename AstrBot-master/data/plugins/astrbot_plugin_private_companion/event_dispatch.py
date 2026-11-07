@@ -3713,6 +3713,8 @@ class EventDispatchMixin:
                 or getattr(resp, "result_chain", None)
             )
             if has_reply:
+                # on_llm_response来自最终on_agent_done；工具轮的分段发送尚未收尾。
+                event._private_companion_hub_final_response_ready = True
                 installer = getattr(
                     self, "_install_reaction_expression_delivery_tracker", None
                 )
@@ -3756,6 +3758,10 @@ class EventDispatchMixin:
             event: Event whose response reached the send stage.
         """
         if not bool(getattr(self, "_central_hub_scheduler_enabled", False)):
+            return
+        # after_message_sent也会在工具轮的空正文/前置说明后触发。
+        # 最终模型回复尚未就绪时保留同一事件，防止后续回答被当成过期回复。
+        if not getattr(event, "_private_companion_hub_final_response_ready", False):
             return
         key = self._message_debounce_pending_key(event)
         store = self._message_debounce_pending_store()
@@ -4316,15 +4322,11 @@ class EventDispatchMixin:
         if timeout_override is not None:
             timeout_seconds = float(timeout_override)
         try:
-            raw = await asyncio.wait_for(
-                self._llm_call(
+            raw = await self._llm_call(
                     prompt,
                     max_tokens=80,
                     provider_id=debounce_provider_id or None,
-                    task="smart_message_debounce",
-                ),
-                timeout=timeout_seconds,
-            ) or ""
+                    task="smart_message_debounce", timeout_seconds=timeout_seconds) or ""
         except asyncio.TimeoutError:
             logger.info(
                 "[PrivateCompanion] 智能防抖模型判断超时,使用启发式: scope=%s sender=%s timeout=%.1fs text=%s",

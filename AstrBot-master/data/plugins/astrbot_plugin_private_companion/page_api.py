@@ -2264,8 +2264,8 @@ class PrivateCompanionPageApi(
             try:
                 timeout_getter = getattr(self.plugin, "_private_image_provider_timeout_seconds", None)
                 timeout = float(timeout_getter(provider_id, provider_source)) if callable(timeout_getter) else 30.0
-                request_call = provider.text_chat(prompt=prompt, image_urls=image_urls)
-                result = await asyncio.wait_for(request_call, timeout=timeout) if timeout > 0 else await request_call
+                request_call = provider.text_chat(prompt=prompt, image_urls=image_urls, timeout=timeout)
+                result = await request_call if timeout > 0 else await request_call
                 completion = str(getattr(result, "completion_text", result) or "").strip()
                 parsed = self._parse_reaction_library_analysis(completion, items)
                 if not parsed:
@@ -14019,16 +14019,12 @@ class PrivateCompanionPageApi(
                 max_tokens = max(1200, min(2400, 380 + len(batch_specs) * 300))
                 local_repair_provider_id = ""
                 try:
-                    raw = await asyncio.wait_for(
-                        caller(
+                    raw = await caller(
                             user_prompt,
                             max_tokens=max_tokens,
                             provider_id=provider_id,
                             task=f"persona_style_scenarios_batch_{batch_index}",
-                            system_prompt=system_prompt,
-                        ),
-                        timeout=batch_timeout,
-                    )
+                            system_prompt=system_prompt, timeout_seconds=batch_timeout)
                     if raw is None:
                         raise ValueError("模型调用返回空结果")
                     try:
@@ -14038,16 +14034,12 @@ class PrivateCompanionPageApi(
                         if not local_repair_provider_id:
                             raise parse_exc
                         repair_system, repair_user = self._persona_style_scenarios_repair_prompt(raw)
-                        repair_raw = await asyncio.wait_for(
-                            caller(
+                        repair_raw = await caller(
                                 repair_user,
                                 max_tokens=max(800, min(1400, max_tokens)),
                                 provider_id=local_repair_provider_id,
                                 task=f"persona_style_scenarios_json_repair_{batch_index}",
-                                system_prompt=repair_system,
-                            ),
-                            timeout=8.0,
-                        )
+                                system_prompt=repair_system, timeout_seconds=8.0)
                         if repair_raw is None:
                             raise ValueError("修复模型返回空结果")
                         parsed = self._loads_json_object(repair_raw)
@@ -15415,10 +15407,9 @@ class PrivateCompanionPageApi(
                 call = provider.text_chat(
                     prompt="这是视觉 Provider 图片输入测试。请观察所附图片，并只回复两个字：正常",
                     image_urls=[self._vision_provider_test_image_data_url()],
-                    max_tokens=16,
-                )
+                    max_tokens=16, timeout=visual_timeout)
                 try:
-                    response = await asyncio.wait_for(call, timeout=visual_timeout) if visual_timeout > 0 else await call
+                    response = await call if visual_timeout > 0 else await call
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -23143,7 +23134,7 @@ class PrivateCompanionPageApi(
 
     def _apply_config_value(self, key: str, value: Any, overrides: dict[str, Any] | None = None) -> None:
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
-            setattr(self.plugin, key, max(1, int(value)))
+            setattr(self.plugin, key, min(60, max(1, int(value))) if key == "task_model_timeout_seconds" else max(1, int(value)))
             return
         if key == "CONVERSATION_TASK_FALLBACK_PROVIDER_ID":
             self.plugin.conversation_task_fallback_provider_id = ""

@@ -140,6 +140,7 @@ async def call_hub_model(
     provider_id: str,
     max_tokens: int,
     persona_revision: str = "",
+    hub_request_attempts: dict[str, int] | None = None,
 ) -> str | None:
     """Batch ambient judgments while returning an independent result per event.
 
@@ -156,6 +157,7 @@ async def call_hub_model(
     Returns:
         Original per-event JSON, or None for a missing or invalid batch result.
     """
+    attempts = hub_request_attempts if hub_request_attempts is not None else {}
     identity = str(scene.get("message_id") or "")
     explicit = scene.get("trigger") in {
         "at_bot",
@@ -188,6 +190,7 @@ async def call_hub_model(
             provider_id=provider_id,
             task="astrbot_reply",
             timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+            hub_request_attempts=attempts,
         )
     batches = getattr(plugin, "_hub_group_batches", None)
     if not isinstance(batches, dict):
@@ -224,6 +227,7 @@ async def call_hub_model(
                         provider_id=provider_id,
                         task="astrbot_reply",
                         timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+                        hub_request_attempts=item["attempts"],
                     )
                     if not item["future"].done():
                         item["future"].set_result(raw)
@@ -248,13 +252,20 @@ async def call_hub_model(
                     "每项沿用上文的全部路由/情绪/工具字段；每个消息ID恰好一次。每条的身份和platform_scene以该条facts为准。\n"
                     + json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
                 )
+                shared_attempts = {
+                    provider: max(item["attempts"].get(provider, 0) for item in items)
+                    for item in items for provider in item["attempts"]
+                }
                 raw = await plugin._llm_call(
                     batch_prompt,
                     max_tokens=min(2400, max_tokens * len(items)),
                     provider_id=provider_id,
                     task="astrbot_reply",
                     timeout_key="CONVERSATION_HUB_PROVIDER_ID",
+                    hub_request_attempts=shared_attempts,
                 )
+                for item in items:
+                    item["attempts"].update(shared_attempts)
                 try:
                     clean = re.sub(
                         r"^```(?:json)?\s*|\s*```$",
@@ -321,6 +332,7 @@ async def call_hub_model(
             "payload": deepcopy(payload),
             "prompt": prompt,
             "future": future,
+            "attempts": attempts,
         }
     )
     try:

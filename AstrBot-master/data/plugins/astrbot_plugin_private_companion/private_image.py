@@ -1689,10 +1689,7 @@ class PrivateImageMixin:
                         error="model_token_limit_exceeded",
                     )
                     continue
-                result = await asyncio.wait_for(
-                    provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=80),
-                    timeout=max(3.0, min(float(getattr(self, "group_nsfw_image_review_timeout_seconds", 8.0) or 8.0), 30.0)),
-                )
+                result = await provider.text_chat(prompt=prompt, image_urls=image_urls, max_tokens=80, timeout=max(3.0, min(float(getattr(self, "group_nsfw_image_review_timeout_seconds", 8.0) or 8.0), 30.0)))
                 raw_text = str(getattr(result, "completion_text", result) or "").strip()
                 payload = self._extract_json_payload(raw_text) if callable(getattr(self, "_extract_json_payload", None)) else {}
                 label_source = payload.get("label") if isinstance(payload, dict) else raw_text
@@ -2829,6 +2826,7 @@ class PrivateImageMixin:
         task_name: str = "private_image_vision",
         log_subject: str = "私聊图片",
         namespace: str = "private_vision",
+        idle_timeout_seconds: float | None = None,
     ) -> str:
         clean_cache_scope = _single_line(cache_scope, 40)
         clean_task_name = _single_line(task_name, 80) or "private_image_vision"
@@ -3048,9 +3046,11 @@ class PrivateImageMixin:
                     )
                     continue
                 attempt_timeout = self._private_image_provider_timeout_seconds(provider_id, provider_source)
-                request_call = provider.text_chat(prompt=prompt, image_urls=image_urls)
+                if idle_timeout_seconds is not None and idle_timeout_seconds > 0:
+                    attempt_timeout = min(attempt_timeout or idle_timeout_seconds, idle_timeout_seconds)
+                request_call = provider.text_chat(prompt=prompt, image_urls=image_urls, timeout=attempt_timeout)
                 result = (
-                    await asyncio.wait_for(request_call, timeout=attempt_timeout)
+                    await request_call
                     if attempt_timeout > 0
                     else await request_call
                 )
@@ -3979,10 +3979,9 @@ class PrivateImageMixin:
             clean_sources,
             umo=umo,
             force_refresh=force_refresh,
+            idle_timeout_seconds=wait_seconds or None,
         )
         try:
-            if wait_seconds > 0:
-                return _single_line(await asyncio.wait_for(task, timeout=wait_seconds), self._private_image_vision_text_limit(len(clean_sources)))
             return _single_line(await task, self._private_image_vision_text_limit(len(clean_sources)))
         except asyncio.TimeoutError:
             logger.warning("[PrivateCompanion] 上下文图片补全等待超时: images=%s timeout=%.1fs", len(clean_sources), wait_seconds)
