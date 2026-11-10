@@ -1085,6 +1085,24 @@ async def test_hub_chat_filter_does_not_hide_safe_registry_tools(runtime):
 
 
 @pytest.mark.asyncio
+async def test_background_search_can_use_enabled_anysearch_tools(runtime):
+    names = ("anysearch_search", "anysearch_extract", "anysearch_batch_search")
+    tools = [FunctionTool(name=n, description=n, parameters={"type": "object"}) for n in names]
+    runtime.test_tools.extend(tools)
+    e = event(mid="anysearch-task")
+    register(runtime, e)
+    created = await runtime.submit(e, {"goal": "查询官方资料并整理"})
+    task = runtime.service.get(created["task_id"], runtime.scope(e))
+
+    assert set(names).issubset(task.metadata["request"]["tool_names"])
+    registry = runtime.resolve_tools(task, list(names))
+    assert set(registry) == set(names)
+    assert all(runtime.authorize_tool(task, t, {"query": "official docs"}) for t in tools)
+    tools[0].active = False
+    assert "anysearch_search" not in runtime.resolve_tools(task, list(names))
+
+
+@pytest.mark.asyncio
 async def test_gemini_music_task_has_search_and_final_delivery_tools(runtime):
     runtime.test_tools.extend(
         FunctionTool(name=name, description=name, parameters={"type": "object"})

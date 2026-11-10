@@ -1330,6 +1330,28 @@ class CapabilityGuidanceInjectionTests(unittest.IsolatedAsyncioTestCase):
         gate_request_search_tools(schedule_approved)
         self.assertEqual(["future_task", "safe_tool"], [tool.name for tool in schedule_approved.func_tool.tools])
 
+    async def test_chat_managed_search_does_not_need_hub_action(self) -> None:
+        from astrbot.core.agent.tool import FunctionTool, ToolSet
+
+        tools = ToolSet()
+        for name in ("web_search_tavily", "tavily_extract_web_page", "find_music", "future_task"):
+            tools.add_tool(FunctionTool(
+                name=name, description=name,
+                parameters={"type": "object", "properties": {}},
+            ))
+        request = SimpleNamespace(
+            func_tool=tools,
+            _private_companion_chat_search_managed=True,
+            _private_companion_capability_decision=SimpleNamespace(actions=()),
+        )
+
+        gate_request_search_tools(request)
+
+        self.assertIsNotNone(tools.get_tool("web_search_tavily"))
+        self.assertIsNotNone(tools.get_tool("tavily_extract_web_page"))
+        self.assertIsNone(tools.get_tool("find_music"))
+        self.assertIsNone(tools.get_tool("future_task"))
+
     async def test_injects_same_group_recent_messages_and_image_summary(self) -> None:
         previous_ts = datetime.now(timezone.utc).timestamp() - 30
         plugin = SimpleNamespace(

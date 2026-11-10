@@ -117,6 +117,55 @@ class ConversationRouteTests(unittest.TestCase):
                 self.assertIsNone(req.func_tool)
                 self.assertNotIn("astr_kb_search", req.system_prompt)
 
+    def test_chat_can_search_and_read_web_pages_with_its_current_model(self):
+        from astrbot.core.agent.tool import FunctionTool, ToolSet
+        from astrbot.core.tools.web_search_tools import WEB_SEARCH_TOOL_NAMES
+        from astrbot_plugin_private_companion.passive_state_pipeline import gate_request_search_tools
+
+        for name in (*WEB_SEARCH_TOOL_NAMES, "anysearch_search", "anysearch_extract", "anysearch_batch_search"):
+            with self.subTest(name=name):
+                tools = ToolSet()
+                search = FunctionTool(name=name, description=name, parameters={"type": "object", "properties": {}})
+                tools.add_tool(search)
+                tools.add_tool(FunctionTool(name="pc_task_run_command", description="Run a task command", parameters={"type": "object", "properties": {}}))
+                decision = CapabilityDecision(True, "text", "neutral", (), False, "test", route="chat")
+                self.event._private_companion_capability_decision = decision
+                req = ProviderRequest(prompt="查一下官网的最新消息", system_prompt="当前人格：小七", func_tool=tools)
+                req._private_companion_capability_decision = decision
+                req._private_companion_chat_search_managed = True
+
+                gate_request_search_tools(req)
+                route.configure_conversation_request(self.plugin, self.event, req)
+
+                self.assertIs(search, req.func_tool.get_tool(name))
+                self.assertIsNone(req.func_tool.get_tool("pc_task_run_command"))
+                self.assertEqual("gemini", req.provider_id)
+                self.assertEqual(["grok"], req.fallback_provider_ids)
+                self.assertIsNone(req.model)
+                self.assertEqual((), req.required_tool_names)
+                self.assertTrue(req.system_prompt.startswith("当前人格：小七"))
+                self.assertIn("【按需联网查看】", req.system_prompt)
+                self.assertIn("当前聊天模型", req.system_prompt)
+                self.assertIn("pc_submit_task_intent", req.system_prompt)
+
+    def test_chat_does_not_restore_disabled_or_missing_web_tools(self):
+        from astrbot.core.agent.tool import FunctionTool, ToolSet
+
+        for present in (False, True):
+            with self.subTest(present=present):
+                tools = ToolSet()
+                if present:
+                    tool = FunctionTool(name="web_search_tavily", description="Search", parameters={"type": "object", "properties": {}})
+                    tool.active = False
+                    tools.add_tool(tool)
+                req = ProviderRequest(prompt="你好", func_tool=tools)
+                self.event._private_companion_capability_decision = CapabilityDecision(True, "text", "neutral", (), False, "test", route="chat")
+
+                route.configure_conversation_request(self.plugin, self.event, req)
+
+                self.assertIsNone(req.func_tool)
+                self.assertNotIn("【按需联网查看】", req.system_prompt)
+
     def test_route_diagnostics_use_astrbot_logger(self):
         with self.assertLogs("astrbot", level="INFO") as captured:
             self.request("task")
@@ -822,6 +871,7 @@ class ConversationHookTests(unittest.IsolatedAsyncioTestCase):
                     judge,
                 ):
                     await append_capability_guidance(plugin, event, req)
+                    self.assertTrue(req._private_companion_chat_search_managed)
                     gate_request_search_tools(req)
                     await append_capability_guidance(plugin, event, req)
                 self.assertEqual(

@@ -49,13 +49,16 @@ def _inline_hub_quotes(event: Any) -> list[dict[str, str]]:
 
 
 def gate_request_search_tools(req: Any) -> None:
-    """Hide web, music, or scheduling tools unless approved by the hub."""
+    """Keep chat-managed web search; gate legacy external actions by the hub."""
     decision = getattr(req, "_private_companion_capability_decision", None)
     tool_set = getattr(req, "func_tool", None)
     remove_tool = getattr(tool_set, "remove_tool", None)
     if not callable(remove_tool):
         return
-    search_allowed = decision_action_allowed(decision, "search")
+    search_allowed = (
+        getattr(req, "_private_companion_chat_search_managed", False) is True
+        or decision_action_allowed(decision, "search")
+    )
     music_allowed = decision_action_allowed(decision, "music")
     schedule_allowed = decision_action_allowed(decision, "schedule")
     for tool in tuple(getattr(tool_set, "tools", ()) or ()):
@@ -121,6 +124,10 @@ async def append_capability_guidance(
     """Append bounded, same-session context and shared capability rules."""
     if self is None:
         return
+    if req is not None:
+        req._private_companion_chat_search_managed = bool(
+            getattr(self, "enable_conversation_model_routing", False)
+        )
     marker = "<!-- private_companion_capability_hub_v1 -->"
     prompt_already_guided = bool(
         req is not None and marker in str(getattr(req, "system_prompt", "") or "")

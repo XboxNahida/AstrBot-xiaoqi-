@@ -69,6 +69,9 @@ from .task_proactive_policy import ProactivePolicyStore, RuleConfig
 from .task_service import TaskFailure, TaskScheduler, TaskScope, TaskService
 
 TOOL_CAPABILITIES = {
+    "anysearch_search": "search",
+    "anysearch_extract": "search",
+    "anysearch_batch_search": "search",
     "web_search_tavily": "search",
     "web_search_bocha": "search",
     "web_search_brave": "search",
