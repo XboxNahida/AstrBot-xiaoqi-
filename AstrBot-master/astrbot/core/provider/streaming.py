@@ -15,7 +15,8 @@ class ModelStreamTimeout(TimeoutError):
 
 async def iter_model_response(
     provider, *, idle_seconds=None,
-    total_seconds=MODEL_TOTAL_TIMEOUT_SECONDS, **kwargs,
+    total_seconds=MODEL_TOTAL_TIMEOUT_SECONDS,
+    idle_timeout_cap=MODEL_IDLE_TIMEOUT_SECONDS, **kwargs,
 ):
     """保护整个流的首包、途中停顿、总边界和取消清理。"""
     if idle_seconds is None:
@@ -26,7 +27,7 @@ async def iter_model_response(
             idle_seconds = MODEL_IDLE_TIMEOUT_SECONDS
     if not math.isfinite(idle_seconds) or idle_seconds <= 0:
         idle_seconds = MODEL_IDLE_TIMEOUT_SECONDS
-    idle_seconds = min(idle_seconds, MODEL_IDLE_TIMEOUT_SECONDS)
+    idle_seconds = min(idle_seconds, MODEL_IDLE_TIMEOUT_SECONDS, idle_timeout_cap)
     loop = asyncio.get_running_loop()
     deadline = loop.time() + total_seconds
     idle_guard = None
@@ -50,6 +51,8 @@ async def iter_model_response(
                     response = await anext(stream)
             except StopAsyncIteration:
                 return
+            except ModelStreamTimeout:
+                raise
             except TimeoutError:
                 kind = "total" if total_guard.expired() else "idle"
                 raise ModelStreamTimeout(kind) from None

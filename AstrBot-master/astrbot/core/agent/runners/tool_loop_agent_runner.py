@@ -48,7 +48,7 @@ from astrbot.core.provider.modalities import (
     sanitize_contexts_by_modalities,
 )
 from astrbot.core.provider.provider import Provider
-from astrbot.core.provider.streaming import iter_model_response
+from astrbot.core.provider.streaming import ModelStreamTimeout, iter_model_response
 
 from ..context.compressor import ContextCompressor
 from ..context.config import ContextConfig
@@ -611,18 +611,37 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             # For primary provider we keep explicit model selection if provided.
             payload["model"] = self.req.model
         if self.streaming:
-            stream = iter_model_response(self.provider, **payload)
-            try:
-                while True:
-                    try:
-                        resp = await self._await_or_stop(anext(stream))  # type: ignore
-                    except StopAsyncIteration:
+            attempts = 1 if self._is_task_request else 2
+            for idle_attempt in range(attempts):
+                if self._is_stop_requested():
+                    return
+                emitted_response = False
+                stream = iter_model_response(
+                    self.provider,
+                    idle_timeout_cap=60 if self._is_task_request else 30,
+                    **payload,
+                )
+                try:
+                    while True:
+                        try:
+                            resp = await self._await_or_stop(anext(stream))  # type: ignore
+                        except StopAsyncIteration:
+                            return
+                        if resp is None:
+                            return
+                        emitted_response = True
+                        yield resp
+                except ModelStreamTimeout as exc:
+                    if self._is_stop_requested():
                         return
-                    if resp is None:
-                        return
-                    yield resp
-            finally:
-                await self._close_executor(stream)
+                    if str(exc) != "idle" or emitted_response or idle_attempt + 1 >= attempts:
+                        raise
+                    logger.warning(
+                        "Chat Model %s stream idle timeout before output; retrying once (2/2).",
+                        self.provider.provider_config.get("id", "<unknown>"),
+                    )
+                finally:
+                    await self._close_executor(stream)
         else:
             resp = await self._await_or_stop(self.provider.text_chat(**payload))
             if resp is not None:

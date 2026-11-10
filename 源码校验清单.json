@@ -529,7 +529,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/agent/runners/tool_loop_agent_runner.py",
-    "SHA256": "fe25ad8a83f348a6dc73bc964d253eb487958aff8c7b8b47249a8de3292c6521"
+    "SHA256": "f7fd639881124b06e969ee3a38fefa16a784f2ceb351131f12fa2c0333ee1f92"
   },
   {
     "路径": "AstrBot-master/astrbot/core/agent/tool.py",
@@ -1549,7 +1549,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/streaming.py",
-    "SHA256": "7ef9188a7333a284b912b105aebd50b79c3fe745c21d3907a1336de2a64c5fae"
+    "SHA256": "b2555d4aa0a1fa92b82b04923d2581cfb67c29db8a6a838589abdfde3f04eebc"
   },
   {
     "路径": "AstrBot-master/astrbot/core/repository.py",
@@ -13685,7 +13685,7 @@
   },
   {
     "路径": "AstrBot-master/tests/test_tool_loop_agent_runner.py",
-    "SHA256": "9f1a6aba3ff62a6d979866a7a539c35f1e93394420c7665cff7909472e53fac6"
+    "SHA256": "c3d068fb37c858185e49a206a4b3f925627cc866c4b1b4e65a96b12c6a222c46"
   },
   {
     "路径": "AstrBot-master/tests/test_umo_alias.py",
@@ -14269,7 +14269,7 @@
   },
   {
     "路径": "导出检查报告.json",
-    "SHA256": "73767be444e2903916598dc7e1dd3cad6524af3507d761a138d7d8cbe97b37ae"
+    "SHA256": "7a0d207fad36745c7d33df606c7bbf1c131f28af5499801118d13a6a83128cb3"
   },
   {
     "路径": "第三方与发布说明.md",
@@ -14282,5 +14282,9 @@
   {
     "路径": "docs/Gemini按需联网-20261110.md",
     "SHA256": "481cd9ca8ce5c264b9c57f4e41ccc720ab8e6229254190d3a76c7c977127f4fa"
+  },
+  {
+    "路径": "docs/聊天无数据超时重试-20261110.md",
+    "SHA256": "2d434cb4f2d4033957cc1db56646d54e2467793a4d0564919f6854f9851b7e7b"
   }
 ]

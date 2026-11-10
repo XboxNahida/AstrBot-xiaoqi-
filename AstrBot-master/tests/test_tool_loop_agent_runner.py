@@ -22,6 +22,126 @@ from astrbot.core.astr_agent_tool_exec import FunctionToolExecutor
 from astrbot.core.exceptions import EmptyModelOutputError
 from astrbot.core.provider.entities import LLMResponse, ProviderRequest, TokenUsage
 from astrbot.core.provider.provider import Provider
+from astrbot.core.provider.streaming import ModelStreamTimeout
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario,expected_calls", [
+    ("recover", [2, 0]), ("fallback", [2, 1]),
+    ("both_retry", [2, 2]), ("all_idle", [2, 2]),
+    ("partial", [1, 1]), ("total", [1, 1]),
+    ("cancel", [1, 0]), ("task", [1, 1]),
+])
+async def test_idle_stream_retries_once_per_chat_model(
+    runner, provider_request, mock_tool_executor, mock_hooks, scenario, expected_calls,
+):
+    class IdleProvider(MockProvider):
+        def __init__(self, label):
+            super().__init__()
+            self.provider_config = {"id": label}
+            self.closed_count = 0
+            self.received_contexts = []
+
+        async def text_chat_stream(self, **kwargs):
+            self.call_count += 1
+            self.received_contexts.append(kwargs["contexts"])
+            try:
+                if scenario == "cancel" and self.provider_config["id"] == "primary":
+                    runner.request_stop()
+                    raise ModelStreamTimeout("idle")
+                if scenario == "partial" and self.provider_config["id"] == "primary":
+                    yield LLMResponse(role="assistant", completion_text="partial", is_chunk=True)
+                    raise ModelStreamTimeout("idle")
+                failures = 1 if scenario == "recover" else 2
+                if scenario == "all_idle":
+                    failures = 99
+                if self.provider_config["id"] == "fallback":
+                    failures = 1 if scenario == "both_retry" else (99 if scenario == "all_idle" else 0)
+                if self.call_count <= failures:
+                    raise ModelStreamTimeout("total" if scenario == "total" else "idle")
+                yield LLMResponse(role="assistant", completion_text="recovered")
+            finally:
+                self.closed_count += 1
+
+    primary, fallback = IdleProvider("primary"), IdleProvider("fallback")
+    provider_request.contexts = [{"role": "tool", "content": "already executed"}]
+    await runner.reset(
+        provider=primary, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks, streaming=True, fallback_providers=[fallback],
+    )
+    runner._is_task_request = scenario == "task"
+    responses = [response async for response in runner._iter_llm_responses_with_fallback()]
+    assert [primary.call_count, fallback.call_count] == expected_calls
+    assert primary.closed_count >= primary.call_count - (scenario == "recover")
+    assert fallback.closed_count >= fallback.call_count - (scenario not in {"all_idle", "cancel"})
+    if primary.call_count == 2:
+        assert primary.received_contexts[0] == primary.received_contexts[1]
+    if scenario not in {"cancel", "all_idle"}:
+        assert responses[-1].completion_text == "recovered"
+    if scenario == "all_idle":
+        assert responses[-1].role == "err"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failures,expected_fallback", [(1, 0), (2, 1)])
+async def test_actual_silent_stream_timeout_retries_and_closes(
+    runner, provider_request, mock_tool_executor, mock_hooks, failures, expected_fallback,
+):
+    class SilentProvider(MockProvider):
+        timeout = 0.01
+
+        def __init__(self):
+            super().__init__()
+            self.closed_count = 0
+
+        async def text_chat_stream(self, **kwargs):
+            self.call_count += 1
+            try:
+                if self.call_count <= failures:
+                    await asyncio.sleep(1)
+                yield LLMResponse(role="assistant", completion_text="recovered")
+            finally:
+                self.closed_count += 1
+
+    primary, fallback = SilentProvider(), MockProvider()
+    fallback.should_call_tools = False
+    await runner.reset(
+        provider=primary, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks, streaming=True, fallback_providers=[fallback],
+    )
+    responses = [response async for response in runner._iter_llm_responses_with_fallback()]
+    assert primary.call_count == 2
+    assert primary.closed_count >= failures
+    assert fallback.call_count == expected_fallback
+    assert responses[-1].role == "assistant"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("configured,is_task,expected", [(120, False, 30), (12, False, 12), (120, True, 60)])
+async def test_chat_idle_cap_preserves_shorter_provider_timeout(
+    runner, provider_request, mock_tool_executor, mock_hooks, monkeypatch, configured, is_task, expected,
+):
+    observed = []
+    real_timeout = asyncio.timeout
+
+    def timeout(delay):
+        observed.append(delay)
+        return real_timeout(delay)
+
+    monkeypatch.setattr(asyncio, "timeout", timeout)
+    provider = MockProvider()
+    provider.timeout = configured
+    provider.should_call_tools = False
+    await runner.reset(
+        provider=provider, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks, streaming=True,
+    )
+    runner._is_task_request = is_task
+    assert [response async for response in runner._iter_llm_responses()]
+    assert observed and all(value == expected for value in observed)
 
 
 @pytest.mark.asyncio
