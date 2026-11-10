@@ -26,6 +26,7 @@ import uuid
 import zoneinfo
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from datetime import date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from http.cookies import SimpleCookie
@@ -358,6 +359,7 @@ class _ProactiveSendOutcome:
     primary_complete: bool = False
     delivery_umo: str = ""
     delivered_chain: tuple[Any, ...] = ()
+    history_metadata: dict[str, Any] = dataclass_field(default_factory=dict)
 
     def __bool__(self) -> bool:
         return self.delivered
@@ -7731,6 +7733,7 @@ Output:
                             action_summary=safe_context,
                         ),
                         assistant_response=assistant_archive_text,
+                        history_metadata=getattr(outcome, "history_metadata", {}),
                     )
                 await self._record_final_assistant_in_livingmemory(
                     umo=delivery_umo,
@@ -15036,7 +15039,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
                 session_obj = self._session_for_platform(session, platform)
                 precise_result = await platform.send_by_session(session_obj, MessageChain(processed_chain))
                 if precise_result is not False:
-                    self._confirm_outbound_delivery(umo, processed_chain)
+                    await self._record_confirmed_outbound_delivery(umo, processed_chain)
                     return True
                 precise_error = RuntimeError("精确平台发送返回 False（平台未接受消息）")
                 logger.warning(
@@ -15073,7 +15076,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
         try:
             core_result = await self.context.send_message(core_session, self._build_result_from_chain(processed_chain))
             if core_result is not False:
-                self._confirm_outbound_delivery(umo, processed_chain)
+                await self._record_confirmed_outbound_delivery(umo, processed_chain)
                 return True
             platform_supports = getattr(self, "_platform_supports", None)
             if not callable(platform_supports) or platform_supports("onebot_actions", umo=umo):
@@ -15123,7 +15126,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
             ) from core_error
         direct_ok, direct_error = await self._send_chain_components_via_onebot_direct(umo, session, processed_chain)
         if direct_ok:
-            self._confirm_outbound_delivery(umo, processed_chain)
+            await self._record_confirmed_outbound_delivery(umo, processed_chain)
             return True
         if self._is_onebot_event_checker_send_rejection(direct_error):
             raise RuntimeError(self._onebot_event_checker_rejection_summary())
@@ -16045,6 +16048,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
         user_prompt: str,
         assistant_response: str,
         umo: str = "",
+        history_metadata: dict | None = None,
     ) -> bool:
         umo = str(umo or user.get("umo") or "").strip()
         if not umo or not assistant_response:
@@ -16053,6 +16057,7 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
             try:
                 user_msg_obj = UserMessageSegment(content=str(user_prompt or ""))
                 assistant_msg_obj = AssistantMessageSegment(content=str(assistant_response or ""))
+                assistant_msg_obj._history_metadata = history_metadata or {}
                 async def _write():
                     conv_id = await self._ensure_conversation_id_for_umo(umo, title="Private Companion 主动消息")
                     if not conv_id:
@@ -16060,7 +16065,10 @@ continuity_mode 只能是 continuation、edit、new_topic、ambiguous。
                     await self.context.conversation_manager.add_message_pair(
                         cid=conv_id,
                         user_message=user_msg_obj,
-                        assistant_message=assistant_msg_obj,
+                        assistant_message={
+                            **assistant_msg_obj.model_dump(), "timestamp": _now_ts(),
+                            "history_metadata": assistant_msg_obj._history_metadata,
+                        } if history_metadata else assistant_msg_obj,
                     )
                     return True
 

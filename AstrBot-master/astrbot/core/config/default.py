@@ -124,7 +124,7 @@ DEFAULT_CONFIG = {
         "default_personality": "default",
         "persona_pool": ["*"],
         "prompt_prefix": "{{prompt}}",
-        "context_limit_reached_strategy": "llm_compress",  # or truncate_by_turns
+        "context_limit_reached_strategy": "recent_only",
         "llm_compress_instruction": (
             "Based on our full conversation history, produce a concise summary of key takeaways and/or project progress.\n"
             "The primary goal of this summary is to enable seamless continuation of the work that follows.\n"
@@ -136,7 +136,7 @@ DEFAULT_CONFIG = {
         ),
         "llm_compress_keep_recent_ratio": 0.15,
         "llm_compress_provider_id": "",
-        "max_context_length": -1,  # 默认不限制
+        "max_context_length": 12,
         "dequeue_context_length": 1,
         "streaming_response": False,
         "show_tool_use_status": False,
@@ -3669,9 +3669,9 @@ CONFIG_METADATA_3 = {
                 "type": "object",
                 "items": {
                     "provider_settings.max_context_length": {
-                        "description": "压缩前最多保留对话轮数",
+                        "description": "请求携带的近期对话轮数",
                         "type": "int",
-                        "hint": "普通会话历史超过该轮数后，才会按下方策略进行持久化截断或 LLM 压缩；请求发送前也会先按该值约束上下文。-1 表示不按轮数限制。",
+                        "hint": "默认12轮，约24条普通消息。仅近期原文策略只限制发送窗口，完整记录保留并可查询，不生成历史摘要。其他策略仍沿用原压缩规则；-1表示不按轮数限制。",
                         "condition": {
                             "provider_settings.agent_runner_type": "local",
                         },
@@ -3687,8 +3687,8 @@ CONFIG_METADATA_3 = {
                     "provider_settings.context_limit_reached_strategy": {
                         "description": "历史超限或上下文接近上限时的处理方式",
                         "type": "string",
-                        "options": ["truncate_by_turns", "llm_compress"],
-                        "labels": ["按对话轮数截断", "由 LLM 压缩上下文"],
+                        "options": ["recent_only", "truncate_by_turns", "llm_compress"],
+                        "labels": ["仅近期原文，保留完整记录（默认）", "按对话轮数截断", "由 LLM 压缩上下文"],
                         "condition": {
                             "provider_settings.agent_runner_type": "local",
                         },

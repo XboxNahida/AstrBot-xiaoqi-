@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import asyncio
@@ -8,21 +7,19 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from astrbot.api.message_components import Image, Plain
+from astrbot.api.message_components import File, Image, Plain
 from astrbot.core.agent.message import Message, TextPart
 from astrbot.core.provider.entities import LLMResponse
-
-from astrbot_plugin_private_companion.proactive_message import ProactiveMessageMixin
 from astrbot_plugin_private_companion.final_response_persistence import (
     FinalResponsePersistenceMixin,
     collect_proactive_delivery,
 )
-from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
 from astrbot_plugin_private_companion.helpers import (
     _strip_internal_message_blocks,
     _strip_outbound_control_blocks,
 )
-
+from astrbot_plugin_private_companion.main import PrivateCompanionPlugin
+from astrbot_plugin_private_companion.proactive_message import ProactiveMessageMixin
 
 UMO = "default:FriendMessage:10001"
 LIVING_MODULE = "data.plugins.astrbot_plugin_livingmemory.main"
@@ -99,6 +96,7 @@ class _ActiveOutcome:
     delivered_text: str = ""
     delivery_umo: str = ""
     delivered_chain: tuple = ()
+    history_metadata: dict | None = None
 
 
 class _ActiveCollector(FinalResponsePersistenceMixin):
@@ -157,6 +155,56 @@ class _Harness(ProactiveMessageMixin):
 
 
 class FinalResponsePersistenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_background_delivery_waits_for_core_archive_before_appending(self):
+        from astrbot.core.utils.session_lock import session_lock_manager
+        harness = _Harness()
+        async with session_lock_manager.acquire_lock(UMO):
+            task = asyncio.create_task(harness._record_confirmed_outbound_delivery(
+                UMO, [Plain("后台发的"), File(name="结果.zip", file="gone.zip")]))
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertEqual(1, len(harness.conversation_manager.history))
+        await task
+        self.assertEqual("assistant", harness.conversation_manager.history[-1]["role"])
+
+    async def test_proactive_collector_keeps_media_metadata(self):
+        class Sender(FinalResponsePersistenceMixin):
+            @collect_proactive_delivery
+            async def send(self, umo):
+                await self._record_confirmed_outbound_delivery(umo, [Image(file="gone.png"), Plain("图片之后")])
+                return _ActiveOutcome(True)
+        outcome = await Sender().send(UMO)
+        self.assertEqual(["image", "text"], [r["type"] for r in outcome.history_metadata["sent_sequence"]])
+
+    async def test_confirmed_media_attached_to_official_message_in_actual_send_order(self):
+        from astrbot.core.agent.message import dump_messages_with_checkpoints
+        harness = _Harness()
+        event = _SendTrackerEvent()
+        coordinator = harness._final_response_persistence_coordinator()
+        coordinator.begin_passive(event)
+        official = Message(role="assistant", content="最终回复")
+        event._private_companion_official_assistant_message = official
+        try:
+            await harness._record_confirmed_outbound_delivery(UMO, [Plain("前一条"), Image(file="gone.png")])
+            coordinator.mark_final_response_ready(event)
+            await harness._record_confirmed_outbound_delivery(UMO, [Plain("后一条"), File(name="结果.txt", file="gone.txt")])
+            await coordinator.finalize_passive(event)
+            row = dump_messages_with_checkpoints([official])[0]
+            sequence = row["history_metadata"]["sent_sequence"]
+            self.assertEqual(["text", "image", "text", "file"], [r["type"] for r in sequence])
+            self.assertEqual([0, 0, 1, 1], [r["send_index"] for r in sequence])
+            self.assertIn("结果.txt", row["content"][0]["text"])
+        finally:
+            coordinator._reset_context(event._private_companion_delivery_ledger)
+
+    async def test_standalone_background_file_is_archived_without_fake_user_turn(self):
+        harness = _Harness()
+        await harness._record_confirmed_outbound_delivery(UMO, [File(name="后台.zip", file="gone.zip")])
+        row = harness.conversation_manager.history[-1]
+        self.assertEqual("assistant", row["role"])
+        self.assertEqual(2, len(harness.conversation_manager.history))
+        self.assertEqual("后台.zip", row["history_metadata"]["sent_sequence"][0]["name"])
+
     def test_delivered_image_is_archived_as_internal_media_marker(self):
         harness = _Harness()
 

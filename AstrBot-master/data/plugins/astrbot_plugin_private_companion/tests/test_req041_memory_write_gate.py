@@ -108,7 +108,14 @@ class ScopedMemoryWriteGateTests(unittest.TestCase):
 
     def test_private_pipeline_guards_all_durable_memory_mutations(self) -> None:
         source = (ROOT / "message_pipeline.py").read_text(encoding="utf-8")
-        gate = source.index("private_memory_write_allowed = self._req041_private_memory_write_allowed(user)")
+        tree = ast.parse(source)
+        gate_node = next(node for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                         and any(isinstance(target, ast.Name) and target.id == "private_memory_write_allowed"
+                                 for target in node.targets))
+        expression = ast.get_source_segment(source, gate_node.value)
+        self.assertIn("self._req041_private_memory_write_allowed(user)", expression)
+        self.assertIn('_gemini_memory_enabled', expression)
+        gate = source.index(ast.get_source_segment(source, gate_node))
         guarded = source.index("if private_memory_write_allowed:", gate)
         for call in (
             "self._update_companion_memory_from_message",

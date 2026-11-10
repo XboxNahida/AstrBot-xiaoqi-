@@ -61,23 +61,51 @@ function mountTasksPanel(root, { fetchJson, showToast }) {
   const list = element("div");
   const pagination = element("p");
   const detail = element("div");
+  let detailSequence = 0;
+  const recordedTime = value => value == null ? "未记录" : new Date(value * 1000).toLocaleString();
+  const facts = task => `${task.engine === "codex" ? "Codex" : "原生"}；模型：${task.codex?.model || task.model_id || "未记录"}；思考：${task.codex?.reasoning_effort || "未记录"}；阶段：${task.execution?.phase_label || "未确认"}；创建：${recordedTime(task.created_at)}；更新：${recordedTime(task.updated_at)}；结束：${recordedTime(task.finished_at)}`;
   async function showDetail(taskId) {
+    const ticket = ++detailSequence;
+    const selectedScope = scope();
+    const detailQuery = extra => new URLSearchParams({ ...selectedScope, task_id: taskId, ...extra }).toString();
     const data = await call(`/tasks/detail?${query({ task_id: taskId })}`);
+    if (ticket !== detailSequence) return;
     const task = data.task;
     detail.replaceChildren(element("h3", task.goal), element("p", `状态：${labels[task.status] || task.status}；尝试次数：${task.attempts}`));
+    detail.append(element("p", facts(task)));
+    if (task.engine === "codex") detail.append(element("p", `对话：${task.codex?.thread_id || "尚未建立"}；连接：${task.codex?.connection_state || "未连接"}。运行状态和宿主心跳不代表持续推进。`));
     if (task.error_kind) detail.append(element("p", `错误：${task.error_kind}`));
     const controls = element("div");
     for (const [action, title] of [["pause", "暂停"], ["resume", "继续"], ["retry", "重试"], ["cancel", "取消任务"]]) {
-      if (task.status === "unknown_result" && ["resume", "retry"].includes(action)) continue;
-      controls.append(button(title, async () => {
-        await call("/tasks/control", { ...scope(), task_id: taskId, action });
-        showToast?.("任务状态已更新", "success");
+      if (task.status === "unknown_result" && ["resume", "retry"].includes(action) && task.engine !== "codex") continue;
+      const controlTitle = task.engine === "codex" && task.status === "unknown_result" && ["resume", "retry"].includes(action) ? `核实原进度并${title}` : title;
+      controls.append(button(controlTitle, async () => {
+        const result = await call("/tasks/control", { ...selectedScope, task_id: taskId, action });
+        showToast?.(result.task?.status === "running" && ["pause", "cancel"].includes(action) ? "已请求中断，等待真实执行回执" : "任务状态已更新", "success");
         await load();
         await showDetail(taskId);
       }));
     }
     detail.append(controls, element("h4", "步骤与执行结果"), element("pre", JSON.stringify({ steps: task.steps, result: task.result }, null, 2)));
-    if (["queued", "paused"].includes(task.status) && !Object.keys(task.steps || {}).length) {
+    if (task.engine === "codex") {
+      detail.append(element("h4", "Codex实际事件"));
+      const timeline = element("div");
+      let cursor = data.codex_events?.next_after;
+      const appendEvents = page => {
+        for (const event of page?.items || []) timeline.append(element("pre", `${recordedTime(event.created_at)} ${event.method}\n${JSON.stringify(event.payload, null, 2)}`));
+      };
+      appendEvents(data.codex_events);
+      const more = button("继续读取事件", async () => {
+        const nextPage = await call(`/tasks/detail?${detailQuery({ after: cursor })}`);
+        if (ticket !== detailSequence) return;
+        appendEvents(nextPage.codex_events);
+        cursor = nextPage.codex_events?.next_after;
+        more.hidden = cursor == null;
+      });
+      more.hidden = cursor == null;
+      detail.append(timeline, more, element("p", "结果未知不会自动重放；显式继续会让原对话先核实旧回执与实际进度。"));
+    }
+    if (task.engine !== "codex" && ["queued", "paused"].includes(task.status) && !Object.keys(task.steps || {}).length) {
       const goal = field(detail, "修订目标");
       goal.value = task.goal;
       detail.append(button("保存目标修订", async () => {
@@ -110,7 +138,7 @@ function mountTasksPanel(root, { fetchJson, showToast }) {
     list.replaceChildren();
     for (const task of data.tasks || []) {
       const row = element("div");
-      row.append(button(task.goal || task.task_id, () => showDetail(task.task_id)), element("span", ` ${labels[task.status] || task.status}`));
+      row.append(button(task.goal || task.task_id, () => showDetail(task.task_id)), element("span", ` ${labels[task.status] || task.status}；${facts(task)}；对话：${task.codex?.thread_id || "无"}`));
       list.append(row);
     }
     if (!data.tasks?.length) list.append(element("p", "当前范围暂无任务。"));
@@ -120,7 +148,7 @@ function mountTasksPanel(root, { fetchJson, showToast }) {
   }
   const previous = button("上一页", async () => { offset = Math.max(0, offset - 20); await load(); });
   const next = button("下一页", async () => { offset += 20; await load(); });
-  section.append(button("查询任务", async () => { offset = 0; detail.replaceChildren(); await load(); }), list, pagination, previous, next, detail);
+  section.append(button("查询任务", async () => { offset = 0; ++detailSequence; detail.replaceChildren(); await load(); }), list, pagination, previous, next, detail);
 
   const grantsSection = element("details");
   grantsSection.append(element("summary", "群友执行授权"), element("p", "授权仅对所选机器人和群生效；主要用户身份由服务器验证。"));
@@ -236,7 +264,7 @@ function mountTasksPanel(root, { fetchJson, showToast }) {
   }), toolDirectory, toolFiles);
   section.append(sharedTools);
   root.replaceChildren(section);
-  return { refresh: load, destroy() { ++sequence; root.replaceChildren(); } };
+  return { refresh: load, destroy() { ++sequence; ++detailSequence; root.replaceChildren(); } };
 }
 window.PrivateCompanionTasksPanel = { mount: mountTasksPanel };
 })();

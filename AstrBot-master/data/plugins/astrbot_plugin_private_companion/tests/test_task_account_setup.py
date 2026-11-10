@@ -120,6 +120,28 @@ async def test_failed_verification_cannot_be_automatically_resumed(setup):
 
 
 @pytest.mark.asyncio
+async def test_live_ready_failure_logs_fixed_reason_without_reprovision(setup, monkeypatch, caplog):
+    import task_account_setup as api
+
+    coordinator, _, actor, calls, _, broker = setup
+    assert (await coordinator.prepare(actor)).ready
+    coordinator._production = True
+    monkeypatch.setattr(api, "_host_acl_probe", lambda *args, **kw: {})
+
+    def invalid(*args, **kw):
+        raise PermissionError("Account or ACL deployment invariant changed")
+
+    monkeypatch.setattr(api.WindowsDeploymentVerifier, "verify", invalid)
+    with caplog.at_level("WARNING"):
+        result = await coordinator.prepare(actor)
+    assert not result.ready and result.code == "audit_required"
+    assert "Account or ACL deployment invariant changed" in caplog.text
+    assert account(actor) in caplog.text
+    assert len(calls) == 2
+    assert not (broker / (account(actor) + ".ready.json")).exists()
+
+
+@pytest.mark.asyncio
 async def test_refresh_failure_removes_previous_ready(setup):
     coordinator, _, owner, _, fail, broker = setup
     assert (await coordinator.prepare(owner)).ready

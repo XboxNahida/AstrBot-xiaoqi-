@@ -200,7 +200,8 @@ class Provider(AbstractProvider):
             if isinstance(message, Message):
                 dicts.append(message.model_dump())
             else:
-                dicts.append(message)
+                # 附件原件来源属于本地历史，不属于供应商消息协议。
+                dicts.append({key: value for key, value in message.items() if key != "history_metadata"})
 
         return dicts
 

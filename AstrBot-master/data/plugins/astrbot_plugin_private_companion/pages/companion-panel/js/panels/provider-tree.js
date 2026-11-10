@@ -20,10 +20,16 @@ window.PrivateCompanionProviderTree = (() => {
     const source = { ...(state.overview?.settings || {}), ...(state.taskModelDraft || {}) };
     const timeout = Math.min(60, Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 120));
     const attempts = Number(document.querySelector("[data-task-model-attempts]")?.value ?? source.task_model_max_attempts ?? 3);
+    const engine = document.querySelector("[data-task-execution-engine]")?.value ?? source.task_execution_engine ?? "codex";
+    const effort = document.querySelector("[data-codex-reasoning-effort]")?.value ?? source.codex_reasoning_effort ?? "medium";
+    if (!["codex", "native"].includes(engine)) throw new Error("后台执行引擎必须是codex或native");
+    if (typeof effort !== "string" || !effort.trim() || effort.length > 64 || /[\x00-\x1f\x7f-\x9f]/.test(effort)) {
+      throw new Error("Codex思考程度必须是最多64字符且不含控制字符的非空档位");
+    }
     if (!Number.isInteger(timeout) || timeout < 1 || !Number.isInteger(attempts) || attempts < 1) {
       throw new Error("后台模型超时和最多请求次数必须是至少1的整数；次数包含首次请求");
     }
-    return { task_model_timeout_seconds: timeout, task_model_max_attempts: attempts };
+    return { task_model_timeout_seconds: timeout, task_model_max_attempts: attempts, task_execution_engine: engine, codex_reasoning_effort: effort.trim() };
   }
 
   function providerTimeoutValuesForRender(context) {
@@ -416,7 +422,9 @@ window.PrivateCompanionProviderTree = (() => {
             </label>
           </div>`}
           ${embeddingProvider ? "" : `<small>流式沿用原超时，大于60秒按60秒；分片刷新计时，单次请求总边界10分钟。中枢保留原30秒上限。</small>`}
-          ${taskProvider ? `<label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-task-model-attempts value="${escapeHtml(taskValues.task_model_max_attempts)}" /><small>默认3次＝首次1次＋重试2次；固定当前模型，不自动使用备用。Gemini可按任务覆盖。</small></label>` : ""}
+          ${taskProvider ? `<label class="provider-field"><span>新GPT任务执行引擎</span><select data-task-execution-engine><option value="codex" ${taskValues.task_execution_engine === "codex" ? "selected" : ""}>Codex</option><option value="native" ${taskValues.task_execution_engine === "native" ? "selected" : ""}>原生</option></select><small>新GPT任务默认Codex；其他模型沿用原生；已有任务不迁移。</small></label>
+          <label class="provider-field"><span>Codex默认思考程度</span><input type="text" maxlength="64" data-codex-reasoning-effort value="${escapeHtml(taskValues.codex_reasoning_effort)}" placeholder="low / medium / high / xhigh" /><small>也可填写模型支持的其他档位；新对话生效，Gemini可按对话修改。</small></label>
+          <label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-task-model-attempts value="${escapeHtml(taskValues.task_model_max_attempts)}" /><small>默认3次＝首次1次＋重试2次；固定当前模型，不自动使用备用。Gemini可按任务覆盖。</small></label>` : ""}
           ${embeddingProvider || taskProvider ? "" : `<label class="provider-field provider-fallback-field">
             <span>备用模型 <small>主模型失败、超时、Token 超限或空响应时尝试一次</small></span>
             ${providerFallbackSelect(context, key, fallbackValue)}
@@ -652,9 +660,9 @@ window.PrivateCompanionProviderTree = (() => {
 
   function bindProviderTests(context) {
     const { document } = context;
-    document.querySelectorAll("[data-task-model-timeout], [data-task-model-attempts]").forEach((input) => {
+    document.querySelectorAll("[data-task-model-timeout], [data-task-model-attempts], [data-task-execution-engine], [data-codex-reasoning-effort]").forEach((input) => {
       input.addEventListener("input", () => {
-        try { context.state.taskModelDraft = currentTaskModelValues(context); } catch (_error) { /* 保存时显示校验错误。 */ }
+        try { context.state.taskModelDraft = currentTaskModelValues(context); } catch (_error) { /* Validate again on save. */ }
       });
     });
     document.querySelectorAll("[data-provider-select]").forEach((select) => {

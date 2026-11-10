@@ -23133,6 +23133,9 @@ class PrivateCompanionPageApi(
             )
 
     def _apply_config_value(self, key: str, value: Any, overrides: dict[str, Any] | None = None) -> None:
+        if key in {"task_execution_engine", "codex_reasoning_effort"}:
+            setattr(self.plugin, key, self._normalize_setting_value(key, value))
+            return
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
             setattr(self.plugin, key, min(60, max(1, int(value))) if key == "task_model_timeout_seconds" else max(1, int(value)))
             return

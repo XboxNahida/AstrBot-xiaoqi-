@@ -451,6 +451,25 @@ class InteractionChannels:
                 "channel": self._channel(db, row["channel_id"]),
             }
 
+    def renew_reply(self, reply):
+        """Keep a claimed script reply fenced while its conversation is busy.
+
+        Args:
+            reply: Claimed reply with the host-owned token.
+
+        Returns:
+            Whether a live preparation or sending lease was extended.
+        """
+        with self.transaction() as db:
+            return (
+                db.execute(
+                    "UPDATE ic_replies SET lease_until=? WHERE id=? AND token=? "
+                    "AND status IN ('preparing','sending') AND lease_until>?",
+                    (self.clock() + 180, reply["id"], reply["token"], self.clock()),
+                ).rowcount
+                > 0
+            )
+
     def begin_reply(self, reply):
         with self.transaction() as db:
             return bool(
@@ -466,16 +485,36 @@ class InteractionChannels:
                 ).rowcount
             )
 
-    def finish_reply(self, reply, status):
+    def finish_reply(self, reply, status, *, stage=None, error_code=None):
+        """Persist final delivery facts without storing exception text or secrets.
+
+        Args:
+            reply: Claimed reply carrying the host-owned lease token.
+            status: Final delivery status; uncertain sends must not be replayed.
+            stage: Optional host phase, never an exception message.
+            error_code: Optional exception class or host-defined symbolic code.
+
+        Returns:
+            Whether the caller still owned an unfinished reply.
+        """
         if status not in {"sent", "failed", "unknown"}:
             raise ValueError("invalid_delivery_status")
+        receipt = {"status": status, "at": self.clock()}
+        if stage is not None:
+            if stage not in {"prepare", "render", "send"}:
+                raise ValueError("invalid_delivery_stage")
+            receipt["stage"] = stage
+        if error_code is not None:
+            if not isinstance(error_code, str) or len(error_code) > 80 or not error_code.isidentifier():
+                raise ValueError("invalid_delivery_error_code")
+            receipt["error_code"] = error_code
         with self.transaction() as db:
             return bool(
                 db.execute(
                     "UPDATE ic_replies SET status=?,receipt=? WHERE id=? AND token=? AND status IN ('preparing','sending')",
                     (
                         status,
-                        self.encode({"status": status, "at": self.clock()}),
+                        self.encode(receipt),
                         reply["id"],
                         reply["token"],
                     ),

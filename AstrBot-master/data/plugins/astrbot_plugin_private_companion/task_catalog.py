@@ -21,7 +21,9 @@ TASK_GUIDANCE = (
     "pc_manage_tasks直接管理已有任务、分类和历史，不要为查询、分类或归档再创建GPT后台任务。"
     "先查询真实清单及counts；分页不完整或某来源不可用时，不得断言没有其他任务。"
     "归档不等于取消，删除只清理已归档历史，不删除工作文件。只有操作回执成功才可说明操作已完成。"
-    "普通新工作通过pc_submit_task_intent交后台；定时安排可通过pc_manage_tasks的schedule操作创建或修改。"
+    "新GPT任务默认Codex，可通过pc_codex_dialogue创建、查询、引导、停止和继续原对话，关联同一后台任务；非GPT沿用原生。"
+    "普通新工作也可通过pc_submit_task_intent交后台；定时安排可通过pc_manage_tasks的schedule操作创建或修改。"
+    "Codex的metadata.codex是实际持久绑定，codex_events给出真实事件查询入口；连接断开不等于仍在推进，结果未知不自动重放。"
     "当前任务是尚未结束的安排/执行；paused、waiting_user、unknown_result仍需关注，不能称为正在运行或已完成。"
     "recent_history是近期已结束记录，用于理解上下文，不是待办，不因历史出现就重新执行。"
     "按任务ID、北京时间（+08:00）、用户最新语义及结果区分同名不同日期的工作；未知时间不能推测。"
@@ -29,6 +31,9 @@ TASK_GUIDANCE = (
     "继续/修订/重试同一目标时，submit可提供related_task_id及relation；已有后台记录可用link关联。"
     "关联只标记目标关系，不取消旧执行、不继承成功证据；按用户语义另行管理有关活动项。"
     "只是没收到已完成文件时，可先查原结果并用pc_task_send_files补发，不必重新生成。"
+    "execution是实际执行阶段：tool_running表示等待工具，model_wait表示等待模型；结合name、phase_elapsed_seconds、seconds_since_progress和last_tool_issue汇报。"
+    "running只是队列状态，worker_lease_valid只是宿主心跳，均不能证明工作持续推进。unconfirmed表示缺少阶段证据，不能声称后台正常推进。"
+    "长时间等待不自动等于任务失败；工具error/unknown不代表整项任务失败，按回执核对后由模型决定修复、等待或向用户说明。"
     "结果未知先核对原工具回执；用户已表示够用、停止或不用再做时，按语义收尾，不机械重开或追问重做。"
 )
 BACKGROUND_TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
@@ -117,7 +122,7 @@ class TaskCatalog:
                 )
             }
             for row in db.execute(
-                "SELECT task_id,goal,status,error_kind,revision,created_at,updated_at,finished_at,next_run,metadata,result FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY created_at DESC,rowid DESC",
+                "SELECT task_id,goal,status,error_kind,revision,created_at,updated_at,finished_at,next_run,metadata,result,lease_until FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY created_at DESC,rowid DESC",
                 identity,
             ):
                 metadata = json.loads(row["metadata"])
@@ -130,6 +135,36 @@ class TaskCatalog:
                         "item_id": row["task_id"],
                         "title": row["goal"],
                         "status": row["status"],
+                        "engine": metadata.get("engine", "native"),
+                        "metadata": {
+                            "codex": {
+                                key: value
+                                for key, value in metadata.get("codex", {}).items()
+                                if key
+                                in {
+                                    "thread_id",
+                                    "turn_id",
+                                    "model_id",
+                                    "model",
+                                    "reasoning_effort",
+                                    "connection_state",
+                                }
+                            }
+                        }
+                        if metadata.get("engine") == "codex"
+                        else {},
+                        "codex_events": {
+                            "tool": "pc_codex_dialogue",
+                            "action": "read",
+                            "task_id": row["task_id"],
+                            "after": 0,
+                            "limit": 20,
+                        }
+                        if metadata.get("engine") == "codex"
+                        else None,
+                        "execution": rt.service.execution_status(
+                            row["status"], metadata, row["lease_until"]
+                        ),
                         "error_kind": row["error_kind"],
                         "revision": row["revision"],
                         "created_at": row["created_at"],
@@ -138,7 +173,11 @@ class TaskCatalog:
                         "group_id": metadata.get("task_group_id") or row["task_id"],
                         "parent_task_id": metadata.get("parent_task_id"),
                         "relation": metadata.get("task_relation"),
-                        "result_summary": str((json.loads(row["result"]) if row["result"] else {}).get("text", "")),
+                        "result_summary": str(
+                            (json.loads(row["result"]) if row["result"] else {}).get(
+                                "text", ""
+                            )
+                        ),
                         "next_run": row["next_run"],
                         "active": active,
                         "category": "background" if active else "history",

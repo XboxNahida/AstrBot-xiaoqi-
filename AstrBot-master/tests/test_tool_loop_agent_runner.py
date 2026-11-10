@@ -117,6 +117,70 @@ def test_model_routing_notice_includes_current_provider_name():
     assert "当前实际使用的模型标识" in notice
 
 
+@pytest.mark.asyncio
+async def test_conversation_queue_revises_unpublished_plain_answer(
+    runner, mock_provider, provider_request, mock_tool_executor, mock_hooks
+):
+    from astrbot.core.pipeline.process_stage.conversation_queue import enqueue_conversation
+
+    mock_hooks.on_agent_done = AsyncMock()
+    await runner.reset(provider=mock_provider, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks)
+    turn = enqueue_conversation("test:revise:1", "u", key="first")
+    runner.conversation_turn = turn
+    calls = 0
+
+    async def responses():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            async def prepare():
+                return Message(role="user", content=[
+                    TextPart(text="补充" * 400),
+                    ImageURLPart(image_url=ImageURLPart.ImageURL(url="data:image/png;base64,AA==")),
+                ])
+            enqueue_conversation(turn.umo, "u", key="second", prepare=prepare)
+        yield LLMResponse(role="assistant", completion_text="旧草稿" if calls == 1 else "合并回复")
+
+    runner._iter_llm_responses_with_fallback = responses
+    first = [item async for item in runner.step()]
+    assert not runner.done()
+    assert not any(item.type == "llm_result" for item in first)
+    assert any(isinstance(m.content, list) and any(isinstance(p, ImageURLPart)
+               for p in m.content) for m in runner.run_context.messages)
+    second = [item async for item in runner.step()]
+    assert runner.done()
+    assert [item.data["chain"].get_plain_text() for item in second
+            if item.type == "llm_result"] == ["合并回复"]
+    mock_hooks.on_agent_done.assert_awaited_once()
+    assert calls == 2
+    turn.finish("sent")
+
+
+@pytest.mark.asyncio
+async def test_conversation_queue_without_new_input_does_not_request_again(
+    runner, mock_provider, provider_request, mock_tool_executor, mock_hooks
+):
+    from astrbot.core.pipeline.process_stage.conversation_queue import enqueue_conversation
+
+    await runner.reset(provider=mock_provider, request=provider_request,
+        run_context=ContextWrapper(context=None), tool_executor=mock_tool_executor,
+        agent_hooks=mock_hooks)
+    turn = enqueue_conversation("test:revise:2", "u", key="first")
+    runner.conversation_turn = turn
+
+    async def responses():
+        yield LLMResponse(role="assistant", completion_text="正常回复")
+
+    runner._iter_llm_responses_with_fallback = responses
+    result = [item async for item in runner.step()]
+    assert runner.done()
+    assert len([item for item in result if item.type == "llm_result"]) == 1
+    assert turn.committed
+    turn.finish("sent")
+
+
 def test_model_routing_notice_includes_fallback_replacement():
     runner = ToolLoopAgentRunner()
 

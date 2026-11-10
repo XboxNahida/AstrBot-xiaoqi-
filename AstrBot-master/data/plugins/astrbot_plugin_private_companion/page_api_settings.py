@@ -43,6 +43,21 @@ class PageSettingNormalizerMixin:
                 return normalized
         return self._normalize_page_schema_fallback(key, value)
     def _normalize_page_core_setting(self, key: str, value: Any) -> Any:
+        if key == "task_execution_engine":
+            if not isinstance(value, str) or value not in {"codex", "native"}:
+                raise ValueError("后台执行引擎必须是codex或native")
+            return value
+        if key == "codex_reasoning_effort":
+            if (
+                not isinstance(value, str)
+                or not value.strip()
+                or len(value) > 64
+                or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value)
+            ):
+                raise ValueError(
+                    "Codex思考程度必须是最多64字符且不含控制字符的非空档位"
+                )
+            return value.strip()
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
             if type(value) is not int or value < 1:
                 raise ValueError("后台模型超时和最多请求次数必须是至少1的整数")

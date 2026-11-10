@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from astrbot.core import logger
+from astrbot.core.agent.context.recent import cache_namespace, select_recent
 from astrbot.core.agent.handoff import HandoffTool
 from astrbot.core.agent.mcp_client import MCPTool
 from astrbot.core.agent.message import TextPart
@@ -183,7 +184,7 @@ class MainAgentBuildConfig:
     """The file extraction provider."""
     file_extract_msh_api_key: str = ""
     """The API key for Moonshot AI file extraction provider."""
-    context_limit_reached_strategy: str = "truncate_by_turns"
+    context_limit_reached_strategy: str = "recent_only"
     """The strategy to handle context length limit reached."""
     llm_compress_instruction: str = ""
     """The instruction for compression in llm_compress strategy."""
@@ -191,7 +192,7 @@ class MainAgentBuildConfig:
     """Percent of current context tokens to keep as exact recent context during llm_compress strategy."""
     llm_compress_provider_id: str = ""
     """The provider ID for the LLM used in context compression."""
-    max_context_length: int = 50
+    max_context_length: int = 12
     """The maximum number of turns to keep in context. -1 means no limit.
     This enforce max turns before compression"""
     dequeue_context_length: int = 10
@@ -1623,6 +1624,10 @@ async def build_main_agent(
 
     if isinstance(req.contexts, str):
         req.contexts = json.loads(req.contexts)
+    if config.context_limit_reached_strategy == "recent_only":
+        req.history_policy = "recent_only"
+        req.history_archive = copy.deepcopy(req.contexts or [])
+        req.contexts = select_recent(req.contexts or [], config.max_context_length)
     thread_selected_text = event.get_extra("thread_selected_text")
     if isinstance(thread_selected_text, str) and thread_selected_text.strip():
         req.extra_user_content_parts.append(
@@ -1657,6 +1662,10 @@ async def build_main_agent(
 
     if not req.session_id:
         req.session_id = event.unified_msg_origin
+    req.prompt_cache_key = cache_namespace(
+        "chat", event.unified_msg_origin,
+        getattr(req.conversation, "cid", "") or req.session_id,
+    )
 
     _plugin_tool_fix(event, req)
     await _apply_web_search_tools(event, req, plugin_context)
@@ -1751,7 +1760,10 @@ async def build_main_agent(
 
     _apply_web_search_citation_prompt(event, req)
 
-    compress_provider = _get_compress_provider(config, plugin_context, event)
+    compress_provider = (
+        None if req.history_policy == "recent_only"
+        else _get_compress_provider(config, plugin_context, event)
+    )
     compress_fallbacks = (
         _get_fallback_chat_providers(compress_provider, plugin_context, config.provider_settings)
         if compress_provider is not None

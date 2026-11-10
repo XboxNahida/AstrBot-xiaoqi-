@@ -47,6 +47,14 @@ class _Event:
 
 
 class PendingMessageDebounceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unified_queue_keeps_original_event_out_of_legacy_text_buffer(self):
+        event = _Event("补充" * 500)
+        event._private_companion_unified_queue = True
+        self.plugin._message_debounce_mark_llm_pending(_Event("原问题"))
+        self.assertFalse(self.plugin._message_debounce_absorb_pending_message(event, event.message_str))
+        await self.plugin.guard_pending_message_debounce(event)
+        self.assertFalse(getattr(event, "_private_companion_hub_pending_marked", False))
+
     def setUp(self) -> None:
         self.plugin = PrivateCompanionPlugin.__new__(PrivateCompanionPlugin)
         self.plugin.enable_message_debounce = True

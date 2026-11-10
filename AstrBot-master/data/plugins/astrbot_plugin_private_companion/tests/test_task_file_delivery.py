@@ -71,6 +71,39 @@ async def test_single_file_sends_snapshot_without_pasting_or_modifying(delivery)
 
 
 @pytest.mark.asyncio
+async def test_real_runtime_sender_freezes_file_before_temporary_snapshot_is_removed(delivery):
+    from astrbot_plugin_private_companion.task_runtime import CompanionTaskRuntime
+    from astrbot_plugin_private_companion.tests.test_final_response_persistence import (
+        _Harness,
+    )
+
+    harness = _Harness()
+    harness.context.send_message = AsyncMock(return_value=True)
+    runtime = object.__new__(CompanionTaskRuntime)
+    runtime.plugin = harness
+    delivery.service.sender = runtime._send_file_message
+    original = delivery.root / "结果.txt"
+    original.write_text("交付内容", encoding="utf-8")
+    result = await delivery.service.send(delivery.actor, "bot:FriendMessage:user", paths=[str(original)])
+    assert result["success"]
+    row = harness.conversation_manager.history[-1]
+    source = Path(row["history_metadata"]["sent_sequence"][0]["source"])
+    assert source.is_relative_to(delivery.root)
+    assert source.read_text(encoding="utf-8") == "交付内容"
+
+
+@pytest.mark.asyncio
+async def test_runtime_does_not_archive_rejected_file_send(delivery):
+    from astrbot_plugin_private_companion.task_runtime import CompanionTaskRuntime
+    runtime = object.__new__(CompanionTaskRuntime)
+    runtime.plugin = SimpleNamespace(context=SimpleNamespace(send_message=AsyncMock(return_value=False)),
+        _record_confirmed_outbound_delivery=AsyncMock())
+    receipt = await runtime._send_file_message("bot:FriendMessage:user", SimpleNamespace(chain=[]))
+    assert receipt["status"] == "not_sent"
+    runtime.plugin._record_confirmed_outbound_delivery.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_batch_and_directory_auto_zip_preserve_chinese_structure(delivery):
     for name in ("甲/结果.txt", "乙/结果.txt"):
         file = delivery.root / name

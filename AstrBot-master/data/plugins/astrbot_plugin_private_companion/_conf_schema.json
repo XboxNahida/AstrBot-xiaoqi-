@@ -4943,6 +4943,19 @@
         "default": "openai/gpt-6-sol",
         "_special": "select_provider"
       },
+      "task_execution_engine": {
+        "description": "新GPT后台任务执行引擎",
+        "type": "string",
+        "default": "codex",
+        "options": ["codex", "native"],
+        "hint": "新GPT任务默认Codex；其他模型沿用原生；已有任务不迁移。此项不改变Gemini聊天模型。"
+      },
+      "codex_reasoning_effort": {
+        "description": "Codex默认思考程度",
+        "type": "string",
+        "default": "medium",
+        "hint": "常用low、medium、high、xhigh，也可填写模型支持的其他非空档位，最多64字符；新对话生效，Gemini可按对话修改。"
+      },
       "task_model_timeout_seconds": {
         "description": "后台模型流式无响应超时（秒，最多60）",
         "type": "int",

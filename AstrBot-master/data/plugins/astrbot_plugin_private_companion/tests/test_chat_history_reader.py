@@ -34,6 +34,33 @@ def setup_reader():
 
 
 @pytest.mark.asyncio
+async def test_outbound_history_has_ordered_images_files_and_resumable_sequence():
+    tool, manager, runtime, event = setup_reader()
+    conv = await manager.get_conversation("", "c1")
+    conv.history = json.dumps([{
+        "role": "assistant", "content": "先给你表情，再给文件", "timestamp": 120,
+        "history_metadata": {"sent_sequence": [
+            {"type": "text", "text": "先看", "send_index": 0, "position": 0, "timestamp": 100},
+            {"type": "image", "source": "/private/emoji.png", "send_index": 0, "position": 1,
+             "timestamp": 100, "availability": "available"},
+            {"type": "file", "name": "结果.docx", "source": "/workspace/结果.docx",
+             "send_index": 1, "position": 0, "timestamp": 120, "availability": "available"},
+        ]},
+    }])
+    raw = await tool.call(None, images_only=True, sequence_limit=2)
+    row = json.loads(raw)["messages"][0]
+    assert row["role"] == "assistant"
+    assert [entry["type"] for entry in row["sent_sequence"]] == ["text", "image"]
+    ref = row["sent_sequence"][1]["image_ref"]
+    assert runtime._events[event]["history_images"][ref] == "/private/emoji.png"
+    assert "/private/" not in raw and "source" not in row["sent_sequence"][1]
+    assert row["next_sequence_offset"] == 2
+    next_row = json.loads(await tool.call(None, sequence_offset=2))["messages"][0]
+    assert next_row["sent_sequence"][0]["name"] == "结果.docx"
+    assert next_row["sent_sequence"][0]["path"] == "/workspace/结果.docx"
+
+
+@pytest.mark.asyncio
 async def test_history_pagination_search_and_image_reference_without_hidden_content():
     tool, manager, runtime, event = setup_reader()
     data = json.loads(await tool.call(None, query="题图", limit=1))
@@ -67,6 +94,37 @@ async def test_history_lists_only_owned_conversations_and_marks_missing_timestam
     assert [row["conversation_id"] for row in data["conversations"]] == ["c1"]
     messages = json.loads(await tool.call(None))
     assert all(row["timestamp"] is None for row in messages["messages"])
+
+
+@pytest.mark.asyncio
+async def test_large_history_query_has_total_budget_and_resumable_message_cursor():
+    tool, manager, runtime, event = setup_reader()
+    conv = await manager.get_conversation("", "c1")
+    conv.history = json.dumps([{"role": "user", "content": str(i) + "x" * 12000} for i in range(20)])
+    raw = await tool.call(None, limit=20, text_limit=8000)
+    data = json.loads(raw)
+    assert len(raw) <= 14000
+    assert 0 < len(data["messages"]) < 20
+    assert data["next_offset"] == len(data["messages"])
+    assert data["messages"][0]["next_text_offset"] == 8000
+    page = json.loads(await tool.call(None, offset=data["next_offset"], limit=1))
+    assert page["messages"][0]["message_index"] == 19 - data["next_offset"]
+
+
+@pytest.mark.asyncio
+async def test_escaped_history_budget_and_long_text_resume_without_data_loss():
+    tool, manager, _, _ = setup_reader()
+    conv = await manager.get_conversation("", "c1")
+    text = '\\"\n' * 40000 + "TAIL"
+    conv.history = json.dumps([{"role": "user", "content": text}])
+    raw = await tool.call(None, text_limit=8000)
+    assert len(raw) <= 14000
+    first = json.loads(raw)["messages"][0]
+    assert first["next_text_offset"] == len(first["content"])
+    next_page = json.loads(await tool.call(None, offset=first["offset"], text_offset=first["next_text_offset"], text_limit=8000))
+    assert next_page["messages"][0]["content"] == text[len(first["content"]):len(first["content"]) + len(next_page["messages"][0]["content"])]
+    tail = json.loads(await tool.call(None, text_offset=len(text) - 4, text_limit=80))
+    assert tail["messages"][0]["content"] == "TAIL"
 
 
 @pytest.mark.asyncio

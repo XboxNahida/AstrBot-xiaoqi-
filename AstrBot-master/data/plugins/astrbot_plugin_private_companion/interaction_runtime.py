@@ -5,12 +5,15 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from contextlib import AsyncExitStack, suppress
 from types import SimpleNamespace
 
 from astrbot.api import logger
 from astrbot.core.agent.tool import FunctionTool
 from astrbot.core.message.components import Plain
 from astrbot.core.message.message_event_result import MessageChain
+from astrbot.core.pipeline.process_stage.conversation_queue import enqueue_conversation
+from astrbot.core.utils.session_lock import session_lock_manager
 
 from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
 from .conversation_route import _task_chat_text
@@ -37,6 +40,11 @@ class ScriptInteractionMixin:
             attempts=0,
             status="running",
             step_key="script",
+            error_kind=None,
+            lease_until=None,
+            created_at=None,
+            updated_at=None,
+            finished_at=None,
         )
         job.workdir = str(
             actor_workspace(self.workspace, self.actor(self.restore_event(job)))
@@ -49,6 +57,10 @@ class ScriptInteractionMixin:
     def interaction_allowed(self, channel):
         try:
             if not bool(getattr(self.plugin, "enabled", True)):
+                return False
+            scope = TaskScope(channel["bot_id"], channel["session_key"], channel["sender_id"])
+            current = self.interaction_api.channels.get(scope, channel["id"], include_inactive=True)
+            if current is None or current["status"] == "closed":
                 return False
             job = self.interaction_job(channel)
             event = self.restore_event(job)
@@ -232,6 +244,8 @@ class ScriptInteractionMixin:
             if action in {"script_status", "stop_script"} and not args.get("script_id"):
                 return {"success": False, "code": "script_id_required", "recoverable": True, "hint": "Use the script_id returned by action=run or the channel's script list."}
             c = api.channels.get(job.scope, args.get("channel_id"), include_inactive=True)
+            if c is not None and c["status"] == "closed":
+                raise ValueError("channel_closed")
             if c is None or not self.interaction_allowed(c):
                 raise PermissionError("channel_not_owned")
             if action == "renew":
@@ -304,12 +318,43 @@ class ScriptInteractionMixin:
             return False
         channel = reply["channel"]
         token = identity_token = None
+        stage = "prepare"
+        turn = renewal = None
+        outcome = "not_sent"
+        stack = AsyncExitStack()
         try:
             if not self.interaction_allowed(channel):
-                self.interaction_api.channels.finish_reply(reply, "failed")
+                self.interaction_api.channels.finish_reply(
+                    reply, "failed", stage=stage, error_code="interaction_not_allowed"
+                )
                 return True
             current = self.interaction_job(channel)
             event = self.restore_event(current)
+            turn = enqueue_conversation(
+                channel["session_key"],
+                channel["sender_id"],
+                key="script-reply:" + reply["id"],
+                kind="script",
+            )
+            turn.source_event = event
+
+            async def keep_lease():
+                while not turn.finished.done():
+                    await asyncio.sleep(30)
+                    if not self.interaction_api.channels.renew_reply(reply):
+                        return
+
+            renewal = asyncio.create_task(keep_lease())
+            if not await turn.wait_turn():
+                return True
+            await stack.enter_async_context(
+                session_lock_manager.acquire_lock(channel["session_key"])
+            )
+            if not self.interaction_allowed(channel):
+                self.interaction_api.channels.finish_reply(
+                    reply, "failed", stage=stage, error_code="interaction_not_allowed"
+                )
+                return True
             token, _ = await self.plugin._activate_persona_for_event_context(event)
             identity_token = await bind_event_bot_identity(self.plugin, event)
             notification = SimpleNamespace(
@@ -319,21 +364,29 @@ class ScriptInteractionMixin:
                     "observed_message_seq": reply["based_on_seq"],
                 },
             )
+            stage = "render"
             text = _task_chat_text(
                 await self.render_notification(notification, current)
             )
             if not text or not self.interaction_allowed(channel):
-                self.interaction_api.channels.finish_reply(reply, "failed")
+                self.interaction_api.channels.finish_reply(
+                    reply, "failed", stage=stage,
+                    error_code="empty_reply" if not text else "interaction_not_allowed",
+                )
                 return True
             if not self.interaction_api.channels.begin_reply(reply):
                 return True
+            turn.commit()
+            stage = "send"
+            outcome = "unknown"
             sent = await self.plugin.context.send_message(
                 channel["session_key"],
                 MessageChain(chain=[Plain(self._safe_text(text, 4500))]),
             )
             self.interaction_api.channels.finish_reply(
-                reply, "sent" if sent is True else "unknown"
+                reply, "sent" if sent is True else "unknown", stage=stage
             )
+            outcome = "sent" if sent is True else "unknown"
             if sent is True:
                 manager = getattr(self.plugin.context, "conversation_manager", None)
                 cid = current.metadata.get("chat_context", {}).get("conversation_id")
@@ -361,12 +414,28 @@ class ScriptInteractionMixin:
                             "Sent script chat archive failed: %s", type(exc).__name__
                         )
         except asyncio.CancelledError:
-            self.interaction_api.channels.finish_reply(reply, "unknown")
+            self.interaction_api.channels.finish_reply(
+                reply, "unknown" if stage == "send" else "failed",
+                stage=stage, error_code="CancelledError",
+            )
             raise
         except Exception as exc:
-            self.interaction_api.channels.finish_reply(reply, "unknown")
-            logger.warning("Script reply failed: %s", type(exc).__name__)
+            self.interaction_api.channels.finish_reply(
+                reply, "unknown" if stage == "send" else "failed",
+                stage=stage, error_code=type(exc).__name__,
+            )
+            logger.warning(
+                "Script reply failed: %s stage=%s reply_id=%s",
+                type(exc).__name__, stage, reply["id"],
+            )
         finally:
+            await stack.aclose()
+            if renewal is not None:
+                renewal.cancel()
+                with suppress(asyncio.CancelledError):
+                    await renewal
+            if turn is not None and not turn.consumed:
+                turn.finish(outcome)
             if identity_token is not None:
                 ACTIVE_BOT_IDENTITY.reset(identity_token)
             self.plugin._deactivate_persona_for_event(token)

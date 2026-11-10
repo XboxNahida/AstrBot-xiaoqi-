@@ -18,6 +18,7 @@ from astrbot.core.agent.tool import FunctionTool
 from astrbot.core.message.components import File
 from astrbot.core.message.message_event_result import MessageChain
 
+from .delivery_media_history import file_history_directory
 from .task_ordinary_read import TaskOrdinaryReader
 
 
@@ -226,10 +227,14 @@ class TaskFileDelivery:
                     )
                     break
                 try:
-                    receipt = await self.sender(
-                        session,
-                        MessageChain(chain=[File(name=name, file=str(snapshot))]),
+                    component = File(name=name, file=str(snapshot))
+                    history_token = file_history_directory.set(
+                        Path(self.reader.current_workspace(actor)) / "sent_media_history"
                     )
+                    try:
+                        receipt = await self.sender(session, MessageChain(chain=[component]))
+                    finally:
+                        file_history_directory.reset(history_token)
                     if not isinstance(receipt, dict) or receipt.get("status") != "sent":
                         item.update(
                             status="unknown",

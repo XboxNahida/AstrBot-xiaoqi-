@@ -128,6 +128,16 @@ class ProviderRequest:
     """Host opt-in: let this request decide tool turns and emit useful intermediate text."""
     required_tool_names: tuple[str, ...] = ()
     """Tools that must be requested before accepting a final assistant response."""
+    history_policy: str = ""
+    """Host-selected request history strategy; recent_only disables summaries."""
+    history_archive: list[dict] | None = field(default=None, repr=False)
+    """Complete original history, kept separate from the active request view."""
+    history_lookup_archive: dict[str, str] = field(default_factory=dict, repr=False)
+    """Unabridged current-run history lookup results for durable storage."""
+    history_message_metadata: dict[int, dict] = field(default_factory=dict, repr=False)
+    """Stable identifiers and first-save times for this run's new archive messages."""
+    prompt_cache_key: str | None = None
+    """Opaque host-bound conversation cache namespace when supported upstream."""
 
     def __repr__(self) -> str:
         return (
@@ -273,6 +283,30 @@ class ProviderRequest:
 
         # 否则返回多模态格式
         return {"role": "user", "content": content_blocks}
+
+
+def reported_cached_tokens(response) -> int | None:
+    """Distinguish a reported cache miss from missing provider cache metrics.
+
+    Args:
+        response: Response retaining optional raw provider usage.
+
+    Returns:
+        Reported cached input tokens, or None when the provider omitted them.
+    """
+    usage = getattr(response, "usage", None)
+    if getattr(usage, "input_cached", 0) > 0:
+        return usage.input_cached
+    raw = getattr(response, "raw_completion", None)
+    for path in (("usage", "prompt_tokens_details", "cached_tokens"),
+                 ("usage_metadata", "cached_content_token_count"),
+                 ("usage", "cache_read_input_tokens")):
+        value = raw
+        for part in path:
+            value = value.get(part) if isinstance(value, dict) else getattr(value, part, None)
+        if type(value) is int:
+            return value
+    return None
 
 
 @dataclass

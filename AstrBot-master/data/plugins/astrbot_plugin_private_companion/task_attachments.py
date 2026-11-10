@@ -11,9 +11,47 @@ from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
 
-from astrbot.core.message.components import File, Reply
+from astrbot.core.message.components import File, Image, Plain, Reply
 
 from .task_ordinary_read import TaskOrdinaryReader
+
+
+def describe_event_input(event):
+    """Index real message components without downloading or reading their contents.
+
+    Args:
+        event: Trusted inbound event supplied by the platform.
+
+    Returns:
+        Ordered text and attachment facts with distinct current/quoted origins.
+    """
+    message = getattr(event, "message_obj", None)
+    message_id = str(getattr(message, "message_id", "") or "")
+    sender = getattr(event, "get_sender_id", None)
+    result = {"message_id": message_id, "sender_id": str(sender() or "") if callable(sender) else "", "timestamp": str(getattr(message, "timestamp", "") or ""), "items": []}
+    attachment_index = 0
+    image_counts = {"current": 0, "quoted": 0}
+    for position, part in enumerate(getattr(message, "message", ()) or (), 1):
+        quoted = isinstance(part, Reply)
+        for child_position, item in enumerate((part.chain or ()) if quoted else (part,), 1):
+            kind = "file" if isinstance(item, File) else "image" if isinstance(item, Image) else "text" if isinstance(item, Plain) else ""
+            if not kind:
+                continue
+            source = "quoted" if quoted else "current"
+            row = {"position": f"{position}.{child_position}" if quoted else str(position), "source": source,
+                   "message_id": str(part.id or "") if quoted else message_id, "type": kind}
+            if kind == "text":
+                row["text"] = str(item.text or "")[:8000]
+            else:
+                attachment_index += 1
+                row["attachment_index"] = attachment_index
+                if kind == "file":
+                    row["name"] = str(item.name or "未命名文件")[:512]
+                else:
+                    image_counts[source] += 1
+                    row["image_index"] = image_counts[source]
+            result["items"].append(row)
+    return result
 
 
 @contextmanager
@@ -49,6 +87,16 @@ def _locked_directories(path):
 
 def _copy(source, workspace, source_roots, authorize):
     source = Path(os.path.abspath(source))
+    if os.name == "nt":
+        # 只展开8.3别名，不解析符号链接；下方仍校验目录重解析和真实句柄。
+        get_long = ctypes.WinDLL("kernel32", use_last_error=True).GetLongPathNameW
+        get_long.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_ulong]
+        get_long.restype = ctypes.c_ulong
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = get_long(str(source), buffer, len(buffer))
+        if not 0 < size < len(buffer):
+            raise OSError(ctypes.get_last_error(), "attachment_source_unavailable")
+        source = Path(buffer.value)
     if not any(source.is_relative_to(Path(root).resolve()) for root in source_roots):
         raise PermissionError("attachment_source_not_allowed")
     if authorize() is not True:
@@ -86,20 +134,24 @@ def _copy(source, workspace, source_roots, authorize):
 async def stage_event_files(event, workspace, source_roots, authorize):
     """只接受真实File组件，包括真实引用链；不解析模型提供的路径文本。"""
     components = list(getattr(event.message_obj, "message", ()) or ())
-    files, seen = [], set()
+    files, seen = [], {}
+    indexed = {row["position"]: row for row in describe_event_input(event)["items"]}
     cancelled = threading.Event()
     def allowed():
         return not cancelled.is_set() and authorize() is True
     try:
-        for part in components:
+        for position, part in enumerate(components, 1):
             candidates = part.chain or () if isinstance(part, Reply) else (part,)
-            for item in candidates:
+            for child_position, item in enumerate(candidates, 1):
                 if not isinstance(item, File):
                     continue
                 source = await item.get_file()
-                if not source or source in seen:
+                if not source:
                     continue
-                seen.add(source)
+                location = f"{position}.{child_position}" if isinstance(part, Reply) else str(position)
+                if source in seen:
+                    files.append({**seen[source], **indexed[location], "name": str(item.name or Path(source).name)})
+                    continue
                 copying = asyncio.create_task(asyncio.to_thread(_copy, source, Path(workspace), source_roots, allowed))
                 try:
                     record = await asyncio.shield(copying)
@@ -111,6 +163,8 @@ async def stage_event_files(event, workspace, source_roots, authorize):
                         files.append(result[0])
                     raise
                 record["name"] = str(item.name or Path(source).name)
+                record.update(indexed[location])
+                seen[source] = record
                 files.append(record)
     except BaseException:
         if files:

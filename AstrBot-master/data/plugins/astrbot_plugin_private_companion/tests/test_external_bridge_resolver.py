@@ -249,3 +249,61 @@ def test_module_scan_ignores_unstringifiable_plugin_name() -> None:
             sys.modules.pop(module_name, None)
         else:
             sys.modules[module_name] = previous
+
+
+def test_module_scan_does_not_trigger_unrelated_lazy_module_attributes(monkeypatch) -> None:
+    import astrbot_plugin_private_companion.external_bridge_resolver as resolver
+
+    accesses = []
+    lazy = types.ModuleType("unrelated.lazy_extension")
+
+    def lazy_attribute(name):
+        accesses.append(name)
+        return None
+
+    lazy.__getattr__ = lazy_attribute
+    real = types.ModuleType("renamed_plugin.main")
+    real.get_test_api = lambda: object()
+    monkeypatch.setattr(resolver, "sys", SimpleNamespace(modules={lazy.__name__: lazy, real.__name__: real}))
+    candidates = resolver._module_candidates(
+        ("missing.main",), getter_name="get_test_api", star_name="test_plugin"
+    )
+    assert candidates == [real]
+    assert accesses == []
+
+
+def test_module_scan_does_not_evaluate_non_string_plugin_identity(monkeypatch) -> None:
+    import astrbot_plugin_private_companion.external_bridge_resolver as resolver
+
+    accesses = []
+
+    class LazyIdentity:
+        def __str__(self):
+            accesses.append("str")
+            return "some_other_plugin"
+
+    unrelated = types.ModuleType("unrelated.identity_proxy")
+    unrelated.PLUGIN_NAME = LazyIdentity()
+    monkeypatch.setattr(resolver, "sys", SimpleNamespace(modules={unrelated.__name__: unrelated}))
+    assert resolver._module_candidates(
+        ("missing.main",), getter_name="get_test_api", star_name="test_plugin"
+    ) == []
+    assert accesses == []
+
+
+def test_module_scan_ignores_proxy_that_claims_to_be_a_module(monkeypatch) -> None:
+    import astrbot_plugin_private_companion.external_bridge_resolver as resolver
+
+    accesses = []
+
+    class ModuleProxy:
+        @property
+        def __class__(self):
+            accesses.append("__class__")
+            return types.ModuleType
+
+    monkeypatch.setattr(resolver, "sys", SimpleNamespace(modules={"unrelated.cffi": ModuleProxy()}))
+    assert resolver._module_candidates(
+        ("missing.main",), getter_name="get_test_api", star_name="test_plugin"
+    ) == []
+    assert accesses == []

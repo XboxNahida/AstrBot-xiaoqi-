@@ -6,6 +6,7 @@ import asyncio
 import ctypes
 import hashlib
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -37,6 +38,7 @@ BROKER_ROOT = Path("C:/ProgramData/AstrBotTaskBroker")
 SCRIPT = BOT_ROOT / "deployment/配置受限任务执行.ps1"
 _SETUP_LOCK = asyncio.Lock()
 _CAPABILITIES = ("read", "write", "shell", "install")
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -213,7 +215,26 @@ class AccountSetupCoordinator:
                             verifier.verify, actor, self.workspace(actor)
                         )
                     return AccountSetupResult(True, "already_ready")
-                except Exception:
+                except Exception as exc:
+                    # 只记录本模块/验证器定义的固定原因，不记录命令、凭据或任意异常正文。
+                    detail = str(exc)
+                    known = {
+                        "Candidate identity binding differs",
+                        "Ready evidence is incomplete",
+                        "Host deployment attestation is missing",
+                        "Deployment attestation differs from task scope",
+                        "Protected ACL tree changed during validation",
+                        "Account or ACL deployment invariant changed",
+                        "Host deployment ACL/account validation failed",
+                        "ACL change escaped protected roots",
+                        "ACL change has a reparsed ancestor",
+                        "Protected ACL monitor could not be established",
+                        "Protected ACL monitoring state is unknown",
+                    }
+                    logger.warning(
+                        "Task account ready verification failed: account=%s reason=%s",
+                        name, detail if detail in known else type(exc).__name__,
+                    )
                     ready.unlink(missing_ok=True)
                     self._audit(name, "failed")
                     return AccountSetupResult(False, "audit_required")

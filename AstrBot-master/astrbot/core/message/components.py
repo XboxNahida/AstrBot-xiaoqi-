@@ -167,7 +167,7 @@ class Record(BaseMessageComponent):
     def _decode_file_uri(uri: str) -> str:
         """解码 file:/// URI 为本地文件路径。
 
-        file:///PUBLIC_USER_HOME  → PUBLIC_USER_HOME  (Windows)
+        file:///C:/Users/...  → C:/Users/...  (Windows)
         file:///home/user/... → /home/user/... (Linux)
         其中的 URL 编码（如 %20 空格）也会被解码。
         """
@@ -177,7 +177,7 @@ class Record(BaseMessageComponent):
         """选择可用的文件源。
 
         NapCat 在 Windows 上可能只给 file 字段一个裸文件名（如 0d2bb1468a87d64414f8e563cc61c33c.amr），
-        而真实路径在 url（如 file:///PUBLIC_USER_HOME path（如 C:\\Users\\...）中。
+        而真实路径在 url（如 file:///C:/Users/...）或 path（如 C:\\Users\\...）中。
         Image.convert_to_file_path 使用 self.url or self.file，Record 同样需要 fallback。
         """
         # 1) 优先尝试 file：如果它已包含完整 URI 或已知格式，直接使用
@@ -218,7 +218,7 @@ class Record(BaseMessageComponent):
             ):
                 return self.url
 
-        # 3) 尝试 path（可能是 Windows 绝对路径如 PUBLIC_USER_HOME
+        # 3) 尝试 path（可能是 Windows 绝对路径如 C:\Users\...）
         if self.path:
             try:
                 if os.path.exists(self.path):

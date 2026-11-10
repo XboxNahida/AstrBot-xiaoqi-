@@ -48,6 +48,165 @@ class Provider:
 
 
 class ExecutorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_history_pages_exclude_their_own_reads_and_keep_original_arguments(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], dynamic_tool_catalog=True)
+        self.primary = Provider(
+            Response(calls=[("read", {"path": "ORIGINAL_ARGUMENT_ONLY"})]),
+            Response(calls=[("read", {"path": "second"})]),
+            Response(calls=[("pc_task_read_steps", {"offset": 0, "max_chars": 6000})]),
+            Response(calls=[("pc_task_read_steps", {"offset": 1, "max_chars": 6000})]),
+            Response("done"),
+        )
+        result = await self.executor().execute(job)
+        self.assertEqual("done", result["text"])
+        pages = []
+        for request in self.primary.requests[3:]:
+            latest = request["contexts"][-1]
+            pages.append(json.loads(latest["content"])["content"])
+        self.assertEqual([2, 2], [page["total_steps"] for page in pages])
+        self.assertTrue(pages[0]["has_more"])
+        self.assertFalse(pages[1]["has_more"])
+        self.assertIn("ORIGINAL_ARGUMENT_ONLY", pages[0]["text"])
+        self.assertIn("tool_call", pages[0]["text"])
+
+    async def test_legacy_step_arguments_are_recovered_from_the_bound_tool_call(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], dynamic_tool_catalog=True)
+        contexts = [{"role": "user", "content": "goal"},
+                    {"role": "assistant", "tool_calls": [{"id": "legacy-call", "type": "function", "function": {"name": "read", "arguments": '{"path":"legacy-path"}'}}]},
+                    {"role": "tool", "tool_call_id": "legacy-call", "content": '{"status":"success","content":"ok"}'}]
+        self.service.record_step(job, job.step_key, {"kind": "tool", "number": 1, "tool": "read", "contexts": contexts, "receipts": [], "pending_calls": [], "outcome": {"content": "ok"}}, next_step="tool:2")
+        self.primary = Provider(Response(calls=[("pc_task_read_steps", {"offset": 0, "max_chars": 6000})]), Response("done"))
+        await self.executor().execute(self.service.get(job.task_id, job.scope))
+        page = json.loads(self.primary.requests[-1]["contexts"][-1]["content"])["content"]
+        self.assertIn("legacy-path", page["text"])
+        self.assertIn("legacy-call", page["text"])
+
+    async def test_model_window_summary_is_durable_and_keeps_full_tool_steps(self):
+        job = self.submit(mode="reasoning", required_tool_names=[])
+        rounds = [{"role": "user", "content": "goal attachment-ref"}]
+        for index in range(6):
+            rounds.extend([
+                {"role": "assistant", "tool_calls": [{"id": str(index), "type": "function", "function": {"name": "read", "arguments": "{}"}}]},
+                {"role": "tool", "tool_call_id": str(index), "content": "observation" * 250},
+            ])
+        self.service.record_step(job, job.step_key, {"kind": "tool", "number": 6, "contexts": rounds, "receipts": [], "pending_calls": [], "outcome": {"content": "original"}}, next_step="tool:7")
+        job = self.service.get(job.task_id, job.scope)
+        self.primary = Provider(Response("Verified observations; no operation should be replayed."), Response("done"))
+        self.primary.provider_config = {"max_context_tokens": 11000}
+        result = await self.executor().execute(job)
+        self.assertEqual("done", result["text"])
+        self.assertEqual(2, len(self.primary.requests))
+        self.assertIn("摘要", self.primary.requests[0]["system_prompt"])
+        self.assertLess(len(str(self.primary.requests[-1]["contexts"])), len(str(rounds)))
+        state = self.service.get(job.task_id, job.scope)
+        summaries = [s for s in state.steps.values() if s.get("kind") == "context_summary"]
+        self.assertEqual(1, len(summaries))
+        self.assertEqual(rounds, next(s for s in state.steps.values() if s.get("kind") == "tool")["contexts"])
+        self.assertIn("goal attachment-ref", str(summaries[0]["contexts"]))
+        self.assertEqual(self.primary.requests[0]["prompt_cache_key"], self.primary.requests[1]["prompt_cache_key"])
+
+    async def test_summary_failure_waits_for_user_and_preserves_original_checkpoint(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], contexts=[{"role": "user", "content": "x" * 30000}])
+        self.primary = Provider(RuntimeError("must not send oversized input"))
+        self.primary.provider_config = {"fallback_max_context_tokens": 8192}
+        state = await self.run_failure(self.executor(), job, "context_limit")
+        self.assertEqual("waiting_user", state.status)
+        self.assertEqual("x" * 30000, state.metadata["request"]["contexts"][0]["content"])
+
+    async def test_own_history_tool_is_bounded_and_does_not_call_external_adapter(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], dynamic_tool_catalog=True)
+        self.primary = Provider(Response(calls=[("pc_task_read_steps", {"offset": 0, "max_chars": 1000})]), Response("done"))
+        result = await self.executor().execute(job)
+        self.assertEqual("done", result["text"])
+        self.assertEqual([], self.executions)
+        tool_reply = self.primary.requests[-1]["contexts"][-1]
+        self.assertLessEqual(len(tool_reply["content"]), 1800)
+        self.assertIn("total_steps", tool_reply["content"])
+
+    async def test_summary_outage_keeps_tool_checkpoint_and_waits_for_recovery(self):
+        job = self.submit(mode="reasoning", required_tool_names=[])
+        rounds = [{"role": "user", "content": "original goal"}]
+        for index in range(6):
+            rounds.extend([
+                {"role": "assistant", "tool_calls": [{"id": str(index)}]},
+                {"role": "tool", "tool_call_id": str(index), "content": "observation" * 250},
+            ])
+        self.service.record_step(job, job.step_key, {"kind": "tool", "number": 6, "contexts": rounds, "receipts": [], "pending_calls": []}, next_step="tool:7")
+        self.primary = Provider(RuntimeError("summary unavailable"))
+        self.primary.provider_config = {"max_context_tokens": 11000}
+        state = await self.run_failure(self.executor(), self.service.get(job.task_id, job.scope), "context_compaction_failed")
+        self.assertEqual("waiting_user", state.status)
+        self.assertEqual(1, len(self.primary.requests))
+        self.assertEqual(rounds, next(iter(state.steps.values()))["contexts"])
+        self.assertFalse(any(s.get("kind") == "context_summary" for s in state.steps.values()))
+
+    async def test_summary_checkpoint_resumes_without_resummarizing_or_replaying(self):
+        job = self.submit(mode="reasoning", required_tool_names=[])
+        compact = [{"role": "user", "content": "goal retained"}, {"role": "user", "content": "summary retained", "task_context_summary": True}]
+        self.assertTrue(self.service.record_context_checkpoint(job, {"kind": "context_summary", "number": 4, "contexts": compact, "receipts": [], "pending_calls": [], "summary": "summary retained"}))
+        self.service.fail(job, "provider_unavailable", retryable=True)
+        self.now += 16
+        resumed = self.service.claim("resume")
+        self.primary = Provider(Response("done"))
+        result = await self.executor().execute(resumed)
+        self.assertEqual("done", result["text"])
+        self.assertEqual(1, len(self.primary.requests))
+        self.assertIn("summary retained", str(self.primary.requests[0]["contexts"]))
+        self.assertTrue(all("task_context_summary" not in m for m in self.primary.requests[0]["contexts"]))
+        self.assertEqual([], self.executions)
+
+    async def test_summary_checkpoint_does_not_reset_current_attempt_budget(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], request_max_attempts=2)
+        self.assertTrue(self.service.record_context_checkpoint(job, {"kind": "context_summary", "number": 0, "contexts": [], "summary": "first"}))
+        self.assertTrue(self.service.begin_attempt(job, "primary", max_attempts=2))
+        self.assertTrue(self.service.record_context_checkpoint(job, {"kind": "context_summary", "number": 0, "contexts": [], "summary": "second"}))
+        self.assertFalse(self.service.begin_attempt(job, "primary", max_attempts=2))
+        self.assertEqual(2, self.service.get(job.task_id, job.scope).attempts)
+
+    async def test_history_page_cannot_read_foreign_task_and_bounds_escaped_content(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], dynamic_tool_catalog=True)
+        self.service.submit(TaskScope("otherbot", "othergroup", "otherowner"), "other", "other", "FOREIGN_PRIVATE_CONTENT", self.temp.name)
+        self.service.record_step(job, job.step_key, {"kind": "tool", "number": 1, "contexts": [], "outcome": {"content": '\n\\"' * 10000}}, next_step="tool:2")
+        self.primary = Provider(Response(calls=[("pc_task_read_steps", {"max_chars": 1000})]), Response("done"))
+        await self.executor().execute(self.service.get(job.task_id, job.scope))
+        reply = json.loads(self.primary.requests[-1]["contexts"][-1]["content"])
+        self.assertLessEqual(len(json.dumps(reply["content"], ensure_ascii=False)), 1000)
+        self.assertNotIn("FOREIGN_PRIVATE_CONTENT", str(reply))
+        self.assertTrue(reply["content"]["has_more"])
+
+    async def test_huge_tool_reply_uses_preview_but_full_original_remains_readable(self):
+        job = self.submit(mode="reasoning", required_tool_names=[], dynamic_tool_catalog=True)
+        original = "large-result-details" * 10000
+        self.primary = Provider(Response(calls=[("read", {})]), Response("done"))
+
+        async def execute(*args):
+            return {"status": "success", "content": original, "receipt": {"observed": True}}
+
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual("done", result["text"])
+        sent = self.primary.requests[-1]["contexts"][-1]["content"]
+        self.assertLess(len(sent), 5000)
+        self.assertIn("pc_task_read_steps", sent)
+        saved = [s for s in self.service.get(job.task_id, job.scope).steps.values() if s.get("kind") == "tool"]
+        self.assertEqual(original, saved[0]["outcome"]["content"])
+
+    async def test_activity_exposes_live_tool_and_retains_issue_after_model_continues(self):
+        job = self.submit(mode="reasoning", required_tool_names=[])
+        self.primary = Provider(Response(calls=[("read", {})]), Response("done"))
+
+        async def execute(job, tool, args):
+            current = self.service.get(job.task_id, job.scope)
+            self.assertEqual(current.metadata["execution_state"]["phase"], "tool_running")
+            self.assertEqual(current.metadata["execution_state"]["name"], "read")
+            return {"status": "error", "content": "recoverable tool error", "receipt": {"tool": "read"}}
+
+        result = await self.executor(execute_tool=execute).execute(job)
+        self.assertEqual(result["text"], "done")
+        state = self.service.get(job.task_id, job.scope).metadata["execution_state"]
+        self.assertEqual(state["phase"], "model_response")
+        self.assertEqual(state["last_tool_issue"]["status"], "error")
+        self.assertEqual(state["last_tool_issue"]["name"], "read")
+
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -487,6 +646,7 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
             *(Response(calls=[("read", {"index": index})]) for index in range(31)),
             Response('{"task_status":"completed","text":"全部步骤完成"}'),
         )
+        self.primary.provider_config = {"max_context_tokens": 65536}
         result = await self.executor().execute(job)
         self.assertEqual(31, len(self.executions))
         self.assertEqual(31, len(result["receipts"]))
@@ -629,10 +789,10 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(names is None for names in catalog_requests))
         self.assertGreaterEqual(len(catalog_requests), 3)
         self.assertEqual(
-            ["read"], [tool.name for tool in self.primary.requests[0]["func_tool"].tools]
+            ["pc_task_read_steps", "read"], [tool.name for tool in self.primary.requests[0]["func_tool"].tools]
         )
         self.assertEqual(
-            {"read", "write"},
+            {"pc_task_read_steps", "read", "write"},
             {tool.name for tool in self.primary.requests[1]["func_tool"].tools},
         )
         self.assertEqual(["read", "write"], [item[1] for item in self.permissions])
@@ -711,6 +871,15 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
             *(Response(calls=[("read", {"index": i})]) for i in range(70)),
             Response('{"task_status":"completed","text":"长任务完成"}'),
         )
+        original_chat = self.primary.text_chat
+
+        async def with_summaries(**kwargs):
+            if "请生成当前后台任务" in kwargs.get("system_prompt", ""):
+                self.primary.requests.append(kwargs)
+                return Response("Earlier read operations returned actual results; retain their receipts in durable steps.")
+            return await original_chat(**kwargs)
+
+        self.primary.text_chat = with_summaries
         result = await self.executor().execute(job)
         self.assertEqual(70, len(result["receipts"]))
         self.assertEqual(70, len(self.executions))
@@ -755,6 +924,7 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_oversized_context_rejected_before_provider_or_tool(self):
         job = self.submit(contexts=[{"role": "user", "content": "x" * 131072}])
+        self.primary.provider_config = {"max_context_tokens": 8192}
         await self.run_failure(self.executor(), job, "context_limit")
         self.assertEqual([], self.primary.requests)
         self.assertEqual([], self.executions)
@@ -769,6 +939,13 @@ class ExecutorTests(unittest.IsolatedAsyncioTestCase):
         state = await self.run_failure(self.executor(), job, "protocol_error")
         self.assertEqual("waiting_retry", state.status)
         self.assertEqual([], self.executions)
+
+    async def test_custom_extra_body_output_allowance_is_reserved(self):
+        job = self.submit(mode="reasoning", required_tool_names=[])
+        self.primary.provider_config = {"max_context_tokens": 8192, "custom_extra_body": {"max_completion_tokens": 8192}}
+        state = await self.run_failure(self.executor(), job, "context_limit")
+        self.assertEqual("waiting_user", state.status)
+        self.assertEqual([], self.primary.requests)
 
 
 if __name__ == "__main__":

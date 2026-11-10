@@ -64,11 +64,26 @@ def _public_evidence(value, depth=0, budget=None):
         return "…"
     budget[0] -= 80
     if isinstance(value, dict):
+        if value.get("type") in {"userMessage", "reasoning"}:
+            return {"type": value["type"], "content": "[输入或内部推理已省略]"}
         return {
             str(key)[:80]: _public_evidence(item, depth + 1, budget)
             for key, item in list(value.items())[:30]
-            if not re.search(
-                r"secret|token|password|authorization|cookie|api.?key|credential|system.?prompt|request|runtime|reply_context",
+            if (str(key) == "tokenUsage" and isinstance(item, dict))
+            or (
+                type(item) is int
+                and str(key)
+                in {
+                    "inputTokens",
+                    "outputTokens",
+                    "totalTokens",
+                    "cachedInputTokens",
+                    "cacheWriteInputTokens",
+                    "reasoningOutputTokens",
+                }
+            )
+            or not re.search(
+                r"secret|token|password|authorization|cookie|api.?key|credential|system.?prompt|request|runtime|reply_context|^input$|baseinstructions|developerinstructions",
                 str(key),
                 re.I,
             )
@@ -83,6 +98,7 @@ def _public_evidence(value, depth=0, budget=None):
             r"\1[已隐藏]",
             text,
         )
+        text = re.sub(r"data:image/[^\s\"'<>]+", "[图片已省略]", text)
         return re.sub(
             r"\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})", "[已隐藏]", text
         )
@@ -93,7 +109,7 @@ def _public_evidence(value, depth=0, budget=None):
     )
 
 
-def _job_view(job, *, detail=False):
+def _job_view(job, *, detail=False, service=None):
     value = {
         "task_id": job.task_id,
         **asdict(job.scope),
@@ -103,7 +119,39 @@ def _job_view(job, *, detail=False):
         "step_key": job.step_key,
         "attempts": job.attempts,
         "error_kind": _public_evidence(job.error_kind),
+        "engine": job.metadata.get("engine", "native"),
+        "codex": _public_evidence(
+            {
+                key: value
+                for key, value in job.metadata.get("codex", {}).items()
+                if key
+                in {
+                    "thread_id",
+                    "turn_id",
+                    "model_id",
+                    "model",
+                    "reasoning_effort",
+                    "connection_state",
+                }
+            }
+        ),
+        "model_id": (job.metadata.get("request") or {}).get("primary")
+        if isinstance(job.metadata.get("request"), dict)
+        else None,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "finished_at": job.finished_at,
     }
+    if service is not None:
+        value["execution"] = _public_evidence(
+            {
+                key: item
+                for key, item in service.execution_status(
+                    job.status, job.metadata, job.lease_until
+                ).items()
+                if key != "worker_lease_valid"
+            }
+        )
     if detail:
         budget = [8000]
         value.update(
@@ -137,7 +185,7 @@ class TasksPageApiMixin:
         tasks = [service.get(row[0], scope) for row in ids]
         return self._ok(
             {
-                "tasks": [_job_view(job) for job in tasks if job],
+                "tasks": [_job_view(job, service=service) for job in tasks if job],
                 "total": total,
                 "offset": offset,
                 "limit": 20,
@@ -152,7 +200,22 @@ class TasksPageApiMixin:
         )
         if job is None:
             raise LookupError("Task not found")
-        return self._ok({"task": _job_view(job, detail=True)})
+        runtime = self.plugin._persistent_task_runtime
+        data = {"task": _job_view(job, detail=True, service=runtime.service)}
+        if job.metadata.get("engine") == "codex":
+            after, limit = int(values.get("after", 0)), int(values.get("limit", 20))
+            if after < 0 or not 1 <= limit <= 20:
+                raise ValueError("Invalid event page")
+            codex = runtime.codex
+            binding = codex.store.get(job.scope, task_id=job.task_id)
+            data["codex_events"] = (
+                codex.read(job.scope, task_id=job.task_id, after=after, limit=limit)[
+                    "events"
+                ]
+                if binding
+                else {"items": [], "next_after": None, "available": False}
+            )
+        return self._ok(data)
 
     @_authenticated
     async def control_task(self, username):
@@ -165,6 +228,30 @@ class TasksPageApiMixin:
         job = runtime.service.get(task_id, scope)
         if job is None:
             raise LookupError("Task not found")
+        if job.metadata.get("engine") == "codex" and action != "reconcile":
+            receipt = await runtime.control_codex_task(job, action)
+            if not receipt.get("accepted"):
+                if receipt.get("code") == "permission_denied":
+                    raise PermissionError("Execution not authorized")
+                return self._error(
+                    "Codex控制未完成：" + str(receipt.get("code", "unknown_result")),
+                    status_code=409,
+                )
+            return self._ok(
+                {
+                    "task": _job_view(
+                        runtime.service.get(task_id, scope), service=runtime.service
+                    ),
+                    "principal": username,
+                    "control": {
+                        key: receipt.get(key) for key in ("code", "status", "thread_id")
+                    },
+                }
+            )
+        if job.metadata.get("engine") == "codex" and task_id in runtime.codex.active:
+            return self._error(
+                "Codex执行进程仍在活动，请先暂停或取消并等待真实回执", status_code=409
+            )
         if action in {"resume", "retry"} and job.status == "unknown_result":
             return self._error("请先核实执行结果，不能直接重新执行", status_code=409)
         if action in {"resume", "retry"}:
@@ -192,7 +279,9 @@ class TasksPageApiMixin:
             return self._error("当前任务状态不支持此操作", status_code=409)
         return self._ok(
             {
-                "task": _job_view(runtime.service.get(task_id, scope)),
+                "task": _job_view(
+                    runtime.service.get(task_id, scope), service=runtime.service
+                ),
                 "principal": username,
             }
         )

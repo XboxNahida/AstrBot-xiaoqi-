@@ -45,6 +45,21 @@ def make_task(rt, scope, index, status="queued"):
     return task
 
 
+@pytest.mark.asyncio
+async def test_catalog_exposes_actual_tool_wait_and_issue_without_claiming_progress(catalog_env):
+    rt, scope = catalog_env
+    task = make_task(rt, scope, "activity")
+    job = rt.service.claim("worker")
+    assert rt.service.record_activity(job, "tool_result", "install", outcome={"status": "unknown", "content": "verify installation"})
+    assert rt.service.record_activity(job, "tool_running", "check_files")
+    data = await TaskCatalog(rt).read(scope, category="background")
+    item = next(item for item in data["items"] if item["item_id"] == task.task_id)
+    assert item["execution"]["phase"] == "tool_running"
+    assert item["execution"]["name"] == "check_files"
+    assert item["execution"]["last_tool_issue"]["name"] == "install"
+    assert item["execution"]["worker_lease_valid"]
+
+
 def cron(scope, key, **kwargs):
     return SimpleNamespace(
         job_id=key,

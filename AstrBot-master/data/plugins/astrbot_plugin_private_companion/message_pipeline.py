@@ -452,7 +452,8 @@ async def handle_private_message(self: Any, event: Any, *args: Any, **kwargs: An
                 now=received_ts,
             )
         private_image_enhancement_enabled = (
-            self._feature_enabled_or_temp_unlocked("enable_private_image_self_recognition")
+            not getattr(event, "_private_companion_native_multimodal", False)
+            and self._feature_enabled_or_temp_unlocked("enable_private_image_self_recognition")
             and bool(getattr(self, "enable_message_debounce", getattr(self, "enable_semantic_message_debounce", True)))
             and self._message_debounce_seconds("image") > 0
         )
@@ -646,7 +647,13 @@ async def handle_private_message(self: Any, event: Any, *args: Any, **kwargs: An
             self._schedule_data_save()
             event.stop_event()
             return
-        elif is_target_user and not forward_only_prompt and not reference_media_with_text:
+        elif (
+            is_target_user
+            and not forward_only_prompt
+            and not reference_media_with_text
+            and not self._event_has_media_component(event)
+            and not getattr(event, "_private_companion_unified_queue", False)
+        ):
             pending_debounce_merge = False
             pending_absorber = getattr(self, "_message_debounce_absorb_pending_message", None)
             if callable(pending_absorber):
@@ -828,7 +835,10 @@ async def handle_private_message(self: Any, event: Any, *args: Any, **kwargs: An
                     _safe_int(expression_feedback.get("updated_rules"), 0, 0),
                     _safe_int(expression_feedback.get("demoted_rules"), 0, 0),
                 )
-            private_memory_write_allowed = self._req041_private_memory_write_allowed(user)
+            private_memory_write_allowed = (
+                not getattr(self, "_gemini_memory_enabled", False)
+                and self._req041_private_memory_write_allowed(user)
+            )
             private_memory_managed = self._req041_private_memory_managed()
             private_memory_revision = (
                 self._req041_prepare_authoritative_private_memory(user)
@@ -1045,7 +1055,7 @@ async def handle_private_message(self: Any, event: Any, *args: Any, **kwargs: An
         event.stop_event()
     elif is_target_user:
         pass
-    if is_target_user:
+    if is_target_user and not getattr(self, "_gemini_memory_enabled", False):
         self._create_lifecycle_background_task(
             self._maybe_refresh_companion_memory(user_id, user_snapshot),
             label="refresh_companion_memory_inbound",
@@ -1687,7 +1697,12 @@ async def handle_group_message(self: Any, event: Any, *args: Any, **kwargs: Any)
                     sender_id,
                     _single_line(text, 80),
                 )
-        if high_intensity_merge_active and talking_to_bot and not group_reference_media_with_text:
+        if (
+            high_intensity_merge_active
+            and talking_to_bot
+            and not group_reference_media_with_text
+            and not getattr(event, "_private_companion_unified_queue", False)
+        ):
             high_key = self._group_high_intensity_buffer_key(group_id, sender_id)
             if self._note_semantic_message_buffer(
                 high_key,
@@ -1773,9 +1788,15 @@ async def handle_group_message(self: Any, event: Any, *args: Any, **kwargs: Any)
             and not high_intensity_merge_active
             and not group_reference_media_with_text
             and callable(pending_absorber)
+            and not getattr(event, "_private_companion_unified_queue", False)
         ):
             pending_debounce_merge = bool(pending_absorber(event, text))
-        if talking_to_bot and not high_intensity_merge_active and not group_reference_media_with_text:
+        if (
+            talking_to_bot
+            and not high_intensity_merge_active
+            and not group_reference_media_with_text
+            and not getattr(event, "_private_companion_unified_queue", False)
+        ):
             if not pending_debounce_merge:
                 self._maybe_record_smart_message_debounce_followup(
                     scope=f"group:{group_id}",
@@ -1796,7 +1817,9 @@ async def handle_group_message(self: Any, event: Any, *args: Any, **kwargs: Any)
         group_smart_decision = str(group_smart_result.get("decision") or "") if isinstance(group_smart_result, dict) else ""
         group_smart_handled = group_smart_decision in {"complete", "incomplete"}
         short_wait = 0.0
-        if not high_intensity_merge_active:
+        if not high_intensity_merge_active and not getattr(
+            event, "_private_companion_unified_queue", False
+        ):
             short_wait = self._group_short_wakeup_wait_seconds(event, text, smart_result=group_smart_result)
         if short_wait > 0:
             group_smart_wait = max(group_smart_wait, short_wait)

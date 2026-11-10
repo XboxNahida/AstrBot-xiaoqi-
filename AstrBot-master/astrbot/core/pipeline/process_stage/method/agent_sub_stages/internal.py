@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import replace
 
 from astrbot.core import db_helper, logger
+from astrbot.core.agent.context.recent import merge_archive
 from astrbot.core.agent.message import (
     CheckpointData,
     CheckpointMessageSegment,
@@ -41,6 +42,7 @@ from astrbot.core.utils.session_lock import session_lock_manager
 
 from .....astr_agent_run_util import AgentRunner, run_agent, run_live_agent
 from ....context import PipelineContext, call_event_hook
+from ...conversation_queue import enqueue_conversation
 from ...follow_up import (
     FollowUpCapture,
     finalize_follow_up_capture,
@@ -160,6 +162,42 @@ class InternalAgentSubStage(Stage):
     ) -> None:
         await event.send(MessageChain().message(str(message)))
 
+    async def _prepare_queued_message(self, event, wake_prefix, owner_event):
+        """Prepare captured input through the ordinary attachment and grant hooks.
+
+        Args:
+            event: Original inbound event, including all media components.
+            wake_prefix: Normal provider wake prefix.
+            owner_event: Same-sender event owning the current model conversation.
+
+        Returns:
+            A complete input message, or None when normal hooks reject it.
+        """
+        if await call_event_hook(event, EventType.OnWaitingLLMRequestEvent):
+            return None
+        event._conversation_owner_event = owner_event
+        result = await build_main_agent(
+            event=event,
+            plugin_context=self.ctx.plugin_manager.context,
+            config=replace(self.main_agent_cfg, provider_wake_prefix=wake_prefix),
+            apply_reset=False,
+        )
+        if result is None:
+            raise RuntimeError("Queued input could not be prepared")
+        try:
+            req = result.provider_request
+            if await call_event_hook(event, EventType.OnLLMRequestEvent, req):
+                return None
+            message = Message.model_validate(await req.assemble_context())
+            message._history_metadata = {
+                "source_message_id": str(event.message_obj.message_id),
+                "source_timestamp": getattr(event.message_obj, "timestamp", None),
+            }
+            return message
+        finally:
+            if result.reset_coro is not None:
+                result.reset_coro.close()
+
     async def process(
         self, event: AstrMessageEvent, provider_wake_prefix: str
     ) -> AsyncGenerator[None, None]:
@@ -167,6 +205,10 @@ class InternalAgentSubStage(Stage):
         follow_up_consumed_marked = False
         follow_up_activated = False
         typing_requested = False
+        conversation_turn = None
+        original_send = None
+        delivery = {"attempted": False, "confirmed": False, "unknown": False}
+        agent_runner = None
         try:
             streaming_response = self.streaming_response
             if (enable_streaming := event.get_extra("enable_streaming")) is not None:
@@ -192,7 +234,55 @@ class InternalAgentSubStage(Stage):
                 return
 
             logger.debug("ready to request llm provider")
-            follow_up_capture = try_capture_follow_up(event)
+            if getattr(event, "_private_companion_unified_queue", False):
+                if getattr(event, "_conversation_duplicate", False):
+                    return
+
+                async def prepare_input():
+                    owner = getattr(conversation_turn.queue[0], "source_event", None)
+                    return await self._prepare_queued_message(
+                        event, provider_wake_prefix, owner
+                    )
+
+                conversation_turn = getattr(event, "_conversation_turn", None)
+                if conversation_turn is None:
+                    conversation_turn = enqueue_conversation(
+                        event.unified_msg_origin,
+                        event.get_sender_id(),
+                        key="user:" + str(event.message_obj.message_id),
+                    )
+                    event._conversation_turn = conversation_turn
+                conversation_turn.prepare = prepare_input
+                conversation_turn.source_event = event
+                if not await conversation_turn.wait_turn():
+                    event.set_extra("_follow_up_captured", {"queued": True})
+                    # Keep source media alive until tools and history have
+                    # consumed the captured input, not merely read its ticket.
+                    await asyncio.shield(conversation_turn.finished)
+                    return
+                original_send = event.send
+
+                async def tracked_queue_send(message, *args, **kwargs):
+                    final = conversation_turn.committed
+                    if final:
+                        delivery["attempted"] = True
+                    try:
+                        result = await original_send(message, *args, **kwargs)
+                    except BaseException:
+                        if final:
+                            delivery["unknown"] = True
+                        raise
+                    if final:
+                        delivery["confirmed"] |= result is not False
+                        delivery["unknown"] |= result is False
+                    return result
+
+                event.send = tracked_queue_send
+                # One bounded settling window; later input never restarts it.
+                delay = event.get_extra("conversation_queue_settle_seconds") or 0
+                await asyncio.sleep(min(2.0, max(0.0, float(delay))))
+            else:
+                follow_up_capture = try_capture_follow_up(event)
             if follow_up_capture:
                 (
                     follow_up_consumed_marked,
@@ -222,6 +312,8 @@ class InternalAgentSubStage(Stage):
                 logger.debug("acquired session lock for llm request")
                 agent_runner: AgentRunner | None = None
                 runner_registered = False
+                history_saved = False
+                req = None
                 try:
                     build_cfg = replace(
                         self.main_agent_cfg,
@@ -266,6 +358,8 @@ class InternalAgentSubStage(Stage):
                         self.unsupported_streaming_strategy == "turn_off"
                         and not event.platform_meta.support_streaming_message
                     )
+                    if conversation_turn is not None:
+                        stream_to_general = True
 
                     if await call_event_hook(event, EventType.OnLLMRequestEvent, req):
                         if reset_coro:
@@ -312,6 +406,12 @@ class InternalAgentSubStage(Stage):
                     if reset_coro:
                         await reset_coro
 
+                    if conversation_turn is not None:
+                        agent_runner.conversation_turn = conversation_turn
+                        # Keep provider SSE, while platform output uses complete
+                        # drafts so an obsolete partial answer cannot escape.
+                        agent_runner.streaming = True
+
                     register_active_runner(event.unified_msg_origin, agent_runner)
                     runner_registered = True
                     action_type = event.get_extra("action_type")
@@ -328,7 +428,11 @@ class InternalAgentSubStage(Stage):
                     )
 
                     # 检测 Live Mode
-                    if action_type == "live" and not req.disable_streaming:
+                    if (
+                        action_type == "live"
+                        and not req.disable_streaming
+                        and conversation_turn is None
+                    ):
                         # Live Mode: 使用 run_live_agent
                         logger.info(
                             "[Internal Agent] Live Mode detected; enabling TTS processing."
@@ -377,6 +481,7 @@ class InternalAgentSubStage(Stage):
                                 agent_runner.stats,
                                 user_aborted=agent_runner.was_aborted(),
                             )
+                            history_saved = True
 
                     elif streaming_response and not stream_to_general:
                         # 流式响应
@@ -452,6 +557,7 @@ class InternalAgentSubStage(Stage):
                             agent_runner.stats,
                             user_aborted=agent_runner.was_aborted(),
                         )
+                        history_saved = True
 
                     asyncio.create_task(
                         Metric.upload(
@@ -460,6 +566,20 @@ class InternalAgentSubStage(Stage):
                             provider_type=agent_runner.provider.meta().type,
                         ),
                     )
+                except Exception:
+                    if (
+                        not history_saved and runner_registered and req is not None
+                        and req.history_policy == "recent_only"
+                        and (not event.is_stopped() or agent_runner.was_aborted())
+                    ):
+                        try:
+                            await self._save_to_history(
+                                event, req, None, agent_runner.run_context.messages,
+                                agent_runner.stats,
+                            )
+                        except Exception:
+                            logger.exception("Failed to archive interrupted agent messages.")
+                    raise
                 finally:
                     if runner_registered and agent_runner is not None:
                         unregister_active_runner(event.unified_msg_origin, agent_runner)
@@ -485,6 +605,30 @@ class InternalAgentSubStage(Stage):
                     activated=follow_up_activated,
                     consumed_marked=follow_up_consumed_marked,
                 )
+            if conversation_turn is not None and not conversation_turn.consumed:
+                if original_send is not None:
+                    event.send = original_send
+                final = (
+                    agent_runner.get_final_llm_resp()
+                    if agent_runner is not None
+                    else None
+                )
+                complete = (
+                    final is not None
+                    and final.role == "assistant"
+                    and agent_runner.done()
+                    and not agent_runner.was_aborted()
+                )
+                outcome = (
+                    "unknown"
+                    if delivery["unknown"]
+                    else "sent"
+                    if delivery["confirmed"]
+                    else "silent"
+                    if complete and not delivery["attempted"]
+                    else "not_sent"
+                )
+                conversation_turn.finish(outcome)
 
     async def _save_to_history(
         self,
@@ -504,7 +648,9 @@ class InternalAgentSubStage(Stage):
             if message.role == "system" and not skipped_initial_system:
                 skipped_initial_system = True
                 continue
-            if message.role in ["assistant", "user"] and message._no_save:
+            if message._no_save and (
+                req.history_policy == "recent_only" or message.role in ["assistant", "user"]
+            ):
                 continue
             messages_to_save.append(message)
 
@@ -520,12 +666,14 @@ class InternalAgentSubStage(Stage):
                         content=CheckpointData(id=checkpoint_id),
                     ).model_dump()
                 )
-            if has_checkpoint or (llm_response is None and req.tool_calls_result):
+            if has_checkpoint or (llm_response is None and req.tool_calls_result) or (
+                req.history_policy == "recent_only" and message_to_save
+            ):
                 token_usage = None if has_checkpoint else req.conversation.token_usage
                 await self.conv_manager.update_conversation(
                     event.unified_msg_origin,
                     req.conversation.cid,
-                    history=message_to_save,
+                    history=merge_archive(req, message_to_save),
                     token_usage=token_usage,
                 )
             return
@@ -571,7 +719,7 @@ class InternalAgentSubStage(Stage):
         await self.conv_manager.update_conversation(
             event.unified_msg_origin,
             req.conversation.cid,
-            history=message_to_save,
+            history=merge_archive(req, message_to_save),
             token_usage=token_usage,
         )
 

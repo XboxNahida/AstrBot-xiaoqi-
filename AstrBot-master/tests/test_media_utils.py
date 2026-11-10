@@ -557,7 +557,7 @@ async def test_record_and_video_components_accept_generic_data_uri(
         ("FILE:///tmp/a", True),
         ("/tmp/a", False),
         ("relative/a", False),
-        ("PUBLIC_USER_HOME", False),
+        ("C:/Users/a.jpg", False),
         (None, False),
         (Path("/tmp/a"), False),
     ],

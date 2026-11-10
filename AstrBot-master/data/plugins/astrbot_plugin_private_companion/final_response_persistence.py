@@ -8,6 +8,8 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, is_dataclass, replace
 from functools import wraps
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from astrbot.api import logger
@@ -17,7 +19,9 @@ from astrbot.core.agent.message import AssistantMessageSegment, TextPart
 from astrbot.core.provider.entities import LLMResponse
 from astrbot.core.star.star import star_map
 from astrbot.core.star.star_handler import EventType, star_handlers_registry
+from astrbot.core.utils.session_lock import session_lock_manager
 
+from .delivery_media_history import capture_sequence, ordered_text
 from .helpers import _format_history_media_marker, _now_ts, _safe_float, _single_line
 
 _DELIVERY_TASK_LABELS = frozenset({"segmented_llm_remainder"})
@@ -31,6 +35,7 @@ class DeliveryLedger:
     event: AstrMessageEvent | None = None
     passive: bool = False
     confirmed_chains: list[list[Any]] = field(default_factory=list)
+    history_sequences: list[list[dict] | None] = field(default_factory=list)
     candidate_chain: list[Any] = field(default_factory=list)
     background_tasks: set[asyncio.Task] = field(default_factory=set)
     original_send: Any = None
@@ -97,6 +102,7 @@ class FinalResponsePersistenceCoordinator:
 
     def finish_proactive(self, ledger: DeliveryLedger, outcome: Any) -> Any:
         self._reset_context(ledger)
+        ledger.finalized = True
         if not is_dataclass(outcome):
             return outcome
         fields = getattr(outcome, "__dataclass_fields__", {})
@@ -105,6 +111,8 @@ class FinalResponsePersistenceCoordinator:
             updates["delivery_umo"] = ledger.umo
         if "delivered_chain" in fields:
             updates["delivered_chain"] = tuple(ledger.delivered_chain)
+        if "history_metadata" in fields:
+            updates["history_metadata"] = self.history_metadata(ledger)
         if "delivered_text" in fields and ledger.confirmed_chains:
             delivered_text = self._delivered_text(ledger.confirmed_chains)
             if delivered_text:
@@ -128,6 +136,7 @@ class FinalResponsePersistenceCoordinator:
         components: list[Any],
     ) -> None:
         ledger.confirmed_chains.append(components)
+        ledger.history_sequences.append(None)
         event = ledger.event
         # A normal passive turn is finalized by the after-send hook.  Only
         # schedule the delayed fallback when propagation has already stopped;
@@ -146,6 +155,57 @@ class FinalResponsePersistenceCoordinator:
                 )
             except RuntimeError:
                 ledger.fallback_task = None
+
+    @staticmethod
+    def history_metadata(ledger: DeliveryLedger) -> dict:
+        return {"sent_sequence": [row for sequence in ledger.history_sequences
+                                  for row in sequence or []]}
+
+    async def freeze_missing(self, ledger: DeliveryLedger) -> None:
+        directory = (Path(getattr(self.owner, "data_dir", "data/plugin_data/astrbot_plugin_private_companion"))
+                     / "outbound_history" / hashlib.sha256(ledger.umo.encode()).hexdigest()[:24])
+        for index, sent_chain in enumerate(ledger.confirmed_chains):
+            if ledger.history_sequences[index] is None:
+                ledger.history_sequences[index] = await capture_sequence(
+                    sent_chain, directory, send_index=index, timestamp=_now_ts())
+
+    async def record(self, umo: str, chain) -> None:
+        """在源临时文件仍存在时冻结真实发送；独立后台发送直接写入会话。"""
+        components = list(chain or [])
+        if not components:
+            return
+        ledger = _CURRENT_DELIVERY.get()
+        if ledger is not None and (ledger.umo != umo or ledger.finalized):
+            ledger = None
+        timestamp = _now_ts()
+        directory = (Path(getattr(self.owner, "data_dir", "data/plugin_data/astrbot_plugin_private_companion"))
+                     / "outbound_history" / hashlib.sha256(umo.encode()).hexdigest()[:24])
+        index = len(ledger.confirmed_chains) if ledger else 0
+        if ledger:
+            self._append_confirmation(ledger, components)
+
+        async def capture():
+            sequence = await capture_sequence(components, directory, send_index=index, timestamp=timestamp)
+            if ledger:
+                ledger.history_sequences[index] = sequence
+            return sequence
+
+        task = asyncio.create_task(capture())
+        if ledger:
+            ledger.background_tasks.add(task)
+        try:
+            sequence = await task
+            if ledger is None:
+                event = SimpleNamespace(unified_msg_origin=umo,
+                    _private_companion_delivery_history_metadata={"sent_sequence": sequence})
+                async with session_lock_manager.acquire_lock(umo):
+                    await self.owner._append_delivered_assistant_to_conversation(
+                        event=event, assistant_response=self.owner._delivered_assistant_text_from_chain(components))
+        except Exception as exc:
+            logger.warning("[PrivateCompanion] 发送历史附件保存失败: %s", type(exc).__name__)
+        finally:
+            if ledger:
+                ledger.background_tasks.discard(task)
 
     async def _finalize_stopped_event_after_yield(self, ledger: DeliveryLedger) -> None:
         await asyncio.sleep(0.05)
@@ -200,7 +260,7 @@ class FinalResponsePersistenceCoordinator:
                     if send_result is not False:
                         sent_chain = getattr(message, "chain", None)
                         if isinstance(sent_chain, (list, tuple)) and sent_chain:
-                            self._append_confirmation(ledger, list(sent_chain))
+                            await self.record(ledger.umo, sent_chain)
                     return send_result
 
                 ledger.original_send = original_send
@@ -232,7 +292,7 @@ class FinalResponsePersistenceCoordinator:
                     if send_result is not False and captured:
                         ledger.streaming = True
                         for sent_chain in captured:
-                            self._append_confirmation(ledger, sent_chain)
+                            await self.record(ledger.umo, sent_chain)
                     return send_result
 
                 ledger.original_send_streaming = original_streaming
@@ -296,6 +356,9 @@ class FinalResponsePersistenceCoordinator:
                     for sent_chain in ledger.confirmed_chains
                 ):
                     ledger.confirmed_chains.insert(0, list(ledger.candidate_chain))
+                    ledger.history_sequences.insert(0, None)
+            await self.freeze_missing(ledger)
+            setattr(event, "_private_companion_delivery_history_metadata", self.history_metadata(ledger))
             confirmed_chains = ledger.confirmed_chains
             if ledger.final_chain_start is not None:
                 confirmed_chains = confirmed_chains[ledger.final_chain_start :]
@@ -346,6 +409,7 @@ def collect_proactive_delivery(
         ledger = coordinator.begin_proactive(umo)
         try:
             outcome = await function(self, umo, *args, **kwargs)
+            await coordinator.freeze_missing(ledger)
         except BaseException:
             coordinator._reset_context(ledger)
             raise
@@ -411,6 +475,9 @@ class FinalResponsePersistenceMixin:
         chain: list[Any] | tuple[Any, ...],
     ) -> None:
         self._final_response_persistence_coordinator().confirm(umo, chain)
+
+    async def _record_confirmed_outbound_delivery(self, umo: str, chain) -> None:
+        await self._final_response_persistence_coordinator().record(umo, chain)
 
     @staticmethod
     def _actual_text_from_delivered_chain(
@@ -675,6 +742,7 @@ class FinalResponsePersistenceMixin:
         text = str(fallback_text or "").strip()
         if not text:
             text = self._actual_text_from_delivered_chain(components)
+        text = ordered_text(components, text)
         image_count = sum(isinstance(component, Image) for component in components)
         record_count = sum(isinstance(component, Record) for component in components)
         media_marker = _format_history_media_marker(
@@ -701,6 +769,7 @@ class FinalResponsePersistenceMixin:
             return False
         try:
             message.content = [TextPart(text=response_text)]
+            message._history_metadata = getattr(event, "_private_companion_delivery_history_metadata", {})
             if hasattr(message, "tool_calls"):
                 message.tool_calls = None
             if hasattr(message, "tool_call_id"):
@@ -751,7 +820,15 @@ class FinalResponsePersistenceMixin:
                 if isinstance(raw_history, list)
                 else []
             )
-            history.append(AssistantMessageSegment(content=response_text).model_dump())
+            item = AssistantMessageSegment(content=response_text).model_dump()
+            item["timestamp"] = _now_ts()
+            metadata = getattr(event, "_private_companion_delivery_history_metadata", {})
+            if metadata:
+                item["history_metadata"] = metadata
+                sequence = metadata.get("sent_sequence", [])
+                if sequence:
+                    item["timestamp"] = sequence[0]["timestamp"]
+            history.append(item)
             await conv_mgr.update_conversation(umo, conv_id, history=history)
             return True
 

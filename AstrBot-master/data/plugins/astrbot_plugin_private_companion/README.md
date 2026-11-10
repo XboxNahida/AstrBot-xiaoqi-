@@ -140,7 +140,7 @@ astrbot_plugin_private_companion
 Windows 常见位置：
 
 ~~~text
-PUBLIC_USER_HOME\.astrbot\data\plugins\astrbot_plugin_private_companion
+C:\Users\你的用户名\.astrbot\data\plugins\astrbot_plugin_private_companion
 ~~~
 
 插件启停由 AstrBot 官方插件开关负责。旧版配置中的 <code>enabled</code> 字段已经废弃。

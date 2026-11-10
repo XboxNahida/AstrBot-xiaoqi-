@@ -17,6 +17,49 @@ class Clock:
 
 
 class TaskServiceTests(unittest.TestCase):
+    def test_notification_waiting_for_chat_renews_lease_and_records_handled(self):
+        self.submit()
+        notice = self.service.claim_notification("queue")
+        self.clock.now += self.service.lease_seconds - 1
+        assert self.service.renew_notification(notice)
+        self.clock.now += self.service.lease_seconds - 1
+        assert self.service.ack_notification(notice, handled=True)
+        with self.service._transaction() as db:
+            assert db.execute("SELECT state FROM pt_outbox").fetchone()[0] == "handled"
+        assert not self.service.renew_notification(notice)
+
+    def test_execution_activity_is_fenced_and_heartbeat_is_not_progress(self):
+        task = self.submit()
+        job = self.service.claim("worker")
+        assert self.service.record_activity(job, "model_wait", "primary")
+        self.clock.now += 2
+        assert self.service.record_activity(job, "model_response", "primary")
+        self.clock.now += 1
+        assert self.service.record_activity(job, "tool_running", "install")
+        self.clock.now += 12
+        assert self.service.heartbeat(job)
+        current = self.service.get(task.task_id, self.scope)
+        state = self.service.execution_status(current.status, current.metadata, current.lease_until)
+        assert state["phase"] == "tool_running"
+        assert state["name"] == "install"
+        assert state["phase_elapsed_seconds"] == 12
+        assert state["seconds_since_progress"] == 13
+        assert state["worker_lease_valid"]
+        assert self.service.record_activity(job, "tool_result", "install", outcome={"status": "unknown", "content": "not confirmed"})
+        state = self.service.get(task.task_id, self.scope).metadata["execution_state"]
+        assert state["last_tool_issue"]["status"] == "unknown"
+        self.service.cancel(task.task_id, self.scope)
+        assert not self.service.record_activity(job, "model_wait", "primary")
+        assert self.service.get(task.task_id, self.scope).metadata["execution_state"] == state
+
+    def test_legacy_running_row_never_implies_verified_execution(self):
+        task = self.submit()
+        job = self.service.claim("worker")
+        state = self.service.execution_status(job.status, job.metadata, job.lease_until)
+        assert state["phase"] == "unconfirmed"
+        assert state["seconds_since_progress"] is None
+        assert state["worker_lease_valid"]
+
     def test_feedback_recovery_keeps_identity_goal_and_rejects_stale_or_duplicate_repairs(self):
         task = self.submit()
         job = self.service.claim("worker")

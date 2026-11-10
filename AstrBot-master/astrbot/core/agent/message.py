@@ -214,6 +214,8 @@ class Message(BaseModel):
 
     _no_save: bool = PrivateAttr(default=False)
     _checkpoint_after: CheckpointData | None = PrivateAttr(default=None)
+    _turn_id: str | None = PrivateAttr(default=None)
+    _history_metadata: dict[str, Any] = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
     def check_content_required(self):
@@ -337,6 +339,9 @@ def bind_checkpoint_messages(history: list[dict]) -> list[Message]:
         message = Message.model_validate(item)
         if item.get("_no_save"):
             message._no_save = True
+        message._turn_id = item.get("turn_id")
+        if isinstance(item.get("history_metadata"), dict):
+            message._history_metadata = item["history_metadata"]
         messages.append(message)
 
     return messages
@@ -347,6 +352,10 @@ def dump_messages_with_checkpoints(messages: list[Message]) -> list[dict]:
     dumped: list[dict] = []
     for message in messages:
         message_data = message.model_dump()
+        if message._turn_id:
+            message_data["turn_id"] = message._turn_id
+        if message._history_metadata:
+            message_data["history_metadata"] = message._history_metadata
         if isinstance(message.content, list):
             message_data["content"] = [
                 part.model_dump()

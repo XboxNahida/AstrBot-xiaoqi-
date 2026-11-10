@@ -26,12 +26,14 @@ class TaskActor:
         group_id: Trusted group identifier, empty for private conversations.
         user_id: Real platform account identifier, never a display name.
         is_primary_user: Host-verified primary-user status.
+        task_authorized: Host-issued approval for an already accepted task.
     """
 
     bot_id: str
     group_id: str
     user_id: str
     is_primary_user: bool
+    task_authorized: bool = False
 
     def __post_init__(self) -> None:
         if (
@@ -41,6 +43,7 @@ class TaskActor:
             or not self.user_id.strip()
             or not isinstance(self.group_id, str)
             or type(self.is_primary_user) is not bool
+            or type(self.task_authorized) is not bool
         ):
             raise ValueError("A trusted actor requires explicit account identifiers")
 
@@ -283,7 +286,7 @@ class TaskPermissionStore:
             resolved = requested.resolve()
             if not any(resolved.is_relative_to(root) for root in self.allowed_roots):
                 return False
-            if actor.is_primary_user:
+            if actor.is_primary_user or actor.task_authorized:
                 return True
             now = time.time()
             return any(

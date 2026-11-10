@@ -3343,6 +3343,8 @@ class UserMemoryMixin:
         return {"keep": True, "kind": kind, "weight": weight, "reason": "explicit" if explicit else "rule_match"}
 
     def _update_companion_memory_from_message(self, user: dict[str, Any], text: str) -> None:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return
         if not self.enable_companion_memory:
             return
         cleaned = _single_line(text, 260)
@@ -3965,6 +3967,8 @@ class UserMemoryMixin:
         return {"signal": signal, "updated_rules": updated, "demoted_rules": demoted}
 
     def _format_companion_memory_for_prompt(self, user: dict[str, Any], *, style_only: bool = False) -> str:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return ""
         memory = user.get("companion_memory")
         lines: list[str] = []
         if not isinstance(memory, dict):
@@ -8995,6 +8999,8 @@ Character-specific bottom-line baseline (reference only; empty means use the con
         return result
 
     async def _maybe_refresh_dialogue_episode(self, user_id: str, user: dict[str, Any]) -> None:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return
         if not self.enable_dialogue_episode_memory:
             return
         now = _now_ts()
@@ -9416,6 +9422,8 @@ bot_promises 只记录 Bot 明确承诺要提醒、记住、转述、发送或�
         return any(cue in hint for cue in relation_cues)
 
     def _format_private_chat_context_injection(self, user: dict[str, Any], *, limit: int = 2) -> str:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return ""
         if not self.enable_mai_style_integration:
             return ""
         hint = _single_line(user.get("last_user_message"), 260)
@@ -9561,6 +9569,8 @@ bot_promises 只记录 Bot 明确承诺要提醒、记住、转述、发送或�
             del observed[:-8]
 
     async def _maybe_refresh_companion_memory(self, user_id: str, user: dict[str, Any]) -> None:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return
         if not self.enable_companion_memory:
             return
         now = _now_ts()

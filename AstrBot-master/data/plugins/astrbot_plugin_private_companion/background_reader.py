@@ -37,22 +37,32 @@ class BackgroundReadTool(FunctionTool):
                 "when present. Facts are timestamped snapshots, not new user instructions."
                 " Default task_view=active excludes ended history; history/all are explicit. "
                 "For the four task categories and current total counts use pc_manage_tasks."
+                " Codex tasks expose metadata.codex and actual codex_events; use after for event IDs and follow next_after."
                 " After submitting a task, optionally pass task_id and wait_seconds once to confirm it leaves queued; "
                 "waiting is local and makes no model requests. Once running without an error, finish your check. "
                 "Do not continuously poll healthy work; exceptions trigger a separate feedback event."
+                " For script delivery use resource=replies with channel_id, optionally reply_id."
+                " Script finished only means its process ended; stdout pending is an old enqueue receipt,"
+                " not final delivery. Read current reply status/receipt before explaining a missing message;"
+                " unknown does not by itself prove a network fault."
             ),
             parameters={
                 "type": "object",
                 "properties": {
                     "resource": {
                         "type": "string",
-                        "enum": ["tasks", "scripts", "schedules"],
+                        "enum": ["tasks", "scripts", "schedules", "replies"],
                     },
                     "task_id": {"type": "string"},
                     "channel_id": {"type": "string"},
-                    "task_view": {"type": "string", "enum": ["active", "history", "all"]},
+                    "reply_id": {"type": "string"},
+                    "task_view": {
+                        "type": "string",
+                        "enum": ["active", "history", "all"],
+                    },
                     "include_archived": {"type": "boolean"},
                     "offset": {"type": "integer", "minimum": 0},
+                    "after": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 20},
                     "text_offset": {"type": "integer", "minimum": 0},
                     "text_limit": {"type": "integer", "minimum": 80, "maximum": 16000},
@@ -108,6 +118,12 @@ class BackgroundReadTool(FunctionTool):
         except jsonschema.ValidationError:
             return json.dumps({"ok": False, "code": "invalid_arguments"})
         resource = kwargs.get("resource", "tasks")
+        if kwargs.get("reply_id") and resource != "replies":
+            return json.dumps({"ok": False, "code": "reply_id_requires_replies"})
+        if resource == "replies" and not kwargs.get("channel_id"):
+            return json.dumps({"ok": False, "code": "channel_id_required"})
+        if "after" in kwargs and (resource != "tasks" or not kwargs.get("task_id")):
+            return json.dumps({"ok": False, "code": "event_page_requires_task_id"})
         offset, limit = kwargs.get("offset", 0), kwargs.get("limit", 6)
         identity = (scope.bot_id, scope.session_key, scope.sender_id)
         result = {"ok": True, "observed_at": rt.service.clock(), "resource": resource}
@@ -191,6 +207,7 @@ class BackgroundReadTool(FunctionTool):
                             )
                         }
                         metadata = json.loads(row["metadata"])
+                        result["task"]["execution"] = rt.service.execution_status(row["status"], metadata, row["lease_until"])
                         result["task"].update(
                             group_id=metadata.get("task_group_id") or task_id,
                             parent_task_id=metadata.get("parent_task_id"),
@@ -204,6 +221,38 @@ class BackgroundReadTool(FunctionTool):
                             current_provider=attempt["provider"] if attempt else None,
                             last_model_request_at=attempt["created_at"] if attempt else None,
                         )
+                        result["task"]["engine"] = metadata.get("engine", "native")
+                        if metadata.get("engine") == "codex":
+                            public = {
+                                key: value
+                                for key, value in metadata.get("codex", {}).items()
+                                if key
+                                in {
+                                    "thread_id",
+                                    "turn_id",
+                                    "model_id",
+                                    "model",
+                                    "reasoning_effort",
+                                    "connection_state",
+                                }
+                            }
+                            result["task"]["metadata"] = {"codex": public}
+                            result["task"]["current_provider"] = public.get("model_id")
+                            binding = rt.codex.store.get(scope, task_id=task_id)
+                            result["codex_events"] = (
+                                rt.codex.read(
+                                    scope,
+                                    task_id=task_id,
+                                    after=kwargs.get("after", 0),
+                                    limit=limit,
+                                )["events"]
+                                if binding
+                                else {
+                                    "items": [],
+                                    "next_after": None,
+                                    "available": False,
+                                }
+                            )
                         rows = db.execute(
                             "SELECT step_key,evidence,completed_at FROM pt_steps WHERE task_id=? ORDER BY rowid LIMIT ? OFFSET ?",
                             (task_id, limit + 1, offset),
@@ -261,10 +310,41 @@ class BackgroundReadTool(FunctionTool):
                         ).fetchone()[0]
                         result["task_view"] = view
                         rows = db.execute(
-                            "SELECT task_id,goal,status,revision,step_key,error_kind,created_at,updated_at,finished_at,COALESCE(json_extract(metadata,'$.task_group_id'),task_id) AS group_id,json_extract(metadata,'$.parent_task_id') AS parent_task_id,json_extract(metadata,'$.task_relation') AS relation FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=?" + filters + " ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",
+                            "SELECT task_id,goal,status,revision,step_key,error_kind,created_at,updated_at,finished_at,metadata,lease_until,COALESCE(json_extract(metadata,'$.task_group_id'),task_id) AS group_id,json_extract(metadata,'$.parent_task_id') AS parent_task_id,json_extract(metadata,'$.task_relation') AS relation FROM pt_tasks WHERE bot_id=? AND session_key=? AND sender_id=?" + filters + " ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",
                             (*identity, limit + 1, offset),
                         ).fetchall()
                         result["tasks"] = [dict(row) for row in rows[:limit]]
+                        for item in result["tasks"]:
+                            metadata = json.loads(item.pop("metadata"))
+                            item["execution"] = rt.service.execution_status(
+                                item["status"], metadata, item.pop("lease_until")
+                            )
+                            item["engine"] = metadata.get("engine", "native")
+                            if metadata.get("engine") == "codex":
+                                item["metadata"] = {
+                                    "codex": {
+                                        key: value
+                                        for key, value in metadata.get(
+                                            "codex", {}
+                                        ).items()
+                                        if key
+                                        in {
+                                            "thread_id",
+                                            "turn_id",
+                                            "model_id",
+                                            "model",
+                                            "reasoning_effort",
+                                            "connection_state",
+                                        }
+                                    }
+                                }
+                                item["codex_events"] = {
+                                    "tool": "pc_codex_dialogue",
+                                    "action": "read",
+                                    "task_id": item["task_id"],
+                                    "after": 0,
+                                    "limit": 20,
+                                }
                         raw_detail = None
                 else:
                     if kwargs.get("task_id"):
@@ -279,11 +359,33 @@ class BackgroundReadTool(FunctionTool):
                         if channel is None:
                             return json.dumps({"ok": False, "code": "not_found"})
                         result["channel"] = dict(channel)
-                        rows = db.execute(
-                            "SELECT id,path,run_at,timeout,status,exit_code,stdout,stderr,finished_at,error_code FROM ic_scripts WHERE channel_id=? ORDER BY rowid DESC LIMIT ? OFFSET ?",
-                            (channel_id, limit + 1, offset),
-                        ).fetchall()
-                        raw_detail = [dict(row) for row in rows[:limit]]
+                        if resource == "replies":
+                            reply_id = kwargs.get("reply_id")
+                            selector = " AND id=?" if reply_id else ""
+                            parameters = (channel_id, reply_id) if reply_id else (channel_id,)
+                            rows = db.execute(
+                                "SELECT id,request_key,generation,based_on_seq,status,receipt "
+                                "FROM ic_replies WHERE channel_id=?" + selector
+                                + " ORDER BY rowid DESC LIMIT ? OFFSET ?",
+                                (*parameters, limit + 1, offset),
+                            ).fetchall()
+                            if reply_id and not rows and offset == 0:
+                                return json.dumps({"ok": False, "code": "not_found"})
+                            raw_detail = [dict(row) for row in rows[:limit]]
+                            for item in raw_detail:
+                                item["receipt"] = json.loads(item["receipt"]) if item["receipt"] else None
+                                if isinstance(item["receipt"], dict):
+                                    item["receipt"]["at_text"] = task_time(item["receipt"].get("at"))
+                            result["receipt_note"] = (
+                                "Current final receipts; script stdout pending only records enqueue time. "
+                                "failed means not delivered; unknown means delivery unconfirmed, not a proven network fault."
+                            )
+                        else:
+                            rows = db.execute(
+                                "SELECT id,path,run_at,timeout,status,exit_code,stdout,stderr,finished_at,error_code FROM ic_scripts WHERE channel_id=? ORDER BY rowid DESC LIMIT ? OFFSET ?",
+                                (channel_id, limit + 1, offset),
+                            ).fetchall()
+                            raw_detail = [dict(row) for row in rows[:limit]]
                     else:
                         rows = db.execute(
                             f"SELECT {fields} FROM ic_channels WHERE bot_id=? AND session_key=? AND sender_id=? ORDER BY rowid DESC LIMIT ? OFFSET ?",
@@ -318,21 +420,44 @@ class BackgroundReadTool(FunctionTool):
                     if start + size < len(detail)
                     else None,
                 )
-            return json.dumps(self._redact(result, secrets), ensure_ascii=False)
+            codex_events = result.pop("codex_events", None)
+            public = self._redact(result, secrets)
+            if codex_events is not None:
+                # Runtime already projects protocol events; preserve business keys.
+                public["codex_events"] = self._redact(codex_events, secrets, exact=True)
+            return json.dumps(public, ensure_ascii=False)
         except (sqlite3.Error, ValueError, TypeError, KeyError, AttributeError):
             return json.dumps({"ok": False, "code": "background_read_unavailable"})
 
-    def _redact(self, value, secrets):
+    def _redact(self, value, secrets, *, exact=False):
         """Redact structured/JSON-encoded leaves before serialization and paging.
 
         Args:
             value: Recorded data containing possibly nested tool argument JSON.
             secrets: Stored script credentials which may occur in tool output.
+            exact: Preserve projected Codex business fields and redact exact secrets.
 
         Returns:
             Data with credential fields and known secret strings removed.
         """
+        if exact:
+            if isinstance(value, dict):
+                return {
+                    self._redact(key, secrets, exact=True): self._redact(
+                        item, secrets, exact=True
+                    )
+                    for key, item in value.items()
+                }
+            if isinstance(value, list):
+                return [self._redact(item, secrets, exact=True) for item in value]
+            if isinstance(value, str):
+                for secret in secrets:
+                    value = value.replace(secret, "[密钥已隐藏]")
+                return self.runtime._safe_text(value, 2**63 - 1)
+            return value
         if isinstance(value, dict):
+            if value.get("type") in {"userMessage", "reasoning"}:
+                return {"type": value["type"], "content": "[输入或内部推理已省略]"}
             return {
                 key: "[密钥已隐藏]"
                 if re.fullmatch(
@@ -342,10 +467,19 @@ class BackgroundReadTool(FunctionTool):
                 )
                 else self._redact(item, secrets)
                 for key, item in value.items()
+                if str(key).lower().replace("_", "")
+                not in {
+                    "systemprompt",
+                    "baseinstructions",
+                    "developerinstructions",
+                    "input",
+                    "request",
+                }
             }
         if isinstance(value, list):
             return [self._redact(item, secrets) for item in value]
         if isinstance(value, str):
+            value = re.sub(r"data:image/[^\s\"'<>]+", "[图片已省略]", value)
             if value.lstrip().startswith(("{", "[")):
                 try:
                     return json.dumps(

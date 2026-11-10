@@ -529,6 +529,23 @@ def _initialize_world_and_model_config(self: Any, c: Any) -> None:
     self.conversation_task_fallback_provider_id = ""  # 旧配置保留，后台不自动切换模型。
     self.task_model_timeout_seconds = min(60, max(1, self._cfg_int(c, "task_model_timeout_seconds", 120)))
     self.task_model_max_attempts = max(1, self._cfg_int(c, "task_model_max_attempts", 3))
+    self.task_execution_engine = self._cfg_raw(c, "task_execution_engine", "codex")
+    if not isinstance(
+        self.task_execution_engine, str
+    ) or self.task_execution_engine not in {"codex", "native"}:
+        raise ValueError("后台执行引擎必须是codex或native")
+    self.codex_reasoning_effort = self._cfg_raw(c, "codex_reasoning_effort", "medium")
+    if (
+        not isinstance(self.codex_reasoning_effort, str)
+        or not self.codex_reasoning_effort.strip()
+        or len(self.codex_reasoning_effort) > 64
+        or any(
+            ord(char) < 32 or 127 <= ord(char) <= 159
+            for char in self.codex_reasoning_effort
+        )
+    ):
+        raise ValueError("Codex思考程度必须是最多64字符且不含控制字符的非空档位")
+    self.codex_reasoning_effort = self.codex_reasoning_effort.strip()
     self.conversation_hub_provider_id = self._cfg_str(c, "CONVERSATION_HUB_PROVIDER_ID", "")
     self.enable_hub_group_batching = self._cfg_bool(c, "enable_hub_group_batching", True)
     self.hub_group_batch_seconds = min(5.0, self._cfg_float(c, "hub_group_batch_seconds", 2.5, 0.0))

@@ -93,7 +93,7 @@ async def test_sandbox_file_download_handles_windows_remote_filename(
     context = _make_sandbox_context()
     result = await fs_tools.FileDownloadTool().call(
         context,
-        remote_path=r"PUBLIC_USER_HOME\report.txt",
+        remote_path=r"C:\Users\AstrBot\report.txt",
         also_send_to_user=True,
     )
 

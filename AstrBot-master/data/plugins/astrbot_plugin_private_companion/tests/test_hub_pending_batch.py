@@ -43,6 +43,21 @@ class Event:
 
 
 class HubPendingBatchTests(unittest.IsolatedAsyncioTestCase):
+    def test_media_message_cannot_be_swallowed_by_text_only_batch(self):
+        from astrbot.core.message.components import File
+
+        first = Event("请接收文件", "m1")
+        second = Event("请接收文件", "m2")
+        first.message_obj.message = [File(name="一.zip", file="one.zip")]
+        second.message_obj.message = [File(name="二.zip", file="two.zip")]
+        first._private_companion_capability_decision = SimpleNamespace(merge_messages=True)
+        second._private_companion_capability_decision = SimpleNamespace(merge_messages=True)
+        self.plugin._message_debounce_mark_llm_pending(first)
+        self.assertFalse(self.plugin._message_debounce_absorb_pending_message(second, second.message_str))
+        third = Event("请接收文件", "m3")
+        third._private_companion_capability_decision = SimpleNamespace(merge_messages=True)
+        self.assertFalse(self.plugin._message_debounce_absorb_pending_message(third, third.message_str))
+
     def setUp(self) -> None:
         self.plugin = PrivateCompanionPlugin.__new__(PrivateCompanionPlugin)
         self.plugin._central_hub_scheduler_enabled = True

@@ -1427,7 +1427,7 @@ class PhotoToolDeliveryContractTests(unittest.IsolatedAsyncioTestCase):
         self,
     ) -> None:
         generated_path = self.image_path
-        windows_path = r"PUBLIC_USER_HOME\AppData\Local\Temp\prompt trace.json"
+        windows_path = r"C:\Users\99505\AppData\Local\Temp\prompt trace.json"
         unc_path = r"\\private-server\reference library\persona.png"
         posix_path = "/var/lib/private-companion/prompts/trace.json"
         relative_path = "data/photo_prompt_debug/trace.json"
@@ -1477,7 +1477,7 @@ class PhotoToolDeliveryContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(public_url, serialized)
 
     async def test_reference_resolution_error_receipt_redacts_local_path(self) -> None:
-        hidden_path = r"C:\AstrBotTest\Pictures\private reference.png"
+        hidden_path = r"C:\Users\99505\Pictures\private reference.png"
         harness = _PhotoToolHarness()
 
         async def fail_to_resolve(_event, _user_id):

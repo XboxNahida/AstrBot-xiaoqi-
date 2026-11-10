@@ -444,7 +444,7 @@ class PhotoPromptContextTests(unittest.TestCase):
             prompt_format="traditional",
             workflow_kind="selfie",
             reference={
-                "source": r"PUBLIC_USER_HOME User\reference image.png",
+                "source": r"C:\Users\Example User\reference image.png",
                 "reference_roles": ["identity", "outfit"],
                 "outfit_category": "sleepwear",
             },

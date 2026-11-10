@@ -397,7 +397,7 @@ async def test_send_message_downloads_windows_sandbox_file_with_original_name(
 
     result = await tool.call(
         ctx,
-        messages=[{"type": "file", "path": r"PUBLIC_USER_HOME\report.txt"}],
+        messages=[{"type": "file", "path": r"C:\Users\AstrBot\report.txt"}],
     )
 
     assert "Message sent to session" in result

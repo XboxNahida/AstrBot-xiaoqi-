@@ -3360,6 +3360,8 @@ class EventDispatchMixin:
 
     def _message_debounce_absorb_pending_message(self, event: AstrMessageEvent, text: str) -> bool:
         """将 LLM 处理中到达的补话放回同一缓冲区，避免并发生成第二个回复。"""
+        if getattr(event, "_private_companion_unified_queue", False):
+            return False
         key = self._message_debounce_pending_key(event)
         if not key:
             return False
@@ -3437,6 +3439,9 @@ class EventDispatchMixin:
     def _hub_absorb_pending_message(
         self, event: AstrMessageEvent, text: str, key: str, pending: dict[str, Any]
     ) -> bool:
+        # This queue only merges text; preserve each media event and its receipt.
+        if self._event_has_media_component(event):
+            return False
         now = _now_ts()
         # Only the hub may merge a request with a resolved decision.
         hub_decision = getattr(event, "_private_companion_capability_decision", None)
@@ -3597,6 +3602,8 @@ class EventDispatchMixin:
                     "signature": signature_getter(text) if callable(signature_getter) else "",
                     "ts": previous.get("ts", _now_ts()),
                     "protected": bool(
+                        self._event_has_media_component(event)
+                        or
                         getattr(decision, "route", "chat") in {"task", "mixed"}
                         or set(getattr(decision, "actions", ())) - {"emoji", "voice"}
                         or getattr(event, "_private_companion_task_id", "")
@@ -3609,6 +3616,8 @@ class EventDispatchMixin:
 
     async def guard_pending_message_debounce(self, event: AstrMessageEvent, *args: Any, **kwargs: Any) -> None:
         """在会话锁前收口补话，避免旧回复与新消息并发出站。"""
+        if getattr(event, "_private_companion_unified_queue", False):
+            return
         if bool(getattr(self, "_central_hub_scheduler_enabled", False)):
             decision = getattr(event, "_private_companion_capability_decision", None)
             if decision is None or not bool(getattr(decision, "reply", False)):
@@ -3646,6 +3655,8 @@ class EventDispatchMixin:
         Returns:
             Whether this request was stopped because it is obsolete.
         """
+        if getattr(event, "_private_companion_unified_queue", False):
+            return False
         if not bool(getattr(self, "_central_hub_scheduler_enabled", False)) or not getattr(event, "_private_companion_hub_pending_marked", False):
             return False
         pending = self._message_debounce_pending_store().get(self._message_debounce_pending_key(event), {})
@@ -3660,6 +3671,8 @@ class EventDispatchMixin:
         return False
 
     async def settle_pending_message_debounce(self, event: AstrMessageEvent, resp: LLMResponse, *args: Any, **kwargs: Any) -> None:
+        if getattr(event, "_private_companion_unified_queue", False):
+            return
         key = self._message_debounce_pending_key(event)
         if not key:
             return

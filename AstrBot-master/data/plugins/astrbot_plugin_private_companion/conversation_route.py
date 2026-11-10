@@ -12,6 +12,7 @@ from typing import Any
 
 from astrbot.api import logger
 from astrbot.core.agent.tool import ToolSet
+from astrbot.core.pipeline.process_stage.conversation_queue import enqueue_conversation
 from astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal import (
     decoded_blocked,
 )
@@ -33,6 +34,11 @@ def enable_model_managed_chat(req):
         "提交任务后可用pc_read_background(task_id, wait_seconds)短暂确认启动；确认正常运行且暂无错误即可结束本轮检查。"
         "不要为正常任务持续等待或反复请求，不用固定发几句；后续错误会触发反馈，由你按需上报或在原授权内调整。"
         "工具报错是供你判断和修正的事实，只有接收回执不能说任务完成；停止、隔离和敏感凭据保护仍生效。"
+        "\n【聊天历史使用】\n"
+        "默认语境是当前对话近期原文，不再自动附加旧聊天摘要；未出现的旧细节不能凭空补全。"
+        "需要核对旧约定、用户原话、过去图片或附件时，自主调用pc_read_chat_history，"
+        "先用query或images_only缩小范围，再按next_offset、next_text_offset分页读取相关片段；"
+        "不要循环搬运全部历史。返回正文有预算限制，未读到不代表不存在。"
     )
 
 
@@ -428,6 +434,31 @@ def prepare_native_chat_entry(plugin: Any, event: Any) -> None:
         return
     event.set_extra("selected_provider", identity)
     event.set_extra("selected_model", None)
+    event._private_companion_unified_queue = True
+    event.set_extra(
+        "conversation_queue_settle_seconds",
+        min(
+            2.0,
+            max(0.0, float(getattr(plugin, "text_message_debounce_seconds", 1.0) or 0)),
+        ),
+    )
+    if getattr(event, "_conversation_turn", None) is None:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            turn = enqueue_conversation(
+                event.unified_msg_origin,
+                event.get_sender_id(),
+                key="user:" + str(event.message_obj.message_id),
+            )
+            event._conversation_turn = turn
+            if getattr(turn, "source_event", event) is not event:
+                event._conversation_duplicate = True
+                event.stop_event()
+            else:
+                turn.source_event = event
     modalities = provider.provider_config.get("modalities")
     event._private_companion_native_multimodal = not modalities or isinstance(modalities, list) and "image" in modalities
 

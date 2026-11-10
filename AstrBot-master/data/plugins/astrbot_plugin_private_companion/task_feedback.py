@@ -46,6 +46,26 @@ class RecoverBackgroundTool(FunctionTool):
         if current is None or not rt.authorize_job(current):
             return json.dumps({"ok": False, "code": "authorization_revoked"})
         guidance = rt._safe_text(kwargs["guidance"], 4000)
+        if current.metadata.get("engine") == "codex":
+            receipt = await rt.control_codex_task(
+                current,
+                "recover",
+                expected_revision=kwargs["expected_revision"],
+                recovery_guidance=guidance,
+            )
+            ok = receipt.get("accepted") is True
+            if ok:
+                self.recovery_revision = receipt.get("recovery_revision")
+                self.recovery_key = receipt.get("recovery_key")
+            return json.dumps(
+                {
+                    "ok": ok,
+                    "code": receipt.get("code", "codex_recovery_failed"),
+                    "task_id": current.task_id,
+                    "thread_id": receipt.get("thread_id"),
+                    "status": receipt.get("status"),
+                }
+            )
         ok = rt.service.recover_with_guidance(
             original.task_id, original.scope, kwargs["expected_revision"], guidance
         )

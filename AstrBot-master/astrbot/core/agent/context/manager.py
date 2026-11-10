@@ -114,6 +114,16 @@ class ContextManager:
         if self.compressor.should_compress(
             messages, tokens_after_summary, self.config.max_context_tokens
         ):
+            if getattr(self.compressor, "preserve_current_turn", False):
+                # Remove only disposable history; never halve current user material.
+                while tokens_after_summary > self.config.max_context_tokens * 0.8:
+                    candidate = await self.compressor(messages)
+                    candidate_tokens = self.token_counter.count_tokens(candidate)
+                    if candidate_tokens >= tokens_after_summary:
+                        logger.warning("Current turn exceeds the context budget; source material was preserved.")
+                        break
+                    messages, tokens_after_summary = candidate, candidate_tokens
+                return messages
             logger.info(
                 "Context still exceeds max tokens after compression, applying halving truncation..."
             )

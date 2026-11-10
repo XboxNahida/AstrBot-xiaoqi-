@@ -226,13 +226,13 @@ def test_build_skills_prompt_normalizes_windows_backslashes_on_non_windows_host(
         SkillInfo(
             name="foo",
             description="do foo",
-            path=r"PUBLIC_USER_HOME\技能\SKILL.md",
+            path=r"C:\Users\Alice\技能\SKILL.md",
             active=True,
         ),
     ]
     prompt = build_skills_prompt(skills)
     example_fragment = prompt.split("(e.g. `", 1)[1].split("`).", 1)[0]
-    assert example_fragment == "cat 'PUBLIC_USER_HOME/技能/SKILL.md'"
+    assert example_fragment == "cat 'C:/Users/Alice/技能/SKILL.md'"
 
 
 def test_build_skills_prompt_preserves_drive_colon_while_sanitizing_unsafe_chars(

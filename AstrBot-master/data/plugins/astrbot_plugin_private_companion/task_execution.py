@@ -212,7 +212,11 @@ _ACL_GUARD_LOCK = threading.Lock()
 
 
 def _host_acl_probe(
-    root: Path, paths: Sequence[Path], *, account: str = "", scan: bool = True,
+    root: Path,
+    paths: Sequence[Path],
+    *,
+    account: str = "",
+    scan: bool = True,
     scan_paths: Sequence[Path] | None = None,
 ) -> dict:
     """Run fixed host ACL inspection without task payload or inherited host env."""
@@ -233,7 +237,9 @@ def _host_acl_probe(
                 "paths": [str(p) for p in paths],
                 "account": account,
                 "scan": scan,
-                "scan_paths": None if scan_paths is None else [str(p) for p in scan_paths],
+                "scan_paths": None
+                if scan_paths is None
+                else [str(p) for p in scan_paths],
             }
         ).encode("utf-8")
     ).decode("ascii")
@@ -781,17 +787,50 @@ class WindowsNativeBackend:
             )
         return _NativeProcess(identity, domain, username, password, argv, cwd, env)
 
+    def start_duplex(self, identity, argv, cwd, env):
+        """Launch an attested identity with an owned bidirectional channel.
+
+        Args:
+            identity: Identity already verified by the trusted caller.
+            argv: Trusted executable and arguments.
+            cwd: Verified working directory.
+            env: Explicit child environment without inherited host secrets.
+
+        Returns:
+            A channel with async write/read/wait/close and sync kill_tree.
+        """
+        if os.name != "nt" or self.credentials is None:
+            raise PermissionError(
+                "Native task execution requires protected credentials"
+            )
+        domain, username, password = self.credentials(identity)
+        if (domain, username) != (identity.domain, identity.username):
+            raise PermissionError(
+                "Credential identity differs from deployment attestation"
+            )
+        process = _NativeProcess(
+            identity, domain, username, password, argv, cwd, env, duplex=True
+        )
+        try:
+            return _NativeDuplexChannel(process)
+        except BaseException:
+            process.close()
+            raise
+
 
 class _NativeProcess:
     """Own every native handle and tear down the entire job on every exit path."""
 
-    def __init__(self, identity, domain, username, password, argv, cwd, env):
+    def __init__(
+        self, identity, domain, username, password, argv, cwd, env, duplex=False
+    ):
         # ctypes definitions are local so Linux/test import never loads WinDLL.
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         advapi = ctypes.WinDLL("advapi32", use_last_error=True)
         self.kernel, self.handles, self.job, self.process = kernel, [], None, None
         self.reads, self._reader_tasks = [], []
         self.output_limit = 1024 * 1024
+        self.duplex, self.stdin = duplex, None
         handle = wintypes.HANDLE
         size = ctypes.c_size_t
 
@@ -898,6 +937,29 @@ class _NativeProcess:
             ),
             (
                 kernel.ReadFile,
+                [
+                    handle,
+                    ctypes.c_void_p,
+                    wintypes.DWORD,
+                    ctypes.POINTER(wintypes.DWORD),
+                    ctypes.c_void_p,
+                ],
+                wintypes.BOOL,
+            ),
+            (
+                kernel.PeekNamedPipe,
+                [
+                    handle,
+                    ctypes.c_void_p,
+                    wintypes.DWORD,
+                    ctypes.c_void_p,
+                    ctypes.POINTER(wintypes.DWORD),
+                    ctypes.c_void_p,
+                ],
+                wintypes.BOOL,
+            ),
+            (
+                kernel.WriteFile,
                 [
                     handle,
                     ctypes.c_void_p,
@@ -1015,11 +1077,24 @@ class _NativeProcess:
                 checked(kernel.SetHandleInformation(read, 1, 0))
                 self.reads.append(read)
                 writers.append(write)
-            stdin = kernel.CreateFileW(
-                "NUL", 0x80000000, 3, ctypes.byref(security), 3, 0, None
-            )
-            checked(stdin and stdin != ctypes.c_void_p(-1).value)
-            self.handles.append(stdin)
+            if duplex:
+                stdin, self.stdin = handle(), handle()
+                checked(
+                    kernel.CreatePipe(
+                        ctypes.byref(stdin),
+                        ctypes.byref(self.stdin),
+                        ctypes.byref(security),
+                        0,
+                    )
+                )
+                self.handles.extend([stdin, self.stdin])
+                checked(kernel.SetHandleInformation(self.stdin, 1, 0))
+            else:
+                stdin = kernel.CreateFileW(
+                    "NUL", 0x80000000, 3, ctypes.byref(security), 3, 0, None
+                )
+                checked(stdin and stdin != ctypes.c_void_p(-1).value)
+                self.handles.append(stdin)
             needed = size()
             kernel.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(needed))
             attribute_buffer = ctypes.create_string_buffer(needed.value)
@@ -1106,6 +1181,8 @@ class _NativeProcess:
 
     async def wait(self):
         """Drain both streams while polling so cancellation never orphans a job."""
+        if self.duplex:
+            raise RuntimeError("Duplex process must be waited through its channel")
         self._reader_tasks = [
             asyncio.create_task(asyncio.to_thread(self._read, pipe))
             for pipe in self.reads
@@ -1142,6 +1219,148 @@ class _NativeProcess:
             self.kernel.CloseHandle(native_handle)
         self.handles.clear()
         self.job = None
+
+
+class _NativeDuplexChannel:
+    """Keep blocking stderr/write workers owned until the killed Job releases I/O.
+
+    Args:
+        process: Newly launched duplex native process whose handles are owned.
+    """
+
+    def __init__(self, process):
+        self._process = process
+        self._write_lock, self._read_lock = asyncio.Lock(), asyncio.Lock()
+        self._writes = set()
+        self._closing = False
+        self._close_task = None
+        self.stderr = ""
+        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._stderr_thread.start()
+
+    def _drain_stderr(self):
+        self.stderr = self._process._read(self._process.reads[1])
+
+    async def read(self):
+        """Return available stdout bytes without an uncancellable ReadFile worker."""
+        async with self._read_lock:
+            while not self._closing:
+                available = wintypes.DWORD()
+                process = self._process
+                ok = process.kernel.PeekNamedPipe(
+                    process.reads[0], None, 0, None, ctypes.byref(available), None
+                )
+                if not ok:
+                    code = ctypes.get_last_error()
+                    if code in (109, 232):
+                        return b""
+                    raise OSError(code, "Windows duplex pipe read failed")
+                if available.value:
+                    buffer = ctypes.create_string_buffer(min(8192, available.value))
+                    count = wintypes.DWORD()
+                    # This is the only stdout reader: the peeked bytes remain
+                    # available, so ReadFile never waits for future child data.
+                    if not process.kernel.ReadFile(
+                        process.reads[0], buffer, len(buffer), ctypes.byref(count), None
+                    ):
+                        code = ctypes.get_last_error()
+                        if code in (109, 232):
+                            return b""
+                        raise OSError(code, "Windows duplex pipe read failed")
+                    return buffer.raw[: count.value]
+                await asyncio.sleep(0.01)
+            return b""
+
+    def _write(self, data):
+        offset = 0
+        while offset < len(data):
+            buffer = ctypes.create_string_buffer(data[offset : offset + 8192])
+            count = wintypes.DWORD()
+            if (
+                not self._process.kernel.WriteFile(
+                    self._process.stdin,
+                    buffer,
+                    len(buffer) - 1,
+                    ctypes.byref(count),
+                    None,
+                )
+                or not count.value
+            ):
+                raise OSError("Windows duplex pipe write failed")
+            offset += count.value
+
+    async def write(self, data: bytes):
+        """Serialize complete writes while retaining ownership of blocked workers.
+
+        Args:
+            data: Raw bytes to deliver, including any protocol framing.
+        """
+        if not isinstance(data, bytes):
+            raise TypeError("Duplex writes require bytes")
+        async with self._write_lock:
+            if self._closing:
+                raise ConnectionError("Windows duplex channel is closed")
+            task = asyncio.create_task(asyncio.to_thread(self._write, data))
+            self._writes.add(task)
+            task.add_done_callback(self._writes.discard)
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                # Kill the child before joining a possibly capacity-blocked write.
+                self.kill_tree()
+                await asyncio.shield(asyncio.gather(task, return_exceptions=True))
+                raise
+            finally:
+                if task.done() and not task.cancelled():
+                    task.exception()
+
+    async def wait(self):
+        """Return the process exit code without consuming stdout.
+
+        Returns:
+            The native exit code, after descendants and stderr are drained.
+        """
+        process = self._process
+        try:
+            while not self._closing:
+                status = process.kernel.WaitForSingleObject(process.process, 0)
+                if status == 0:
+                    self.kill_tree()
+                    await asyncio.to_thread(self._stderr_thread.join)
+                    if self._closing:
+                        raise ConnectionError("Windows duplex channel is closed")
+                    code = wintypes.DWORD()
+                    if not process.kernel.GetExitCodeProcess(
+                        process.process, ctypes.byref(code)
+                    ):
+                        raise OSError("Reading task exit code failed")
+                    return code.value
+                if status != 0x102:
+                    raise OSError("Waiting for task process failed")
+                await asyncio.sleep(0.05)
+            raise ConnectionError("Windows duplex channel is closed")
+        except BaseException:
+            await self.close()
+            raise
+
+    def kill_tree(self):
+        """Terminate the complete process Job, releasing blocked child pipe I/O."""
+        self._process.kill_tree()
+
+    async def _close(self):
+        self.kill_tree()
+        try:
+            await asyncio.gather(*self._writes, return_exceptions=True)
+            await asyncio.to_thread(self._stderr_thread.join)
+        finally:
+            self._process.close()
+
+    async def close(self):
+        """Kill first, join all I/O workers, then release handles once."""
+        if self._close_task is None:
+            self._closing = True
+            self._close_task = asyncio.create_task(self._close())
+        await asyncio.shield(self._close_task)
 
 
 def _check_token_sid(advapi, kernel, token, expected):

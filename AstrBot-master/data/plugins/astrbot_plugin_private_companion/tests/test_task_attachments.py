@@ -1,6 +1,8 @@
 """真实附件导入的权限、链接及取消回归。"""
 
 import asyncio
+import ctypes
+import os
 import threading
 from types import SimpleNamespace
 
@@ -8,6 +10,22 @@ import pytest
 
 from astrbot.core.message.components import File
 from astrbot_plugin_private_companion import task_attachments as attachments
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows短路径兼容")
+def test_windows_short_filename_is_same_upload_without_relaxing_boundaries(tmp_path):
+    source = tmp_path / "长文件名的上传资料.txt"
+    source.write_bytes(b"actual-upload")
+    get_short = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+    get_short.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_ulong]
+    get_short.restype = ctypes.c_ulong
+    buffer = ctypes.create_unicode_buffer(32768)
+    assert get_short(str(source), buffer, len(buffer))
+    copied = attachments._copy(buffer.value, tmp_path / "workspace", [tmp_path], lambda: True)
+    from pathlib import Path
+    assert Path(copied["path"]).read_bytes() == b"actual-upload"
+    with pytest.raises(PermissionError):
+        attachments._copy(buffer.value, tmp_path / "workspace", [tmp_path / "different"], lambda: True)
 
 
 def message(*paths):

@@ -40,6 +40,7 @@ from astrbot.core.provider.entities import (
     LLMResponse,
     ProviderRequest,
     ToolCallsResult,
+    reported_cached_tokens,
 )
 from astrbot.core.provider.error_response import looks_like_upstream_llm_error_response
 from astrbot.core.provider.modalities import (
@@ -52,6 +53,7 @@ from astrbot.core.provider.streaming import iter_model_response
 from ..context.compressor import ContextCompressor
 from ..context.config import ContextConfig
 from ..context.manager import ContextManager
+from ..context.recent import RecentOnlyCompressor, select_recent
 from ..context.token_counter import EstimateTokenCounter, TokenCounter
 from ..hooks import BaseAgentRunHooks
 from ..message import (
@@ -225,8 +227,16 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             f"[E_LLM_ALL_PROVIDERS_FAILED] {label}{reason}，{unfinished}请稍后重试。{suffix}"
         )
 
-    async def _complete_with_assistant_response(self, llm_resp: LLMResponse) -> None:
+    async def _complete_with_assistant_response(self, llm_resp: LLMResponse) -> bool:
         """Finalize the current step as a plain assistant response with no tool calls."""
+        if (
+            not self._conversation_revision_used
+            and await self._consume_conversation_inputs(draft=llm_resp)
+        ):
+            self._conversation_revision_used = True
+            return False
+        if self.conversation_turn is not None:
+            self.conversation_turn.commit()
         self.final_llm_resp = llm_resp
         self._transition_state(AgentState.DONE)
         self.stats.end_time = time.time()
@@ -250,6 +260,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         except Exception as e:
             logger.error(f"Error in on_agent_done hook: {e}", exc_info=True)
         self._resolve_unconsumed_follow_ups()
+        return True
 
     @override
     async def reset(
@@ -281,6 +292,16 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         **kwargs: T.Any,
     ) -> None:
         self.req = request
+        recent_only = request.history_policy == "recent_only"
+        if recent_only:
+            if request.history_archive is None:
+                request.history_archive = copy.deepcopy([
+                    item for item in request.contexts or [] if not item.get("_no_save")
+                ])
+            request.contexts = select_recent(request.contexts or [], enforce_max_turns)
+            # The stored archive, rather than this disposable view, owns old turns.
+            custom_compressor = RecentOnlyCompressor(request=request)
+            llm_compress_provider = None
         event = getattr(run_context.context, "event", None)
         get_extra = getattr(event, "get_extra", None)
         self._is_task_request = bool(
@@ -304,7 +325,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             # <=0 disables token-based guarding.
             max_context_tokens=provider.provider_config.get("max_context_tokens", 0),
             # Enforce max turns before token-based guarding.
-            enforce_max_turns=self.enforce_max_turns,
+            enforce_max_turns=-1 if recent_only else self.enforce_max_turns,
             truncate_turns=self.truncate_turns,
             llm_compress_instruction=self.llm_compress_instruction,
             llm_compress_keep_recent_ratio=self.llm_compress_keep_recent_ratio,
@@ -339,6 +360,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         self._abort_signal = asyncio.Event()
         self._pending_follow_ups: list[FollowUpTicket] = []
         self._follow_up_seq = 0
+        self.conversation_turn = None
+        self._conversation_revision_used = False
         self._last_tool_name: str | None = None
         self._last_tool_args: dict[str, T.Any] | None = None
         self._same_tool_streak = 0
@@ -366,6 +389,9 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
 
         # append existing messages in the run context
         messages = bind_checkpoint_messages(request.contexts or [])
+        if recent_only:
+            for message in messages:
+                message._no_save = True
         if (
             request.prompt is not None
             or request.image_urls
@@ -564,6 +590,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             "contexts": self._sanitize_contexts_for_provider(self.run_context.messages),
             "func_tool": self._func_tool_for_provider(),
             "session_id": self.req.session_id,
+            "prompt_cache_key": self.req.prompt_cache_key,
             "extra_user_content_parts": self.req.extra_user_content_parts,  # list[ContentPart]
             "abort_signal": self._abort_signal,
             "request_max_retries": self.request_max_retries,
@@ -833,6 +860,51 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             return content
         return f"{content}{notice}"
 
+    async def _consume_conversation_inputs(
+        self, draft: LLMResponse | None = None
+    ) -> bool:
+        """Import full queued inputs without replaying any executed tools.
+
+        Args:
+            draft: Completed but unpublished response, if revision is needed.
+
+        Returns:
+            Whether new input was added to the current model conversation.
+        """
+        turn = self.conversation_turn
+        if turn is None:
+            return False
+        messages = await turn.drain()
+        if not messages:
+            return False
+        notice = Message(
+            role="user",
+            content=(
+                "【会话队列事实】以下按到达顺序补入原始用户消息或后台只读回执。"
+                "结合当前对话决定怎样回复；不必逐条确认收到，不重复已发送内容，"
+                "已执行的工具不要因补话重跑。后台回执不是用户新要求或新增权限。"
+            ),
+        )
+        notice._no_save = True
+        self.run_context.messages.append(notice)
+        if draft is not None:
+            text = draft.completion_text or (
+                draft.result_chain.get_plain_text(with_other_comps_mark=True)
+                if draft.result_chain
+                else ""
+            )
+            unpublished = Message(
+                role="user",
+                content=(
+                    "【尚未发送的草稿】下面内容没有发给用户，可结合新增输入修改或替换；"
+                    "不要当成已发送的历史：\n" + text
+                ),
+            )
+            unpublished._no_save = True
+            self.run_context.messages.append(unpublished)
+        self.run_context.messages.extend(messages)
+        return True
+
     def _track_tool_call_streak(
         self,
         tool_name: str,
@@ -914,8 +986,12 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
         self._transition_state(AgentState.RUNNING)
         llm_resp_result = None
 
+        await self._consume_conversation_inputs()
+
         # Process request-time context before sending it to the provider.
         token_usage = self.req.conversation.token_usage if self.req.conversation else 0
+        if self.req.history_policy == "recent_only":
+            token_usage = 0
         self._simple_print_message_role("[BefCompact]", self.run_context.messages)
         processed_messages = await self._await_or_stop(
             self.request_context_manager.process(
@@ -933,6 +1009,11 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             if llm_response.is_chunk:
                 if self.stats.time_to_first_token == 0:
                     self.stats.time_to_first_token = time.time() - self.stats.start_time
+
+                if self.conversation_turn is not None:
+                    # Network streaming remains enabled; unpublished platform text
+                    # is held until the final input checkpoint has been reached.
+                    continue
 
                 if llm_response.reasoning_content:
                     yield AgentResponse(
@@ -968,6 +1049,13 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                 # input separately for context-window occupancy displays.
                 self.stats.token_usage += llm_response.usage
                 self.stats.current_context_tokens = llm_response.usage.input
+                logger.info(
+                    "Model usage: scope=%s input=%s cached=%s output=%s",
+                    self.req.prompt_cache_key or "unassigned",
+                    llm_response.usage.input,
+                    reported_cached_tokens(llm_response) if reported_cached_tokens(llm_response) is not None else "unknown",
+                    llm_response.usage.output,
+                )
                 if self.req.conversation:
                     self.req.conversation.token_usage = llm_response.usage.total
             # end_time must be set before the yield serializes to_dict().
@@ -1016,7 +1104,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
             return
 
         if not llm_resp.tools_call_name:
-            await self._complete_with_assistant_response(llm_resp)
+            if not await self._complete_with_assistant_response(llm_resp):
+                return
 
         # 返回 LLM 结果
         if llm_resp.reasoning_content:
@@ -1053,7 +1142,8 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                     logger.warning(
                         "skills_like tool re-query returned no tool calls; fallback to assistant response."
                     )
-                    await self._complete_with_assistant_response(llm_resp)
+                    if not await self._complete_with_assistant_response(llm_resp):
+                        return
                     if llm_resp.reasoning_content:
                         yield AgentResponse(
                             type="llm_result",
@@ -1554,6 +1644,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                         func_tool=param_subset,
                         model=self.req.model,
                         session_id=self.req.session_id,
+                        prompt_cache_key=self.req.prompt_cache_key,
                         extra_user_content_parts=self.req.extra_user_content_parts,
                         # tool_choice="required",
                         abort_signal=self._abort_signal,
@@ -1586,6 +1677,7 @@ class ToolLoopAgentRunner(BaseAgentRunner[TContext]):
                             func_tool=param_subset,
                             model=self.req.model,
                             session_id=self.req.session_id,
+                            prompt_cache_key=self.req.prompt_cache_key,
                             extra_user_content_parts=self.req.extra_user_content_parts,
                             # tool_choice="required",
                             abort_signal=self._abort_signal,

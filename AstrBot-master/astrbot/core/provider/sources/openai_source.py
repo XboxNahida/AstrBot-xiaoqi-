@@ -1018,6 +1018,12 @@ class ProviderOpenAIOfficial(Provider):
         # SDK请求选项，不属于模型提示或extra_body；保持共享client默认值不变。
         if "timeout" in kwargs:
             payloads["timeout"] = kwargs["timeout"]
+        cache_key = kwargs.get("prompt_cache_key")
+        supports_cache_key = self.provider_config.get(
+            "supports_prompt_cache_key", self.client.base_url.host == "api.openai.com"
+        )
+        if supports_cache_key is True and isinstance(cache_key, str) and cache_key:
+            payloads["prompt_cache_key"] = cache_key
 
         return payloads, context_query
 

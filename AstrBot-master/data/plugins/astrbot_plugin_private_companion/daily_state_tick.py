@@ -1637,6 +1637,7 @@ class DailyStateTickMixin:
                     action_summary=action_summary,
                 ),
                 assistant_response=assistant_archive_text,
+                history_metadata=getattr(delivered, "history_metadata", {}),
             )
             await self._record_final_assistant_in_livingmemory(
                 umo=delivery_umo,

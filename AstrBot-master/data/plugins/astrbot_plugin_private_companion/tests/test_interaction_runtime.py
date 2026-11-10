@@ -19,6 +19,80 @@ def channel(runtime, e=None):
     )
 
 
+@pytest.mark.asyncio
+async def test_script_delivery_waits_for_the_current_conversation_turn(runtime):
+    from astrbot.core.pipeline.process_stage.conversation_queue import enqueue_conversation
+
+    e = event()
+    c = channel(runtime, e)
+    runtime.interaction_api.channels.request_reply(c["id"], "queued", "后续发言", based_on_seq=0)
+    turn = enqueue_conversation(e.unified_msg_origin, e.get_sender_id(), key="chat")
+    runtime.render_notification = AsyncMock(return_value="后续发言")
+    sending = asyncio.create_task(runtime.send_script_reply_once())
+    try:
+        for _ in range(20):
+            if len(turn.queue) > 1:
+                break
+            await asyncio.sleep(0)
+        assert len(turn.queue) == 2
+        runtime.render_notification.assert_not_awaited()
+        runtime.plugin.context.send_message.assert_not_awaited()
+        turn.finish("sent")
+        assert await sending
+        runtime.plugin.context.send_message.assert_awaited_once()
+    finally:
+        turn.finish("unknown")
+        if not sending.done():
+            sending.cancel()
+        await asyncio.gather(sending, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_script_reply_runs_real_notification_renderer_and_sends_once(runtime):
+    c = channel(runtime)
+    reply = runtime.interaction_api.channels.request_reply(
+        c["id"], "wake", "叫用户起床", based_on_seq=0
+    )
+    provider = SimpleNamespace(text_chat=AsyncMock(return_value=SimpleNamespace(
+        role="assistant", completion_text="起床啦。&&reply&&", tools_call_name=None
+    )))
+    runtime.plugin.context.get_provider_by_id = lambda _: provider
+    assert await runtime.send_script_reply_once()
+    receipt = runtime.interaction_api.channels.reply_status(c["id"], reply["id"])
+    assert receipt["status"] == "sent", receipt
+    provider.text_chat.assert_awaited_once()
+    runtime.plugin.context.send_message.assert_awaited_once()
+    assert runtime.plugin.context.send_message.await_args.args[1].chain[0].text == "起床啦。"
+    assert not await runtime.send_script_reply_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["render", "send"])
+@pytest.mark.parametrize("cancelled", [False, True])
+async def test_script_reply_failure_records_actual_stage_without_replay(runtime, stage, cancelled):
+    c = channel(runtime)
+    reply = runtime.interaction_api.channels.request_reply(
+        c["id"], "failure", "叫醒", based_on_seq=0
+    )
+    error = asyncio.CancelledError() if cancelled else AttributeError("topsecret " + c["token"])
+    runtime.render_notification = AsyncMock(return_value="起床啦")
+    failing = runtime.render_notification if stage == "render" else runtime.plugin.context.send_message
+    failing.side_effect = error
+    if cancelled:
+        with pytest.raises(asyncio.CancelledError):
+            await runtime.send_script_reply_once()
+    else:
+        assert await runtime.send_script_reply_once()
+    receipt = runtime.interaction_api.channels.reply_status(c["id"], reply["id"])
+    assert receipt["status"] == ("failed" if stage == "render" else "unknown"), receipt
+    assert receipt["receipt"]["stage"] == stage
+    assert receipt["receipt"]["error_code"] == type(error).__name__
+    assert c["token"] not in json.dumps(receipt) and "topsecret" not in json.dumps(receipt)
+    assert runtime.interaction_api.channels.claim_reply() is None
+    if stage == "render":
+        runtime.plugin.context.send_message.assert_not_awaited()
+
+
 def test_channel_data_observed_before_chat_and_ignores_bots(runtime):
     c = channel(runtime)
     e = event(mid="m1")
@@ -51,10 +125,12 @@ async def test_script_reply_uses_chat_and_rechecks_after_generation(runtime):
     assert sent == "行，那就先这样。"
 
 
-def test_channel_auth_revocation_is_not_overridden_by_script(runtime):
+def test_accepted_channel_keeps_authority_until_explicitly_closed(runtime):
     c = channel(runtime)
     assert runtime.interaction_allowed(c)
     runtime.plugin._is_private_companion_owner_user_id = lambda _: False
+    assert runtime.interaction_allowed(c)
+    runtime.interaction_api.channels.control(c["id"], "close")
     assert not runtime.interaction_allowed(c)
 
 
@@ -360,8 +436,8 @@ async def test_channel_tool_explains_future_expiry_and_lists_existing_script(run
     assert rows["success"] is True
     assert [r["id"] for r in rows["scripts"]] == [first["id"]]
     runtime.plugin._is_private_companion_owner_user_id = lambda _: False
-    denied = await runtime.call_interaction_tool(job, {"action": "renew", "channel_id": c["id"], "ttl_seconds": 100})
-    assert denied["success"] is False
+    renewed = await runtime.call_interaction_tool(job, {"action": "renew", "channel_id": c["id"], "ttl_seconds": 100})
+    assert renewed["success"] is True
 
 
 @pytest.mark.asyncio
@@ -434,7 +510,9 @@ async def test_script_tools_use_current_authorized_registry_not_saved_snapshot(r
         })
         assert unavailable.status == 403
         runtime.plugin._is_private_companion_owner_user_id = lambda _: False
-        assert (await client.get("/v1/tools", headers=auth)).status == 403
+        assert (await client.get("/v1/tools", headers=auth)).status == 200
+        runtime.interaction_api.channels.control(c["id"], "close")
+        assert (await client.get("/v1/tools", headers=auth)).status == 401
         runtime.plugin.context.send_message.assert_not_awaited()
     finally:
         await client.close()

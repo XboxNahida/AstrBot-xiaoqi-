@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import time
+from types import ModuleType
 from typing import Any
 
 
@@ -109,12 +110,19 @@ def _module_candidates(
     for name, module in list(sys.modules.items()):
         if module is None or id(module) in seen:
             continue
-        module_identity = getattr(module, "PLUGIN_NAME", "")
+        # sys.modules也包含惰性扩展；getattr会调用它们的__getattr__，
+        # 引发导入/原生查询并阻塞宿主事件循环。这里只查已导出的属性。
+        if not issubclass(type(module), ModuleType):
+            continue
+        namespace = ModuleType.__getattribute__(module, "__dict__")
+        module_identity = namespace.get("PLUGIN_NAME", "")
+        if not isinstance(module_identity, str):
+            module_identity = ""
         if (
             any(name.endswith(suffix) for suffix in suffixes)
             or _safe_identity_text(star_name).casefold().replace("-", "_")
             in _identity_segments(module_identity)
-            or callable(getattr(module, getter_name, None))
+            or callable(namespace.get(getter_name))
         ):
             candidates.append(module)
             seen.add(id(module))

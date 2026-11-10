@@ -99,6 +99,19 @@ def test_unknown_delivery_not_retried_and_close_revokes_token(channels, scope):
     assert channels.authenticate(c["token"]) is None
 
 
+def test_failed_reply_keeps_final_stage_receipt_across_restart(channels, scope):
+    c = opened(channels, scope)
+    reply = channels.request_reply(c["id"], "broken", "叫醒", based_on_seq=0)
+    claimed = channels.claim_reply()
+    assert channels.finish_reply(claimed, "failed", stage="render", error_code="AttributeError")
+    rebooted = InteractionChannels(channels.path, clock=lambda: 1000)
+    receipt = rebooted.reply_status(c["id"], reply["id"])
+    assert receipt == {"id": reply["id"], "status": "failed", "receipt": {
+        "status": "failed", "at": 1000, "stage": "render", "error_code": "AttributeError"
+    }}
+    assert not channels.finish_reply(claimed, "sent")
+
+
 def test_state_compare_and_swap_and_pagination(channels, scope):
     c = opened(channels, scope)
     channels.set_state(c["id"], 0, {"count": 1})

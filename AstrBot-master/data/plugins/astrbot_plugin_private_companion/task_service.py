@@ -353,12 +353,14 @@ class TaskService:
         with self._transaction() as db:
             # Expired workers require explicit recovery; they still occupy capacity.
             active = db.execute(
-                "SELECT COUNT(*) FROM pt_tasks WHERE lease_token IS NOT NULL"
+                "SELECT COUNT(*) FROM pt_tasks WHERE lease_token IS NOT NULL "
+                "AND COALESCE(json_extract(metadata,'$.engine'),'')!='codex'"
             ).fetchone()[0]
             if active >= self.max_concurrency:
                 return None
             row = db.execute(
                 "SELECT * FROM pt_tasks WHERE status IN ('queued','waiting_retry') "
+                "AND COALESCE(json_extract(metadata,'$.engine'),'')!='codex' "
                 "AND lease_token IS NULL AND next_run<=? ORDER BY created_at,rowid LIMIT 1",
                 (self.clock(),),
             ).fetchone()
@@ -389,6 +391,41 @@ class TaskService:
                 ).fetchone(),
             )
 
+    def claim_external(self, task_id: str, scope: TaskScope) -> TaskJob | None:
+        """Acquire a precise external lease without inventing a model attempt.
+
+        Args:
+            task_id: Exact persisted task identifier.
+            scope: Trusted platform identity.
+
+        Returns:
+            A fenced lease, or None when ineligible or already leased.
+        """
+        if not isinstance(task_id, str) or not 1 <= len(task_id) <= 256:
+            raise ValueError("Invalid task_id")
+        with self._transaction() as db:
+            row = db.execute(
+                "SELECT * FROM pt_tasks WHERE task_id=? AND bot_id=? "
+                "AND session_key=? AND sender_id=? AND lease_token IS NULL "
+                "AND status IN ('queued','paused','unknown_result','failed','waiting_user','succeeded')",
+                (task_id, scope.bot_id, scope.session_key, scope.sender_id),
+            ).fetchone()
+            if row is None:
+                return None
+            metadata = json.loads(row["metadata"])
+            if metadata.get("engine") != "codex" or metadata.get("history_deleted"):
+                return None
+            db.execute(
+                "UPDATE pt_tasks SET status='running',revision=revision+1,worker_id='codex',"
+                "lease_token=?,lease_until=?,result=NULL,error_kind=NULL,finished_at=NULL "
+                "WHERE task_id=?",
+                (uuid4().hex, self.clock() + self.lease_seconds, task_id),
+            )
+            self._touch(db, task_id)
+            return self._job(db, db.execute(
+                "SELECT * FROM pt_tasks WHERE task_id=?", (task_id,)
+            ).fetchone())
+
     def heartbeat(self, job: TaskJob) -> bool:
         with self._transaction() as db:
             if not self._owned(db, job):
@@ -398,6 +435,50 @@ class TaskService:
                 (self.clock() + self.lease_seconds, job.task_id),
             )
             return True
+
+    def record_activity(self, job, phase, name, *, outcome=None):
+        """Persist a fenced execution boundary without treating renewal as progress."""
+        if phase not in {"model_wait", "model_response", "model_error", "tool_running", "tool_result"}:
+            raise ValueError("Unknown execution phase")
+        with self._transaction() as db:
+            row = self._owned(db, job)
+            if row is None:
+                return False
+            metadata = json.loads(row["metadata"])
+            previous = metadata.get("execution_state", {})
+            now = self.clock()
+            state = {**previous, "phase": phase, "name": str(name)[:120],
+                     "phase_started_at": now, "last_activity_at": now}
+            if phase in {"model_response", "tool_result"}:
+                state["last_progress_at"] = now
+            if phase == "tool_result" and isinstance(outcome, Mapping):
+                state["last_tool_result"] = {"name": str(name)[:120], "status": outcome.get("status"), "at": now}
+                if outcome.get("status") != "success":
+                    state["last_tool_issue"] = {**state["last_tool_result"],
+                                                "summary": str(outcome.get("content", ""))[:600]}
+            metadata["execution_state"] = state
+            db.execute("UPDATE pt_tasks SET metadata=? WHERE task_id=?",
+                       (json.dumps(metadata, ensure_ascii=False), job.task_id))
+            self._touch(db, job.task_id)
+            return True
+
+    def execution_status(self, status, metadata, lease_until):
+        """Return observed stage, elapsed time and independent worker liveness facts."""
+        state = dict(metadata.get("execution_state") or {})
+        now = self.clock()
+        lease_valid = isinstance(lease_until, (int, float)) and lease_until > now
+        observed_phase = state.get("phase", "unconfirmed")
+        phase = observed_phase if status == "running" and lease_valid else "unconfirmed" if status == "running" else status
+        labels = {"model_wait": "等待模型响应", "model_response": "已收到模型响应",
+                  "model_error": "模型请求异常", "tool_running": "正在执行工具",
+                  "tool_result": "已收到工具回执", "unconfirmed": "执行阶段尚未确认"}
+        def elapsed(key):
+            value = state.get(key)
+            return round(max(0, now - value), 1) if isinstance(value, (int, float)) else None
+        return {**state, "phase": phase, "phase_label": labels.get(phase, phase),
+                "worker_lease_valid": bool(lease_valid),
+                "phase_elapsed_seconds": elapsed("phase_started_at") if phase == observed_phase else None,
+                "seconds_since_progress": elapsed("last_progress_at")}
 
     def ack_control(self, job: TaskJob) -> bool:
         """Release fenced capacity after the worker has stopped its execution.
@@ -419,12 +500,13 @@ class TaskService:
                 > 0
             )
 
-    def begin_attempt(self, job: TaskJob, provider: str) -> bool:
+    def begin_attempt(self, job: TaskJob, provider: str, *, max_attempts: int | None = None) -> bool:
         """Record another model request, including fallback, under the live lease.
 
         Args:
             job: Live lease capability returned by claim.
             provider: Actual model role or provider identifier, without secrets.
+            max_attempts: Optional current-step request cap, including first call.
 
         Returns:
             Whether the caller may issue this additional request.
@@ -432,6 +514,8 @@ class TaskService:
         with self._transaction() as db:
             row = self._owned(db, job)
             if not row:
+                return False
+            if max_attempts is not None and row["attempts"] >= max_attempts:
                 return False
             db.execute(
                 "UPDATE pt_tasks SET attempts=attempts+1 WHERE task_id=?",
@@ -485,6 +569,30 @@ class TaskService:
             db.execute(
                 "UPDATE pt_tasks SET revision=revision+1 WHERE task_id=?",
                 (job.task_id,),
+            )
+            self._touch(db, job.task_id)
+            return True
+
+    def record_context_checkpoint(self, job: TaskJob, evidence: Mapping) -> bool:
+        """Save a compact request view without completing a step or resetting attempts.
+
+        Args:
+            job: Current execution lease.
+            evidence: Validated context summary checkpoint.
+
+        Returns:
+            Whether the live lease still owns this checkpoint.
+        """
+        if evidence.get("kind") != "context_summary":
+            raise ValueError("Context checkpoint requires summary evidence")
+        with self._transaction() as db:
+            row = self._owned(db, job)
+            if not row:
+                return False
+            db.execute(
+                "INSERT INTO pt_steps(task_id,step_key,evidence,completed_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(task_id,step_key) DO UPDATE SET evidence=excluded.evidence,completed_at=excluded.completed_at",
+                (job.task_id, "context:" + row["step_key"], json.dumps(dict(evidence)), self.clock()),
             )
             self._touch(db, job.task_id)
             return True
@@ -560,6 +668,8 @@ class TaskService:
                 "permission_denied",
                 "authorization_expired",
                 "missing_input",
+                "context_limit",
+                "context_compaction_failed",
             }:
                 status = "waiting_user"
             elif error_kind in {"unknown_result", "interrupted"}:
@@ -867,13 +977,40 @@ class TaskService:
                 token,
             )
 
-    def ack_notification(self, notification: Notification) -> bool:
+    def renew_notification(self, notification: Notification) -> bool:
+        """Extend an owned delivery lease while its conversation is busy.
+
+        Args:
+            notification: Claimed outbox entry with its original fencing token.
+
+        Returns:
+            Whether the live lease was renewed without reviving an expired one.
+        """
         with self._transaction() as db:
             return (
                 db.execute(
-                    "UPDATE pt_outbox SET state='sent',lease_token=NULL,lease_until=NULL WHERE notification_id=? "
+                    "UPDATE pt_outbox SET lease_until=? WHERE notification_id=? "
                     "AND state='sending' AND lease_token=? AND lease_until>?",
                     (
+                        self.clock() + self.lease_seconds,
+                        notification.notification_id,
+                        notification.lease_token,
+                        self.clock(),
+                    ),
+                ).rowcount
+                > 0
+            )
+
+    def ack_notification(
+        self, notification: Notification, *, handled: bool = False
+    ) -> bool:
+        with self._transaction() as db:
+            return (
+                db.execute(
+                    "UPDATE pt_outbox SET state=?,lease_token=NULL,lease_until=NULL WHERE notification_id=? "
+                    "AND state='sending' AND lease_token=? AND lease_until>?",
+                    (
+                        "handled" if handled else "sent",
                         notification.notification_id,
                         notification.lease_token,
                         self.clock(),

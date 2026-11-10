@@ -94,5 +94,14 @@ class PipelineScheduler:
 
             logger.debug("pipeline execution completed.")
         finally:
+            turn = getattr(event, "_conversation_turn", None)
+            if (
+                turn is not None
+                and getattr(turn, "source_event", None) is event
+                and not turn.consumed
+            ):
+                # Early participation gates may stop a reserved input before it
+                # reaches the internal agent stage. Never leave a FIFO tombstone.
+                turn.finish("unknown" if turn.claimed else "not_sent")
             event.cleanup_temporary_local_files()
             active_event_registry.unregister(event)

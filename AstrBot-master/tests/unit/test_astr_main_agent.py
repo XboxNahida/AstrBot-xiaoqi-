@@ -1,6 +1,7 @@
 """Tests for astr_main_agent module."""
 
 import datetime
+import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -159,6 +160,32 @@ def _setup_conversation_for_build(conv_mgr, cid: str = "conv-id") -> MagicMock:
     conversation = _new_mock_conversation(cid=cid)
     conv_mgr.get_conversation = AsyncMock(return_value=conversation)
     return conversation
+
+
+@pytest.mark.asyncio
+async def test_build_recent_chat_archives_before_persona_and_uses_real_cid(
+    mock_event, mock_context, mock_provider
+):
+    conversation = _setup_conversation_for_build(mock_context.conversation_manager)
+    archive = [item for i in range(20) for item in (
+        {"role": "user", "content": f"question {i}"},
+        {"role": "assistant", "content": f"answer {i}"},
+    )]
+    conversation.history = json.dumps(archive)
+    mock_context.get_using_provider.return_value = mock_provider
+    with patch.object(ama, "AgentRunner") as runner_cls, patch.object(ama, "AstrAgentContext"):
+        runner_cls.return_value.reset = AsyncMock()
+        result = await ama.build_main_agent(
+            event=mock_event, plugin_context=mock_context, provider=mock_provider,
+            config=ama.MainAgentBuildConfig(tool_call_timeout=60),
+        )
+    req = result.provider_request
+    assert req.history_policy == "recent_only"
+    assert req.history_archive == archive
+    assert req.contexts == archive[-24:]
+    assert runner_cls.return_value.reset.await_args.kwargs["llm_compress_provider"] is None
+    from astrbot.core.agent.context.recent import cache_namespace
+    assert req.prompt_cache_key == cache_namespace("chat", mock_event.unified_msg_origin, "conv-id")
 
 
 def test_append_system_reminders_includes_weekday(mock_event):

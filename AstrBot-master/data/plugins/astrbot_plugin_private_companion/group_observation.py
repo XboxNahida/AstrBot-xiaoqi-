@@ -2716,6 +2716,8 @@ class GroupObservationMixin:
         return "\n".join(lines)
 
     def _format_group_episodes_for_prompt(self, group: dict[str, Any]) -> str:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return ""
         episodes = group.get("group_episodes")
         if not isinstance(episodes, list):
             return ""
@@ -3942,6 +3944,8 @@ class GroupObservationMixin:
         return True
 
     async def _maybe_refresh_group_episode(self, group_id: str, group: dict[str, Any]) -> None:
+        if getattr(self, "_gemini_memory_enabled", False):
+            return
         if not self.enable_group_episode_memory:
             return
         now = _now_ts()

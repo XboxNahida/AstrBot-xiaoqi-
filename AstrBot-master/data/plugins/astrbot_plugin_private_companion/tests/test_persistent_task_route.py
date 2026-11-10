@@ -109,6 +109,20 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
         configure.assert_called_once()
         self.assertIn("pc_manage_tasks", [tool.name for tool in req.func_tool.tools])
 
+    async def test_permission_and_library_and_mentions_survive_chat_filter(self):
+        plugin, event, req, runtime = self.setup_route("chat")
+        for method, name in (("make_permission_tool", "pc_manage_task_authorization"),
+                             ("make_reaction_library_tool", "pc_reaction_library"),
+                             ("make_group_message_tool", "pc_send_group_message")):
+            setattr(runtime, method, MagicMock(return_value=FunctionTool(name=name, description=name, parameters={"type": "object"})))
+        await self.invoke(plugin, event, req)
+        names = {tool.name for tool in req.func_tool.tools}
+        self.assertTrue({"pc_manage_task_authorization", "pc_reaction_library", "pc_send_group_message"} <= names)
+        self.assertIn("当前群", req.system_prompt)
+        self.assertIn("人格", req.system_prompt)
+        self.assertIn("不必", req.system_prompt)
+        runtime.submit.assert_not_awaited()
+
     async def test_actual_chat_provider_route_keeps_reader_and_persona_with_backup(self):
         plugin, event, req, runtime = self.setup_route("chat")
         providers = {}
@@ -167,6 +181,7 @@ class PersistentTaskRouteTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_tool_schema_failure_is_not_reported_as_model_configuration(self):
         plugin, event, req, runtime = self.setup_route()
+        plugin.config = {"api_key": "topsecret"}
         runtime.register.side_effect = ValidationError("api_key=topsecret invalid required")
         event.send = AsyncMock()
         event.plain_result = lambda value: value
