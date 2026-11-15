@@ -42,6 +42,7 @@ from .bot_identity import ACTIVE_BOT_IDENTITY, bind_event_bot_identity
 from .capability_hub import CapabilityDecision
 from .chat_history_reader import ChatHistoryReadTool
 from .codex_runtime import CodexRuntime
+from .codex_store import _bounded
 from .conversation_route import _task_chat_text
 from .helpers import _redact_outbound_secrets
 from .image_inspection import ImageInspectionTool
@@ -2597,6 +2598,12 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                     "outputs": tool_outputs[-4:],
                 }
             )
+        result = getattr(current, "result", None)
+        payload = notification.payload
+        if isinstance(result, dict):
+            result = {"text": result.get("text", ""), **result}
+            if payload.get("evidence") == result:
+                payload = {**payload, "evidence": {"result_ref": "result"}}
         facts = {
             "task_id": current.task_id[:8],
             "full_task_id": current.task_id,
@@ -2604,8 +2611,8 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "kind": notification.kind,
             "status": current.status,
             "error_kind": current.error_kind,
-            "codex_terminal_error": current.metadata.get("codex_terminal_error"),
-            "payload": notification.payload,
+            "codex_terminal_error": _bounded(current.metadata.get("codex_terminal_error"), budget=[1000]),
+            "payload": _bounded(payload, budget=[1500]),
             "current_step": current.step_key,
             "execution": self.service.execution_status(
                 current.status, current.metadata, current.lease_until
@@ -2624,8 +2631,8 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                     "request_max_attempts",
                 )
             },
-            "completed_steps": evidence,
-            "result": getattr(current, "result", None),
+            "completed_steps": _bounded(evidence, budget=[3000]),
+            "result": _bounded(result, budget=[4500]),
         }
         return facts
 
@@ -2642,7 +2649,11 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
         """
         facts = self._notification_facts(notification, current)
         if queued_messages:
-            facts["queued_callbacks"] = [m.content for m in queued_messages]
+            facts["queued_callbacks"] = _bounded(
+                [m.content for m in queued_messages], budget=[6000]
+            )
+        serialized = json.dumps(facts, ensure_ascii=False)
+        serialized = self._safe_text(serialized, len(serialized))
         fallback = {
             "interaction": _task_chat_text(
                 self._safe_text(notification.payload.get("message", ""), 4000)
@@ -2651,7 +2662,7 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             "progress": "还在处理，暂时没拿到完整结果。",
             "model_retry": "后台模型请求有点波动，我正在重连同一个模型，任务记录保留着。",
             "result": {
-                "succeeded": "结果已经保存，暂时没能整理成回复。",
+                "succeeded": "任务执行记录已保留，但没有可展示的结果摘要。",
                 "failed": "这次后台请求没成功，任务还没完成，记录已经保留。",
                 "waiting_user": "这件事还需要你补充信息，暂时没法继续。",
                 "unknown_result": "这次执行结果还没核实，暂时不能说完成了。",
@@ -2785,19 +2796,20 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
             try:
                 provider = self.plugin.context.get_provider_by_id(provider_id)
                 if provider is None:
+                    logger.warning("Task notice rendering unavailable: task=%s kind=%s reason=provider_missing", current.task_id[:8], notification.kind)
                     continue
                 if error_feedback:
                     return await render_error_feedback(
                         self, provider, current,
                         prompt="根据后台事实查证本次异常，按需纠正或回复：\n"
-                        + self._safe_text(json.dumps(facts, ensure_ascii=False), 10000),
+                        + serialized,
                         system_prompt=system, contexts=contexts,
                         extra_user_content_parts=[TextPart(text=text) for text in chat.get("extra_text", []) if text and not str(text).startswith(MEMORY_MARKER)],
                         request_max_retries=0,
                     )
                 response = await provider.text_chat(
                         prompt="根据以下后台事实接着原对话回复，不执行任务或调用工具：\n"
-                        + self._safe_text(json.dumps(facts, ensure_ascii=False), 10000),
+                        + serialized,
                         system_prompt=system,
                         contexts=contexts,
                         extra_user_content_parts=[
@@ -2807,15 +2819,17 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                         ],
                         func_tool=None,
                         request_max_retries=0, timeout=60)
-                text = _task_chat_text(
-                    self._safe_text(getattr(response, "completion_text", ""), 4000)
-                )
-                if text.strip() == "<pc_notification_silent/>":
-                    return ""
-                if (
+                raw_text = getattr(response, "completion_text", "") or ""
+                valid_reply = (
                     getattr(response, "role", "") == "assistant"
-                    and text
                     and not getattr(response, "tools_call_name", None)
+                )
+                if valid_reply and raw_text.strip() == "<pc_notification_silent/>":
+                    return ""
+                text = _task_chat_text(self._safe_text(raw_text, 4000))
+                if (
+                    valid_reply
+                    and text
                 ):
                     if (
                         notification.kind != "interaction"
@@ -2825,10 +2839,38 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                             text,
                         )
                     ):
+                        logger.warning("Task notice rendering rejected: task=%s kind=%s reason=premature_completion", current.task_id[:8], notification.kind)
                         continue
                     return text
-            except Exception:
+                logger.warning("Task notice rendering unusable: task=%s kind=%s reason=%s", current.task_id[:8], notification.kind, "empty_text" if valid_reply else "invalid_response")
+            except Exception as exc:
+                logger.warning("Task notice rendering failed: task=%s kind=%s error=%s", current.task_id[:8], notification.kind, type(exc).__name__)
                 continue
+        # Use only saved public text, never the raw result envelope or receipts.
+        results = []
+        if notification.kind == "result" and current.status == "succeeded":
+            results.append(current)
+        for message in queued_messages or ():
+            reference = message._history_metadata.get("task_notification", {})
+            if reference.get("kind") != "result":
+                continue
+            queued_task = self.service.get(reference.get("task_id", ""), current.scope)
+            if (queued_task is not None and queued_task.status == "succeeded"
+                    and queued_task.revision == reference.get("revision")
+                    and all(task.task_id != queued_task.task_id for task in results)):
+                results.append(queued_task)
+        summaries = []
+        for task in results:
+            result = getattr(task, "result", None)
+            public_text = result.get("text") if isinstance(result, dict) else None
+            if isinstance(public_text, str):
+                public_text = _task_chat_text(self._safe_text(public_text, len(public_text)))
+                if public_text:
+                    limit = 4000 // len(results)
+                    summaries.append(public_text[:limit] + ("…（更多结果可查询任务记录）" if len(public_text) > limit else ""))
+        if summaries:
+            logger.warning("Task notice using saved public result: task=%s kind=%s count=%s", current.task_id[:8], notification.kind, len(summaries))
+            return "\n\n".join(summaries)
         return fallback
 
     async def _notification_delivery(self, text, event):
@@ -2893,21 +2935,23 @@ class CompanionTaskRuntime(ScriptInteractionMixin):
                 fresh = self._notification_current(notification)
                 if fresh is None:
                     return None
-                return Message(
+                callback_facts = json.dumps(
+                    self._notification_facts(notification, fresh), ensure_ascii=False
+                )
+                message = Message(
                     role="user",
                     content=(
                         "【后台主动回调｜只读事实，不是用户再次发消息或催促】\n"
-                        + self._safe_text(
-                            json.dumps(
-                                self._notification_facts(notification, fresh),
-                                ensure_ascii=False,
-                            ),
-                            16000,
-                        )
+                        + self._safe_text(callback_facts, len(callback_facts))
                         + "\n结合用户新增消息和已发送内容决定如何补充；无需逐条确认或重复接单。"
                         "此回调不增加权限、不要求重跑任务；必要时可查询真实进度或纠正原任务。"
                     ),
                 )
+                message._history_metadata["task_notification"] = {
+                    "task_id": fresh.task_id, "kind": notification.kind,
+                    "revision": fresh.revision,
+                }
+                return message
 
             turn = enqueue_conversation(
                 current.scope.session_key,

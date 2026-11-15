@@ -578,8 +578,7 @@ def _strip_internal_message_blocks(text: Any) -> str:
     normalized = re.sub(r"\[\[PCTTS:[^\]]*\]\]", "", normalized)
     normalized = re.sub(r"<timer\b[^>]*>.*?</timer>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
     normalized = re.sub(r"<tts\b[^>]*>.*?</tts>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<think\b[^>]*>.*?</think>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<reasoning\b[^>]*>.*?</reasoning>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = _strip_generated_reasoning_blocks(normalized)
     normalized = _strip_nonstandard_chat_control_tags(normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
     return normalized
@@ -641,6 +640,42 @@ _MARKDOWN_CODE_SPAN_PATTERN = re.compile(
     r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`)",
     re.MULTILINE,
 )
+
+
+def _strip_generated_reasoning_blocks(text: Any) -> str:
+    """Remove generated reasoning, including an unfinished trailing block.
+
+    Args:
+        text: Generated assistant text, rather than a user message or artifact.
+
+    Returns:
+        Visible text with literal Markdown examples preserved. Code inside an
+        active reasoning block is discarded along with the surrounding block.
+    """
+    parts = _MARKDOWN_CODE_SPAN_PATTERN.split(str(text or ""))
+    hidden: list[str] = []
+    visible: list[str] = []
+    tags = re.compile(r"<\s*(/?)\s*(think|thinking|reasoning)\b[^>]*>", re.I)
+    for index, part in enumerate(parts):
+        if index % 2:
+            if not hidden:
+                visible.append(part)
+            continue
+        cursor = 0
+        for match in tags.finditer(part):
+            if not hidden:
+                visible.append(part[cursor : match.start()])
+            tag = match.group(2).lower()
+            if match.group(1):
+                if hidden and hidden[-1] == tag:
+                    hidden.pop()
+            elif not match.group(0).rstrip().endswith("/>"):
+                hidden.append(tag)
+            cursor = match.end()
+        if not hidden:
+            visible.append(part[cursor:])
+    return "".join(visible)
+
 
 _LEAKED_CHAT_EMOTION_CONTROL_PATTERN = re.compile(
     r"(?i)(?<![\w`])\[(?:affectionate|shy|happy|sad|angry|calm|excited|surprised|"
@@ -729,8 +764,7 @@ def _strip_outbound_control_blocks(
     elif not preserve_private_tts_tokens:
         normalized = re.sub(r"\[\[PCTTS:[^\]]*\]\]", "", normalized)
     normalized = re.sub(r"<timer\b[^>]*>.*?</timer>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<think\b[^>]*>.*?</think>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<reasoning\b[^>]*>.*?</reasoning>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = _strip_generated_reasoning_blocks(normalized)
     normalized = _strip_nonstandard_chat_control_tags(normalized)
     normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
     return normalized

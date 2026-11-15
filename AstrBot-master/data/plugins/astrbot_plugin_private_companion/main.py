@@ -149,6 +149,7 @@ from .helpers import (
     _set_into_config,
     _single_line,
     _strip_internal_message_blocks,
+    _strip_generated_reasoning_blocks,
     _strip_outbound_control_blocks,
     _today_key,
     _resolve_timezone_setting,
@@ -16245,7 +16246,10 @@ wakeup_type={_single_line(wakeup.get('type'), 40)} score={_single_line(wakeup.ge
         """恢复降级为正文的生图调用，并规范化 TTS 标签。"""
         if self is None or not self.enabled:
             return
-        original_text = str(getattr(resp, "completion_text", "") or "")
+        original_text = _strip_generated_reasoning_blocks(
+            getattr(resp, "completion_text", "")
+        )
+        resp.completion_text = original_text
         same_session_tool = getattr(self, "_prepare_same_session_send_tool_response", None)
         same_session_tool_call = False
         if callable(same_session_tool):

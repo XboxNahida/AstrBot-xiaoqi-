@@ -2,6 +2,7 @@ import asyncio
 import copy
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -1888,6 +1889,55 @@ async def test_outbox_generation_rechecks_state_and_send_false_is_unknown(runtim
 
 
 @pytest.mark.asyncio
+async def test_notification_fallback_batch_retains_each_scoped_result(runtime):
+    from astrbot.core.agent.message import Message
+
+    jobs = []
+    for index, user in enumerate(("owner", "owner", "other")):
+        e = event(user=user, mid=f"batch-{index}")
+        register(runtime, e)
+        if user == "other":
+            runtime.permissions.grant(runtime.actor(event()), "other", roots=[runtime.workspace],
+                                      capabilities=runtime.permissions.allowed_capabilities)
+        await runtime.submit(e, {"goal": f"检查{index}"})
+        job = runtime.service.claim("worker")
+        runtime.service.finish(job, {"text": (f"结论{index}。" * 1200)})
+        jobs.append(runtime.service.get(job.task_id, job.scope))
+    messages = []
+    for job in jobs[1:]:
+        message = Message(role="user", content="队列中的后台事实")
+        message._history_metadata["task_notification"] = {
+            "task_id": job.task_id, "kind": "result", "revision": job.revision,
+        }
+        messages.append(message)
+    rendered = await runtime.render_notification(
+        SimpleNamespace(kind="result", payload={}), jobs[0], queued_messages=messages
+    )
+    assert "结论0" in rendered and "结论1" in rendered and "结论2" not in rendered
+    assert len(rendered) <= 4500
+
+
+@pytest.mark.asyncio
+async def test_notification_failures_log_only_safe_classification(runtime, monkeypatch):
+    from astrbot_plugin_private_companion import task_runtime
+
+    e = event()
+    register(runtime, e)
+    receipt = await runtime.submit(e, {"goal": "查公告"})
+    current = runtime.service.get(receipt["task_id"], runtime.scope(e))
+    current = replace(current, status="failed", result={"text": "不可当成成功结果"})
+    logs = []
+    monkeypatch.setattr(task_runtime.logger, "warning", lambda message, *args: logs.append(message % args))
+    runtime.plugin.context.get_provider_by_id = lambda _: SimpleNamespace(
+        text_chat=AsyncMock(side_effect=TimeoutError("never-leak-secret PRIVATE-PROMPT"))
+    )
+    rendered = await runtime.render_notification(SimpleNamespace(kind="result", payload={}), current)
+    assert "不可当成成功结果" not in rendered
+    assert any("TimeoutError" in line for line in logs)
+    assert not any("never-leak-secret" in line or "PRIVATE-PROMPT" in line for line in logs)
+
+
+@pytest.mark.asyncio
 async def test_healthy_background_has_no_timer_or_model_progress(runtime):
     assert runtime.scheduler.progress_after_seconds is None
     e = event(mid="healthy")
@@ -2768,3 +2818,101 @@ def test_control_cleaner_never_preserves_code_from_internal_reasoning(closing, t
     )
     assert "不可外发" not in _task_chat_text(raw)
     assert "内部推理" not in _task_chat_text(raw)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["timeout", "empty", "thinking", "role", "tools"])
+async def test_completed_notice_retains_real_result_when_chat_fails(runtime, failure):
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "检查文档"})
+    job = runtime.service.claim("worker")
+    result = {
+        "text": "<thinking>不可外发</thinking>文档已检查，有三处需要调整。topsecret",
+        "thread_id": "private-thread-id",
+        "receipts": [{"raw": "INTERNAL-RECEIPT"}],
+    }
+    assert runtime.service.finish(job, result)
+    current = runtime.service.get(job.task_id, job.scope)
+    response = SimpleNamespace(
+        role="tool" if failure == "role" else "assistant",
+        completion_text={"empty": "", "thinking": "<thinking>内部推理"}.get(failure, "不能外发的草稿"),
+        tools_call_name=["unexpected"] if failure == "tools" else [],
+    )
+    chat = SimpleNamespace(text_chat=AsyncMock(return_value=response))
+    if failure == "timeout":
+        chat.text_chat.side_effect = TimeoutError("never-leak-secret")
+    runtime.plugin.conversation_chat_fallback_provider_id = "backup"
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    rendered = await runtime.render_notification(
+        SimpleNamespace(kind="result", payload={"evidence": result}), current
+    )
+    assert "文档已检查，有三处需要调整。" in rendered
+    assert not any(s in rendered for s in ("不可外发", "topsecret", "INTERNAL-RECEIPT", "private-thread-id", "暂时没能整理"))
+    assert chat.text_chat.await_count == 2
+    assert runtime.service.get(job.task_id, job.scope).result == result
+
+
+@pytest.mark.asyncio
+async def test_large_notification_is_valid_json_and_keeps_result(runtime):
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "检查文档"})
+    job = runtime.service.claim("worker")
+    result = {"receipts": [{"output": '大输出\\"' * 30000}], "text": "最终核对结果"}
+    assert runtime.service.finish(job, result)
+    current = runtime.service.get(job.task_id, job.scope)
+    payload = {"status": "succeeded", "evidence": result}
+    original = copy.deepcopy(payload)
+    chat = SimpleNamespace(text_chat=AsyncMock(return_value=SimpleNamespace(
+        role="assistant", completion_text="自然的人格回复", tools_call_name=[]
+    )))
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    assert await runtime.render_notification(SimpleNamespace(kind="result", payload=payload), current) == "自然的人格回复"
+    prompt = chat.text_chat.await_args.kwargs["prompt"]
+    facts = json.loads(prompt.split("\n", 1)[1])
+    assert facts["status"] == "succeeded"
+    assert facts["full_task_id"] == job.task_id
+    assert facts["result"]["text"] == "最终核对结果"
+    assert len(prompt) < 24000
+    assert payload == original and current.result == result
+
+
+@pytest.mark.asyncio
+async def test_successful_notice_explicit_silence_and_empty_result(runtime):
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "检查文档"})
+    job = runtime.service.claim("worker")
+    runtime.service.finish(job, {"receipts": [{"raw": "INTERNAL-ONLY"}]})
+    current = runtime.service.get(job.task_id, job.scope)
+    chat = SimpleNamespace(text_chat=AsyncMock(return_value=SimpleNamespace(
+        role="assistant", completion_text="<pc_notification_silent/>", tools_call_name=[]
+    )))
+    runtime.plugin.context.get_provider_by_id = lambda _: chat
+    notification = SimpleNamespace(kind="result", payload={})
+    assert await runtime.render_notification(notification, current) == ""
+    chat.text_chat.side_effect = TimeoutError()
+    rendered = await runtime.render_notification(notification, current)
+    assert "INTERNAL-ONLY" not in rendered
+    assert "可展示" in rendered
+
+
+@pytest.mark.asyncio
+async def test_completed_notice_chat_failure_sends_once_and_acks(runtime):
+    e = event()
+    register(runtime, e)
+    await runtime.submit(e, {"goal": "检查文档"})
+    await runtime.send_once()
+    runtime.plugin.context.send_message.reset_mock()
+    job = runtime.service.claim("worker")
+    runtime.service.finish(job, {"text": "真实检查结论"})
+    runtime.plugin.context.get_provider_by_id = lambda _: SimpleNamespace(
+        text_chat=AsyncMock(side_effect=TimeoutError())
+    )
+    assert await runtime.send_once()
+    assert not await runtime.send_once()
+    assert runtime.plugin.context.send_message.await_count == 1
+    chain = runtime.plugin.context.send_message.await_args.args[1].chain
+    assert "真实检查结论" in "".join(part.text for part in chain)
+    assert runtime.service.get(job.task_id, job.scope).status == "succeeded"

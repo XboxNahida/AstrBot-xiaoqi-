@@ -19,7 +19,11 @@ from astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal import
 from astrbot.core.provider import Provider
 from astrbot.core.tools.web_search_tools import WEB_SEARCH_TOOL_NAMES
 
-from .helpers import _redact_outbound_secrets, _strip_outbound_control_blocks
+from .helpers import (
+    _redact_outbound_secrets,
+    _strip_generated_reasoning_blocks,
+    _strip_outbound_control_blocks,
+)
 
 CHAT_WEB_TOOL_NAMES = (
     *WEB_SEARCH_TOOL_NAMES,
@@ -59,7 +63,10 @@ def _task_chat_text(text: Any) -> str:
     Returns:
         Visible text without private controls, reasoning or credentials.
     """
-    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`)", str(text or ""))
+    parts = re.split(
+        r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`)",
+        _strip_generated_reasoning_blocks(text),
+    )
     reasoning = None
     for index, text in enumerate(parts):
         if reasoning:
