@@ -18966,6 +18966,8 @@ class PrivateCompanionPageApi(
     @staticmethod
     def _normalize_provider_mode_value(value: Any) -> str:
         text = str(value or "").strip().lower()
+        if text in {"centralized", "集中配置"}:
+            return "centralized"
         return "precision" if text in {"precision", "precise", "advanced", "精准", "精准配置", "分流"} else "quick"
 
     def _precision_bundle_from_quick(self, values: dict[str, str]) -> dict[str, str]:
@@ -19040,7 +19042,10 @@ class PrivateCompanionPageApi(
         for key, value in values.items():
             if key in self._allowed_provider_keys():
                 merged[key] = self._single_line(value, 160)
-        if self._normalize_provider_mode_value(mode) == "quick":
+        normalized_mode = self._normalize_provider_mode_value(mode)
+        if normalized_mode == "centralized":
+            return {key: value for key, value in merged.items() if key in self._allowed_provider_keys()}
+        if normalized_mode == "quick":
             merged.update(self._precision_bundle_from_quick(merged))
         else:
             merged.update(self._quick_bundle_from_precision(merged))
@@ -20994,6 +20999,7 @@ class PrivateCompanionPageApi(
             "page_theme",
             "provider_config_mode",
             "model_timeout_overrides",
+            "model_request_attempt_overrides",
             "model_token_limit_overrides",
             "model_fallback_overrides",
             "enable_deepseek_peak_replacement",
@@ -23137,7 +23143,7 @@ class PrivateCompanionPageApi(
             setattr(self.plugin, key, self._normalize_setting_value(key, value))
             return
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
-            setattr(self.plugin, key, min(60, max(1, int(value))) if key == "task_model_timeout_seconds" else max(1, int(value)))
+            setattr(self.plugin, key, min(600, max(1, int(value))) if key == "task_model_timeout_seconds" else max(1, int(value)))
             return
         if key == "CONVERSATION_TASK_FALLBACK_PROVIDER_ID":
             self.plugin.conversation_task_fallback_provider_id = ""
@@ -23294,6 +23300,9 @@ class PrivateCompanionPageApi(
         if key == "model_timeout_overrides":
             normalizer = getattr(self.plugin, "_normalize_model_timeout_overrides", None)
             self.plugin.model_timeout_overrides = normalizer(value) if callable(normalizer) else {}
+            return
+        if key == "model_request_attempt_overrides":
+            self.plugin.model_request_attempt_overrides = self.plugin._normalize_model_request_attempt_overrides(value)
             return
         if key == "model_token_limit_overrides":
             normalizer = getattr(self.plugin, "_normalize_model_token_limit_overrides", None)
@@ -24181,6 +24190,7 @@ class PrivateCompanionPageApi(
             "page_theme",
             "provider_config_mode",
             "model_timeout_overrides",
+            "model_request_attempt_overrides",
             "model_token_limit_overrides",
             "model_fallback_overrides",
             "enable_deepseek_peak_replacement",

@@ -499,6 +499,9 @@ def _initialize_world_and_model_config(self: Any, c: Any) -> None:
     self.model_timeout_overrides = self._normalize_model_timeout_overrides(
         self._cfg_raw(c, "model_timeout_overrides", {})
     )
+    self.model_request_attempt_overrides = self._normalize_model_request_attempt_overrides(
+        self._cfg_raw(c, "model_request_attempt_overrides", {})
+    )
     self.model_token_limit_overrides = self._normalize_model_token_limit_overrides(
         self._cfg_raw(c, "model_token_limit_overrides", {})
     )
@@ -527,7 +530,7 @@ def _initialize_world_and_model_config(self: Any, c: Any) -> None:
     self.conversation_chat_fallback_provider_id = self._cfg_str(c, "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "")
     self.conversation_task_provider_id = self._cfg_str(c, "CONVERSATION_TASK_PROVIDER_ID", "openai/gpt-6-sol") or "openai/gpt-6-sol"
     self.conversation_task_fallback_provider_id = ""  # 旧配置保留，后台不自动切换模型。
-    self.task_model_timeout_seconds = min(60, max(1, self._cfg_int(c, "task_model_timeout_seconds", 120)))
+    self.task_model_timeout_seconds = min(600, max(1, self._cfg_int(c, "task_model_timeout_seconds", 60)))
     self.task_model_max_attempts = max(1, self._cfg_int(c, "task_model_max_attempts", 3))
     self.task_execution_engine = self._cfg_raw(c, "task_execution_engine", "codex")
     if not isinstance(

@@ -120,6 +120,8 @@ class ProviderRequest:
     """Optional request-scoped chat provider override."""
     fallback_provider_ids: list[str] | None = None
     """None inherits global fallbacks; an empty list explicitly disables them."""
+    provider_request_settings: dict[str, dict] = field(default_factory=dict)
+    """Request-local provider timeouts and total attempts, including the first call."""
     disable_streaming: bool = False
     """Buffer this request when its final response needs postprocessing."""
     final_response_only: bool = False

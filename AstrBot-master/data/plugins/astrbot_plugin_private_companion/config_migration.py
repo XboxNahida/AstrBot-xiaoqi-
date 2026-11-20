@@ -863,6 +863,8 @@ def _ensure_provider_config_mode(root: dict[str, Any], schema_map: dict[str, dic
 def _normalize_provider_config_mode_value(value: Any) -> str:
     text = str(value or "").strip().lower()
     aliases = {
+        "centralized": "centralized",
+        "集中配置": "centralized",
         "quick": "quick",
         "fast": "quick",
         "simple": "quick",

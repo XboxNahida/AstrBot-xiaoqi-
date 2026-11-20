@@ -12,13 +12,13 @@ window.PrivateCompanionProviderTree = (() => {
   function normalizeTimeoutValue(value) {
     if (value === null || value === undefined || String(value).trim() === "") return "";
     const parsed = Math.round(Number(value));
-    return Number.isFinite(parsed) && parsed >= 5 && parsed <= 600 ? Math.min(60, parsed) : "";
+    return Number.isFinite(parsed) && parsed >= 5 && parsed <= 600 ? parsed : "";
   }
 
   function currentTaskModelValues(context) {
     const { document, state } = context;
     const source = { ...(state.overview?.settings || {}), ...(state.taskModelDraft || {}) };
-    const timeout = Math.min(60, Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 120));
+    const timeout = Number(document.querySelector("[data-task-model-timeout]")?.value ?? source.task_model_timeout_seconds ?? 60);
     const attempts = Number(document.querySelector("[data-task-model-attempts]")?.value ?? source.task_model_max_attempts ?? 3);
     const engine = document.querySelector("[data-task-execution-engine]")?.value ?? source.task_execution_engine ?? "codex";
     const effort = document.querySelector("[data-codex-reasoning-effort]")?.value ?? source.codex_reasoning_effort ?? "medium";
@@ -26,7 +26,7 @@ window.PrivateCompanionProviderTree = (() => {
     if (typeof effort !== "string" || !effort.trim() || effort.length > 64 || /[\x00-\x1f\x7f-\x9f]/.test(effort)) {
       throw new Error("Codex思考程度必须是最多64字符且不含控制字符的非空档位");
     }
-    if (!Number.isInteger(timeout) || timeout < 1 || !Number.isInteger(attempts) || attempts < 1) {
+    if (!Number.isInteger(timeout) || timeout < 1 || timeout > 600 || !Number.isInteger(attempts) || attempts < 1) {
       throw new Error("后台模型超时和最多请求次数必须是至少1的整数；次数包含首次请求");
     }
     return { task_model_timeout_seconds: timeout, task_model_max_attempts: attempts, task_execution_engine: engine, codex_reasoning_effort: effort.trim() };
@@ -54,6 +54,27 @@ window.PrivateCompanionProviderTree = (() => {
       const normalized = normalizeTimeoutValue(input.value);
       if (normalized === "") delete values[input.dataset.providerTimeout];
       else values[input.dataset.providerTimeout] = normalized;
+    });
+    return values;
+  }
+
+  function providerAttemptValuesForRender(context) {
+    let source = context.state.overview?.settings?.model_request_attempt_overrides || {};
+    if (typeof source === "string") {
+      try { source = JSON.parse(source); } catch (_error) { source = {}; }
+    }
+    return { ...source, ...(context.state.providerAttemptDraft || {}) };
+  }
+
+  function currentProviderAttemptValues(context) {
+    const values = providerAttemptValuesForRender(context);
+    Object.keys(values).forEach(key => {
+      if (!Number.isInteger(Number(values[key])) || Number(values[key]) < 1) delete values[key];
+    });
+    context.document.querySelectorAll("[data-provider-attempts]").forEach(input => {
+      const count = Number(input.value);
+      if (String(input.value).trim() === "" || !Number.isInteger(count) || count < 1) delete values[input.dataset.providerAttempts];
+      else values[input.dataset.providerAttempts] = count;
     });
     return values;
   }
@@ -208,6 +229,10 @@ window.PrivateCompanionProviderTree = (() => {
 
   function resolveProviderId(context, key, values = currentProviderValues(context)) {
     const { noFallbackProviderKeys, optionalNoFallbackProviderKeys } = context;
+    if (context.currentProviderConfigMode?.() === "centralized") {
+      if (["PLUGIN_VISION_PROVIDER_ID", "PRIVATE_READING_VISION_PROVIDER_ID"].includes(key)) return values.PLUGIN_VISION_PROVIDER_ID || "";
+      if (!key.startsWith("CONVERSATION_") && !embeddingProviderKeys.has(key)) return values.LLM_PROVIDER_ID || "";
+    }
     if (values[key]) return values[key];
     if (embeddingProviderKeys.has(key)) return "";
     if (noFallbackProviderKeys.has(key)) return "";
@@ -409,7 +434,7 @@ window.PrivateCompanionProviderTree = (() => {
             <label class="provider-field provider-limit-field provider-timeout-field">
               <span>${embeddingProviderKeys.has(key) ? "请求超时" : "流式无响应超时"}</span>
               <span class="provider-limit-control provider-timeout-control">
-                ${taskProvider ? `<input type="number" min="1" max="60" step="1" data-task-model-timeout value="${escapeHtml(timeoutValue)}" aria-label="后台模型连续无响应超时秒数" />` : `<input type="number" min="5" max="60" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="原提供器配置（最多60秒）" aria-label="${escapeHtml(label)}无响应超时秒数" />`}
+                ${taskProvider ? `<input type="number" min="1" max="600" step="1" data-task-model-timeout value="${escapeHtml(timeoutValue)}" aria-label="后台模型连续无响应超时秒数" />` : `<input type="number" min="5" max="600" step="1" inputmode="numeric" data-provider-timeout="${escapeHtml(key)}" value="${escapeHtml(timeoutValue)}" placeholder="沿用原默认，可设5–600秒" aria-label="${escapeHtml(label)}无响应超时秒数" />`}
                 <b>秒</b>
               </span>
             </label>
@@ -421,12 +446,13 @@ window.PrivateCompanionProviderTree = (() => {
               </span>
             </label>
           </div>`}
-          ${embeddingProvider ? "" : `<small>流式沿用原超时，大于60秒按60秒；分片刷新计时，单次请求总边界10分钟。中枢保留原30秒上限。</small>`}
+          ${embeddingProvider ? "" : `<small>首字等待和流中连续无响应使用所填超时；正文、推理和工具参数分片刷新计时。单次总边界10分钟；留空保留原默认。</small>`}
+          ${embeddingProvider || taskProvider ? "" : `<label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-provider-attempts="${escapeHtml(key)}" value="${escapeHtml(providerAttemptValuesForRender(context)[key] || "")}" placeholder="沿用原默认" /><small>3次＝首次1次＋重试2次；主、备用分别计数。通用卡的备用继承该卡次数；已输出内容不自动重放。</small></label>`}
           ${taskProvider ? `<label class="provider-field"><span>新GPT任务执行引擎</span><select data-task-execution-engine><option value="codex" ${taskValues.task_execution_engine === "codex" ? "selected" : ""}>Codex</option><option value="native" ${taskValues.task_execution_engine === "native" ? "selected" : ""}>原生</option></select><small>新GPT任务默认Codex；其他模型沿用原生；已有任务不迁移。</small></label>
           <label class="provider-field"><span>Codex默认思考程度</span><input type="text" maxlength="64" data-codex-reasoning-effort value="${escapeHtml(taskValues.codex_reasoning_effort)}" placeholder="low / medium / high / xhigh" /><small>也可填写模型支持的其他档位；新对话生效，Gemini可按对话修改。</small></label>
           <label class="provider-field"><span>最多请求次数（包含首次）</span><input type="number" min="1" step="1" data-task-model-attempts value="${escapeHtml(taskValues.task_model_max_attempts)}" /><small>默认3次＝首次1次＋重试2次；固定当前模型，不自动使用备用。Gemini可按任务覆盖。</small></label>` : ""}
-          ${embeddingProvider || taskProvider ? "" : `<label class="provider-field provider-fallback-field">
-            <span>备用模型 <small>主模型失败、超时、Token 超限或空响应时尝试一次</small></span>
+          ${embeddingProvider || taskProvider || key === "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID" || (key === "CONVERSATION_CHAT_PROVIDER_ID" && context.currentProviderConfigMode?.() === "centralized") ? "" : `<label class="provider-field provider-fallback-field">
+            <span>备用模型 <small>主模型失败、超时、Token 超限或空响应时按本卡次数尝试</small></span>
             ${providerFallbackSelect(context, key, fallbackValue)}
           </label>`}
           <div class="provider-current">
@@ -658,14 +684,14 @@ window.PrivateCompanionProviderTree = (() => {
     `;
   }
 
-  function bindProviderTests(context) {
+  function bindProviderTests(context, root = context.document) {
     const { document } = context;
-    document.querySelectorAll("[data-task-model-timeout], [data-task-model-attempts], [data-task-execution-engine], [data-codex-reasoning-effort]").forEach((input) => {
+    root.querySelectorAll("[data-task-model-timeout], [data-task-model-attempts], [data-task-execution-engine], [data-codex-reasoning-effort]").forEach((input) => {
       input.addEventListener("input", () => {
         try { context.state.taskModelDraft = currentTaskModelValues(context); } catch (_error) { /* Validate again on save. */ }
       });
     });
-    document.querySelectorAll("[data-provider-select]").forEach((select) => {
+    root.querySelectorAll("[data-provider-select]").forEach((select) => {
       syncProviderInput(context, select);
       select.addEventListener("change", () => {
         const custom = select.value === "__custom__";
@@ -673,25 +699,25 @@ window.PrivateCompanionProviderTree = (() => {
         rememberProviderDraft(context, select.dataset.providerSelect);
         // Keep the manual field mounted so the just-selected custom option is
         // not immediately replaced by a render based on its still-empty value.
-        if (!custom) renderProviders(context);
+        if (!custom) context.state.modelsSection === "image" ? renderVisionConfig(context) : renderProviders(context);
       });
     });
-    document.querySelectorAll("[data-provider-key]").forEach((input) => {
+    root.querySelectorAll("[data-provider-key]").forEach((input) => {
       input.addEventListener("input", () => rememberProviderDraft(context, input.dataset.providerKey));
     });
-    document.querySelectorAll("[data-provider-fallback-select]").forEach((select) => {
+    root.querySelectorAll("[data-provider-fallback-select]").forEach((select) => {
       syncProviderFallbackInput(context, select);
       select.addEventListener("change", () => {
         const custom = select.value === "__custom__";
         syncProviderFallbackInput(context, select);
         rememberProviderFallbackDraft(context, select.dataset.providerFallbackSelect);
-        if (!custom) renderProviders(context);
+        if (!custom) context.state.modelsSection === "image" ? renderVisionConfig(context) : renderProviders(context);
       });
     });
-    document.querySelectorAll("[data-provider-fallback-key]").forEach((input) => {
+    root.querySelectorAll("[data-provider-fallback-key]").forEach((input) => {
       input.addEventListener("input", () => rememberProviderFallbackDraft(context, input.dataset.providerFallbackKey));
     });
-    document.querySelectorAll("[data-provider-timeout]").forEach((input) => {
+    root.querySelectorAll("[data-provider-timeout]").forEach((input) => {
       input.addEventListener("input", () => rememberProviderTimeoutDraft(context, input));
       input.addEventListener("change", () => {
         const normalized = normalizeTimeoutValue(input.value);
@@ -699,7 +725,15 @@ window.PrivateCompanionProviderTree = (() => {
         rememberProviderTimeoutDraft(context, input);
       });
     });
-    document.querySelectorAll("[data-provider-token-limit]").forEach((input) => {
+    root.querySelectorAll("[data-provider-attempts]").forEach(input => {
+      input.addEventListener("input", () => {
+        context.state.providerAttemptDraft = {
+          ...(context.state.providerAttemptDraft || {}),
+          [input.dataset.providerAttempts]: input.value,
+        };
+      });
+    });
+    root.querySelectorAll("[data-provider-token-limit]").forEach((input) => {
       input.addEventListener("input", () => rememberProviderTokenLimitDraft(context, input));
       input.addEventListener("change", () => {
         const normalized = normalizeTokenLimitValue(input.value);
@@ -707,7 +741,7 @@ window.PrivateCompanionProviderTree = (() => {
         rememberProviderTokenLimitDraft(context, input);
       });
     });
-    document.querySelectorAll("[data-provider-test]").forEach((button) => {
+    root.querySelectorAll("[data-provider-test]").forEach((button) => {
       button.addEventListener("click", async () => {
         await testProvider(context, button.dataset.providerTest);
       });
@@ -718,6 +752,22 @@ window.PrivateCompanionProviderTree = (() => {
     const { syncProviderConfigModeControls, providerLabels, visibleConfigKey, providerAllowedInCurrentMode, providerGroups, providerGroupByKey, escapeHtml, document } = context;
     syncProviderConfigModeControls();
     const providers = providerValuesForRender(context);
+    if (context.currentProviderConfigMode?.() === "centralized") {
+      document.getElementById("deepseekPeakCard").innerHTML = "";
+      document.getElementById("providerSummary").textContent = "集中配置：聊天、主模型、中枢独立选择主备；图片与语音在上方固定入口。";
+      document.getElementById("providerFlow").textContent = `零散文本功能 → ${providers.LLM_PROVIDER_ID || "AstrBot 默认模型"}；备用 → ${providerFallbackValuesForRender(context).LLM_PROVIDER_ID || "未启用"}。后台模型不受集中配置影响。`;
+      document.getElementById("providerForm").innerHTML = [
+        { id: "central-chat", title: "聊天模型", desc: "负责日常回复、任务派发和后台进度反馈。", keys: ["CONVERSATION_CHAT_PROVIDER_ID", "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID"] },
+        { id: "central-main", title: "主模型及备用", desc: "日程、创作、情绪、提示词整理等零散文本功能自动跟随，旧分流值不参与。", keys: ["LLM_PROVIDER_ID"] },
+        { id: "central-hub", title: "中枢模型及备用", desc: "独立负责消息预处理和回复资格判断，保留现有超时与重试策略。", keys: ["CONVERSATION_HUB_PROVIDER_ID"] },
+      ].map((group) => providerGroupMarkup(context, group, group.keys.map((key) => [key, providerLabels[key]]), providers)).join("");
+      const vision = document.getElementById("imageVisionConfig");
+      if (vision) vision.innerHTML = "";
+      bindProviderTests(context, document.getElementById("providerForm"));
+      return;
+    }
+    const vision = document.getElementById("imageVisionConfig");
+    if (vision) vision.innerHTML = "";
     renderProviderSummary(context, providers);
     renderDeepseekPeakCard(context);
     renderProviderFlow(context, providers);
@@ -740,6 +790,25 @@ window.PrivateCompanionProviderTree = (() => {
       </div>
     `;
     bindProviderTests(context);
+  }
+
+  function renderVisionConfig(context) {
+    const { document } = context;
+    const container = document.getElementById("imageVisionConfig");
+    if (!container) return;
+    if (context.currentProviderConfigMode?.() !== "centralized") {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = providerGroupMarkup(context, {
+      id: "central-vision", title: "识图模型及备用",
+      desc: "普通图片、历史图片和辅助视觉读取统一使用此入口。生图／改图仍使用下方专用后端。",
+    }, [["PLUGIN_VISION_PROVIDER_ID", "识图模型"]], providerValuesForRender(context))
+      + '<button type="button" data-save-central-vision>保存识图与集中模型选择</button>';
+    bindProviderTests(context, container);
+    container.querySelector("[data-save-central-vision]")?.addEventListener("click", () => {
+      document.getElementById("saveProvidersBtn")?.click();
+    });
   }
 
   function bindProviderToolbar(context) {
@@ -771,9 +840,11 @@ window.PrivateCompanionProviderTree = (() => {
 
   return {
     renderProviders,
+    renderVisionConfig,
     bindProviderToolbar,
     currentProviderValues,
     currentProviderTimeoutValues,
+    currentProviderAttemptValues,
     currentTaskModelValues,
     currentProviderTokenLimitValues,
     currentProviderFallbackValues,

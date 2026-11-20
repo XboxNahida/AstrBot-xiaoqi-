@@ -958,6 +958,31 @@ class TokenBudgetMixin:
         return normalized
 
     @staticmethod
+    def _normalize_model_request_attempt_overrides(value: Any) -> dict[str, int]:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value or "{}")
+            except (TypeError, ValueError):
+                return {}
+        if not isinstance(value, dict):
+            return {}
+        normalized = {}
+        for key, raw in value.items():
+            if key not in MODEL_PROVIDER_KEYS or isinstance(raw, bool):
+                continue
+            try:
+                count = int(raw)
+                if count >= 1 and float(raw) == count:
+                    normalized[key] = count
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return normalized
+
+    def _model_request_attempts_for_call(self, task: str, provider_id: str = "", provider_key: str = "") -> int | None:
+        key = self._model_provider_key_for_call(task, provider_id, provider_key)
+        return getattr(self, "model_request_attempt_overrides", {}).get(key)
+
+    @staticmethod
     def _normalize_model_fallback_overrides(value: Any) -> dict[str, str]:
         raw = value
         if isinstance(raw, str):
@@ -988,6 +1013,15 @@ class TokenBudgetMixin:
                         provider_key = candidate_key
                         break
         mode = str(getattr(self, "provider_config_mode", "quick") or "quick")
+        if provider_key and mode == "centralized":
+            if provider_key == "PRIVATE_READING_VISION_PROVIDER_ID":
+                provider_key = "PLUGIN_VISION_PROVIDER_ID"
+            elif provider_key not in {
+                "CONVERSATION_CHAT_PROVIDER_ID", "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID",
+                "CONVERSATION_TASK_PROVIDER_ID", "CONVERSATION_HUB_PROVIDER_ID",
+                "PLUGIN_VISION_PROVIDER_ID", "REACTION_EXPRESSION_EMBEDDING_PROVIDER_ID",
+            }:
+                provider_key = "LLM_PROVIDER_ID"
         if provider_key and mode == "quick":
             provider_key = MODEL_QUICK_TIMEOUT_KEYS.get(provider_key, provider_key)
         if provider_key:
@@ -997,6 +1031,8 @@ class TokenBudgetMixin:
         config = getattr(self, "config", {})
         if not selected_provider:
             return ""
+        if mode == "centralized" and selected_provider == str(getattr(self, "llm_provider_id", "") or "").strip():
+            return "LLM_PROVIDER_ID"
         matching_keys = [
             candidate_key
             for candidate_key in MODEL_PROVIDER_KEYS
@@ -1015,6 +1051,8 @@ class TokenBudgetMixin:
 
     def _model_fallback_provider_id(self, provider_key: str, primary_provider_id: str = "") -> str:
         key = str(provider_key or "").strip()
+        if getattr(self, "provider_config_mode", "") == "centralized":
+            key = self._model_provider_key_for_call("", primary_provider_id, key)
         fallbacks = getattr(self, "model_fallback_overrides", {})
         if key not in MODEL_PROVIDER_KEYS or not isinstance(fallbacks, dict):
             return ""
@@ -1046,15 +1084,13 @@ class TokenBudgetMixin:
         timeout_key: str = "",
         timeout_seconds: float | None = None,
     ) -> float | None:
-        if timeout_seconds is not None:
-            explicit = _safe_float(timeout_seconds, 0.0, 0.0)
-            return min(600.0, explicit) if explicit >= 5.0 else None
         overrides = getattr(self, "model_timeout_overrides", {})
-        if not isinstance(overrides, dict):
-            return None
         provider_key = self._model_timeout_provider_key(task, provider_id, timeout_key)
-        configured = _safe_float(overrides.get(provider_key), 0.0, 0.0)
-        return min(600.0, configured) if configured >= 5.0 else None
+        configured = _safe_float(overrides.get(provider_key), 0.0, 0.0) if isinstance(overrides, dict) else 0.0
+        if configured >= 5.0:
+            return min(600.0, configured)
+        explicit = _safe_float(timeout_seconds, 0.0, 0.0)
+        return min(600.0, explicit) if explicit >= 5.0 else None
 
     def _model_token_limit_provider_key(
         self,
@@ -1309,6 +1345,9 @@ class TokenBudgetMixin:
         candidates = ([fallback_provider] if token_routed else [selected_provider])
         if not token_routed and fallback_provider:
             candidates.append(fallback_provider)
+        max_attempts = self._model_request_attempts_for_call(task_key, selected_provider, provider_key)
+        if max_attempts is not None:
+            candidates = [candidate for candidate in candidates for _ in range(max_attempts)]
         for attempt_index, attempt_provider in enumerate(candidates):
             started_at = time.time()
             response = None
@@ -1329,7 +1368,9 @@ class TokenBudgetMixin:
                     timeout_seconds=timeout_seconds,
                 )
                 if effective_timeout is not None:
-                    kwargs["timeout"] = min(effective_timeout, 60.0)
+                    kwargs["timeout"] = effective_timeout
+                if max_attempts is not None:
+                    kwargs["request_max_retries"] = 1
                 request_call = self.context.llm_generate(**kwargs)
                 try:
                     response = (
@@ -1340,7 +1381,7 @@ class TokenBudgetMixin:
                 except asyncio.TimeoutError as exc:
                     if effective_timeout is None:
                         raise TimeoutError(f"模型任务 {task_key} 调用超时") from exc
-                    raise TimeoutError(f"模型任务 {task_key} 连续 {min(effective_timeout or 60, 60):.0f} 秒无分片或单次请求超过600秒") from exc
+                    raise TimeoutError(f"模型任务 {task_key} 连续 {effective_timeout or 60:.0f} 秒无分片或单次请求超过600秒") from exc
 
                 completion = str(getattr(response, "completion_text", "") or "").strip()
                 usage_completion = self._llm_tool_response_for_usage(response, completion)
@@ -1491,18 +1532,20 @@ class TokenBudgetMixin:
             candidates.append(fallback_provider)
         is_hub = str(timeout_key or "") == "CONVERSATION_HUB_PROVIDER_ID"
         hub_attempts = hub_request_attempts if hub_request_attempts is not None else {}
-        if is_hub:
+        configured_attempts = self._model_request_attempts_for_call(task_key, selected_provider, provider_key)
+        max_attempts = configured_attempts or (3 if is_hub else 1)
+        if is_hub or configured_attempts is not None:
             # Budget by actual provider, shared with structural correction;
             # never mutate the provider shared by chat and task requests.
-            candidates = [candidate for candidate in candidates for _ in range(3)]
+            candidates = [candidate for candidate in candidates for _ in range(max_attempts)]
         for attempt_index, attempt_provider in enumerate(candidates):
             if is_hub:
-                if hub_attempts.get(attempt_provider, 0) >= 3:
+                if hub_attempts.get(attempt_provider, 0) >= max_attempts:
                     continue
                 hub_attempts[attempt_provider] = hub_attempts.get(attempt_provider, 0) + 1
                 logger.info(
-                    "[PrivateCompanion] 中枢流式请求: provider=%s attempt=%s/3 idle_timeout_max=30s total_boundary=600s",
-                    _single_line(attempt_provider, 120), hub_attempts[attempt_provider],
+                    "[PrivateCompanion] Hub stream request: provider=%s attempt=%s/%s total_boundary=600s",
+                    _single_line(attempt_provider, 120), hub_attempts[attempt_provider], max_attempts,
                 )
             start = time.time()
             resp = None
@@ -1521,10 +1564,14 @@ class TokenBudgetMixin:
                     timeout_seconds=timeout_seconds,
                 )
                 if is_hub:
-                    effective_timeout = min(effective_timeout or 30.0, 30.0)
+                    overrides = getattr(self, "model_timeout_overrides", {})
+                    if not overrides.get(provider_key):
+                        effective_timeout = min(effective_timeout or 30.0, 30.0)
                     kwargs.update(timeout=effective_timeout, request_max_retries=1)
                 if effective_timeout is not None:
-                    kwargs["timeout"] = min(effective_timeout, 60.0)
+                    kwargs["timeout"] = effective_timeout
+                if configured_attempts is not None:
+                    kwargs["request_max_retries"] = 1
                 try:
                     request_call = self.context.llm_generate(**kwargs)
                     if effective_timeout is not None:
@@ -1532,7 +1579,7 @@ class TokenBudgetMixin:
                     else:
                         resp = await request_call
                 except asyncio.TimeoutError as exc:
-                    raise TimeoutError(f"模型任务 {task_key} 连续 {min(effective_timeout or 60, 60):.0f} 秒无分片或单次请求超过600秒") from exc
+                    raise TimeoutError(f"模型任务 {task_key} 连续 {effective_timeout or 60:.0f} 秒无分片或单次请求超过600秒") from exc
                 if resp and resp.completion_text:
                     completion = resp.completion_text.strip()
                     if completion:

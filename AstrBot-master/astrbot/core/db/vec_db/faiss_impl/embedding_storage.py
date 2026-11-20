@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 # ── Faiss C++ fopen() 在 Windows 上使用 ANSI codepage ──
 # Python 传给 Faiss 的路径是 UTF-8 字节，但 Windows fopen 期望 ANSI 编码，
-# 导致含非 ASCII 字符的路径（如 PUBLIC_USER_HOME\...）被解读为乱码而失败。
+# 导致含非 ASCII 字符的路径（如 C:\Users\中文用户名\...）被解读为乱码而失败。
 # 本模块通过"纯 ASCII 临时文件桥接"规避此问题。
 
 

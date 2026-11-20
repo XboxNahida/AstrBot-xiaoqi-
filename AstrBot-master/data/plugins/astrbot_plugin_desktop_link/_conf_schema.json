@@ -1,0 +1,27 @@
+{
+  "qa_provider_id": {
+    "type": "string", "description": "截图答疑/观察总结模型配置ID",
+    "hint": "留空使用AstrBot当前默认聊天模型。答疑需要模型支持图片；可在此填已有提供商ID。", "default": ""
+  },
+  "observation_summary_enabled": {
+    "type": "bool", "description": "观察日志超过1000字自动总结", "default": true
+  },
+  "public_url": {
+    "type": "string",
+    "description": "云端公开HTTPS地址",
+    "hint": "配对码会自动生成对应WSS连接地址；一般填现有面板根地址，不含密码和查询参数。",
+    "default": "https://localhost"
+  },
+  "listen_port": {
+    "type": "int",
+    "description": "桌宠通道回环监听端口",
+    "hint": "默认18210，仅云端本机监听。Caddy需要把/desktop/*转发到此端口。",
+    "default": 18210
+  },
+  "dashboard_port": {
+    "type": "int",
+    "description": "AstrBot本机面板端口",
+    "hint": "云端语言请求通过本机WebChat进入机器人处理流程，一般无需修改。",
+    "default": 6185
+  }
+}

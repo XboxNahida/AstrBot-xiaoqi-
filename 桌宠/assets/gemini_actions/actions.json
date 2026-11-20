@@ -1,0 +1,1713 @@
+{
+  "schemaVersion": 1,
+  "petId": "gemini-pet",
+  "animations": [
+    {
+      "id": "下五子棋",
+      "name": "下五子棋",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/下五子棋.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "优雅猫耳娘舞",
+      "name": "优雅猫耳娘舞",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/优雅猫耳娘舞.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-分文不剩",
+      "name": "余额-分文不剩",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-分文不剩.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-数金皱眉",
+      "name": "余额-数金皱眉",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-数金皱眉.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-袋空如洗",
+      "name": "余额-袋空如洗",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-袋空如洗.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-金袋叮当",
+      "name": "余额-金袋叮当",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-金袋叮当.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-钱袋如常",
+      "name": "余额-钱袋如常",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-钱袋如常.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "余额-钱袋满溢",
+      "name": "余额-钱袋满溢",
+      "category": "余额",
+      "sources": {
+        "webp": "spritesheet/余额-钱袋满溢.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "偷吃零食被抓住",
+      "name": "偷吃零食被抓住",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/偷吃零食被抓住.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "写代码",
+      "name": "写代码",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/写代码.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "写福字",
+      "name": "写福字",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/写福字.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "凭空生花",
+      "name": "凭空生花",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/凭空生花.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "动物环绕",
+      "name": "动物环绕",
+      "category": "模仿动物",
+      "sources": {
+        "webp": "spritesheet/动物环绕.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地专心玩魔方",
+      "name": "原地专心玩魔方",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/原地专心玩魔方.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地小憩沉眠",
+      "name": "原地小憩沉眠",
+      "category": "待机",
+      "sources": {
+        "webp": "spritesheet/原地小憩沉眠.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地左转奔跑",
+      "name": "原地左转奔跑",
+      "category": "移动",
+      "sources": {
+        "webp": "spritesheet/原地左转奔跑.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地敲击桌面互动",
+      "name": "原地敲击桌面互动",
+      "category": "小动作",
+      "sources": {
+        "webp": "spritesheet/原地敲击桌面互动.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地漂浮踏步",
+      "name": "原地漂浮踏步",
+      "category": "移动",
+      "sources": {
+        "webp": "spritesheet/原地漂浮踏步.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地跳跃抓碎头顶物品",
+      "name": "原地跳跃抓碎头顶物品",
+      "category": "小动作",
+      "sources": {
+        "webp": "spritesheet/原地跳跃抓碎头顶物品.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地蹲下玩玩具汽车",
+      "name": "原地蹲下玩玩具汽车",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/原地蹲下玩玩具汽车.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "原地重力下蹲压缩",
+      "name": "原地重力下蹲压缩",
+      "category": "小动作",
+      "sources": {
+        "webp": "spritesheet/原地重力下蹲压缩.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "变鸽子",
+      "name": "变鸽子",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/变鸽子.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "可爱宅舞",
+      "name": "可爱宅舞",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/可爱宅舞.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃Token",
+      "name": "吃Token",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃Token.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃冰淇淋融化",
+      "name": "吃冰淇淋融化",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃冰淇淋融化.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃午餐",
+      "name": "吃午餐",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃午餐.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃大闸蟹",
+      "name": "吃大闸蟹",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃大闸蟹.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃年糕",
+      "name": "吃年糕",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃年糕.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃早餐",
+      "name": "吃早餐",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃早餐.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃晚餐",
+      "name": "吃晚餐",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃晚餐.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃汤圆",
+      "name": "吃汤圆",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃汤圆.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃白饭",
+      "name": "吃白饭",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃白饭.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃粽子",
+      "name": "吃粽子",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃粽子.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃糖葫芦",
+      "name": "吃糖葫芦",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃糖葫芦.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃腊八粥",
+      "name": "吃腊八粥",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃腊八粥.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃西瓜",
+      "name": "吃西瓜",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃西瓜.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃重阳糕",
+      "name": "吃重阳糕",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃重阳糕.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃长寿面",
+      "name": "吃长寿面",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃长寿面.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃青团",
+      "name": "吃青团",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃青团.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吃饺子",
+      "name": "吃饺子",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/吃饺子.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "吹气球",
+      "name": "吹气球",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/吹气球.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "哈欠连天",
+      "name": "哈欠连天",
+      "category": "日常起居",
+      "sources": {
+        "webp": "spritesheet/哈欠连天.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "嘟嘴吹泡泡特效",
+      "name": "嘟嘴吹泡泡特效",
+      "category": "娱乐休闲",
+      "sources": {
+        "webp": "spritesheet/嘟嘴吹泡泡特效.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "堆雪人",
+      "name": "堆雪人",
+      "category": "时节",
+      "sources": {
+        "webp": "spritesheet/堆雪人.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "大口吃零食",
+      "name": "大口吃零食",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/大口吃零食.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "小幅度原地360度旋转展示",
+      "name": "小幅度原地360度旋转展示",
+      "category": "转向",
+      "sources": {
+        "webp": "spritesheet/小幅度原地360度旋转展示.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "小提琴演奏",
+      "name": "小提琴演奏",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/小提琴演奏.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "工作状态-原地踱步张望",
+      "name": "工作状态-原地踱步张望",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/工作状态-原地踱步张望.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "工作状态-忙碌点按",
+      "name": "工作状态-忙碌点按",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/工作状态-忙碌点按.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "工作状态-思考冒泡",
+      "name": "工作状态-思考冒泡",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/工作状态-思考冒泡.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "工作状态-清点归档",
+      "name": "工作状态-清点归档",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/工作状态-清点归档.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "工作状态-雀跃庆祝",
+      "name": "工作状态-雀跃庆祝",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/工作状态-雀跃庆祝.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "待机呼吸休闲",
+      "name": "待机呼吸休闲",
+      "category": "待机",
+      "sources": {
+        "webp": "spritesheet/待机呼吸休闲.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "悠闲哼歌",
+      "name": "悠闲哼歌",
+      "category": "娱乐休闲",
+      "sources": {
+        "webp": "spritesheet/悠闲哼歌.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "扑克魔术",
+      "name": "扑克魔术",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/扑克魔术.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "打瞌睡被惊醒",
+      "name": "打瞌睡被惊醒",
+      "category": "日常起居",
+      "sources": {
+        "webp": "spritesheet/打瞌睡被惊醒.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "抽陀螺",
+      "name": "抽陀螺",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/抽陀螺.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "拆礼物",
+      "name": "拆礼物",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/拆礼物.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "插茱萸赏菊",
+      "name": "插茱萸赏菊",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/插茱萸赏菊.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "摇扇纳凉",
+      "name": "摇扇纳凉",
+      "category": "时节",
+      "sources": {
+        "webp": "spritesheet/摇扇纳凉.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "收红包",
+      "name": "收红包",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/收红包.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放孔明灯",
+      "name": "放孔明灯",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/放孔明灯.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放孔明灯v2",
+      "name": "放孔明灯v2",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/放孔明灯v2.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放河灯v2",
+      "name": "放河灯v2",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/放河灯v2.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放河灯v3",
+      "name": "放河灯v3",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/放河灯v3.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放烟花",
+      "name": "放烟花",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/放烟花.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "放风筝",
+      "name": "放风筝",
+      "category": "时节",
+      "sources": {
+        "webp": "spritesheet/放风筝.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "整体换装试色",
+      "name": "整体换装试色",
+      "category": "换装造型",
+      "sources": {
+        "webp": "spritesheet/整体换装试色.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "星星精灵现世",
+      "name": "星星精灵现世",
+      "category": "魔法特效",
+      "sources": {
+        "webp": "spritesheet/星星精灵现世.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "是啊，吃什么",
+      "name": "是啊，吃什么",
+      "category": "碎碎念",
+      "sources": {
+        "webp": "spritesheet/是啊，吃什么.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "晨间刷牙",
+      "name": "晨间刷牙",
+      "category": "日常起居",
+      "sources": {
+        "webp": "spritesheet/晨间刷牙.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "涮火锅",
+      "name": "涮火锅",
+      "category": "吃喝",
+      "sources": {
+        "webp": "spritesheet/涮火锅.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "深度思考碎碎念",
+      "name": "深度思考碎碎念",
+      "category": "碎碎念",
+      "sources": {
+        "webp": "spritesheet/深度思考碎碎念.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "点击回应-傲娇生气",
+      "name": "点击回应-傲娇生气",
+      "category": "点击回应",
+      "sources": {
+        "webp": "spritesheet/点击回应-傲娇生气.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "点击回应-元气挥手",
+      "name": "点击回应-元气挥手",
+      "category": "点击回应",
+      "sources": {
+        "webp": "spritesheet/点击回应-元气挥手.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "点击回应-害羞惊讶",
+      "name": "点击回应-害羞惊讶",
+      "category": "点击回应",
+      "sources": {
+        "webp": "spritesheet/点击回应-害羞惊讶.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "点击回应-开心跃动",
+      "name": "点击回应-开心跃动",
+      "category": "点击回应",
+      "sources": {
+        "webp": "spritesheet/点击回应-开心跃动.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "照镜子",
+      "name": "照镜子",
+      "category": "日常起居",
+      "sources": {
+        "webp": "spritesheet/照镜子.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "猫耳娘屈膝礼仪",
+      "name": "猫耳娘屈膝礼仪",
+      "category": "礼仪致意",
+      "sources": {
+        "webp": "spritesheet/猫耳娘屈膝礼仪.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "玩水枪",
+      "name": "玩水枪",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/玩水枪.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "玩游戏气急败坏",
+      "name": "玩游戏气急败坏",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/玩游戏气急败坏.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "用蓬松紫色猫尾拍打地面",
+      "name": "用蓬松紫色猫尾拍打地面",
+      "category": "模仿动物",
+      "sources": {
+        "webp": "spritesheet/用蓬松紫色猫尾拍打地面.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "碎碎念-发呆碎碎念",
+      "name": "碎碎念-发呆碎碎念",
+      "category": "碎碎念",
+      "sources": {
+        "webp": "spritesheet/碎碎念-发呆碎碎念.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "碎碎念-对屏碎碎念",
+      "name": "碎碎念-对屏碎碎念",
+      "category": "碎碎念",
+      "sources": {
+        "webp": "spritesheet/碎碎念-对屏碎碎念.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "碎碎念-擦桌碎碎念",
+      "name": "碎碎念-擦桌碎碎念",
+      "category": "碎碎念",
+      "sources": {
+        "webp": "spritesheet/碎碎念-擦桌碎碎念.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "穿针乞巧",
+      "name": "穿针乞巧",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/穿针乞巧.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "舞狮头",
+      "name": "舞狮头",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/舞狮头.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "荡秋千",
+      "name": "荡秋千",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/荡秋千.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "萌化小幽灵",
+      "name": "萌化小幽灵",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/萌化小幽灵.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "蝴蝶蜜蜂环绕头顶开花",
+      "name": "蝴蝶蜜蜂环绕头顶开花",
+      "category": "魔法特效",
+      "sources": {
+        "webp": "spritesheet/蝴蝶蜜蜂环绕头顶开花.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "螃蟹走路",
+      "name": "螃蟹走路",
+      "category": "移动",
+      "sources": {
+        "webp": "spritesheet/螃蟹走路.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "moving": [
+        [
+          26,
+          89,
+          1.0
+        ]
+      ],
+      "facing": "left"
+    },
+    {
+      "id": "被吓一跳",
+      "name": "被吓一跳",
+      "category": "情绪反应",
+      "sources": {
+        "webp": "spritesheet/被吓一跳.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "被落叶淹没",
+      "name": "被落叶淹没",
+      "category": "时节",
+      "sources": {
+        "webp": "spritesheet/被落叶淹没.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "被鼠标拖拽悬空反馈",
+      "name": "被鼠标拖拽悬空反馈",
+      "category": "拖拽",
+      "sources": {
+        "webp": "spritesheet/被鼠标拖拽悬空反馈.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "装点圣诞树",
+      "name": "装点圣诞树",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/装点圣诞树.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "讨糖南瓜灯",
+      "name": "讨糖南瓜灯",
+      "category": "手工节日",
+      "sources": {
+        "webp": "spritesheet/讨糖南瓜灯.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "超大伸懒腰",
+      "name": "超大伸懒腰",
+      "category": "日常起居",
+      "sources": {
+        "webp": "spritesheet/超大伸懒腰.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "轻快摇摆舞",
+      "name": "轻快摇摆舞",
+      "category": "才艺表演",
+      "sources": {
+        "webp": "spritesheet/轻快摇摆舞.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "轻快记录",
+      "name": "轻快记录",
+      "category": "工作状态",
+      "sources": {
+        "webp": "spritesheet/轻快记录.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "骑木马",
+      "name": "骑木马",
+      "category": "玩耍",
+      "sources": {
+        "webp": "spritesheet/骑木马.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    }
+  ]
+}

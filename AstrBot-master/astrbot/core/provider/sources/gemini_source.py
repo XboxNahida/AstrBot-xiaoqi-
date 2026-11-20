@@ -264,6 +264,10 @@ class ProviderGoogleGenAI(Provider):
                     thinking_config.thinking_level = level
 
         return types.GenerateContentConfig(
+            http_options=(types.HttpOptions(
+                timeout=int(float(payloads["timeout"]) * 1000) if payloads.get("timeout") is not None else None,
+                retry_options=types.HttpRetryOptions(attempts=1) if payloads.get("request_max_retries") in (0, 1) else None,
+            ) if payloads.get("timeout") is not None or payloads.get("request_max_retries") in (0, 1) else None),
             system_instruction=system_instruction,
             temperature=temperature,
             max_output_tokens=payloads.get("max_tokens")
@@ -642,6 +646,8 @@ class ProviderGoogleGenAI(Provider):
                 break
 
             except APIError as e:
+                if request_max_retries in (0, 1):
+                    raise
                 if e.message is None:
                     e.message = ""
                 if "Developer instruction is not enabled" in e.message:
@@ -714,6 +720,8 @@ class ProviderGoogleGenAI(Provider):
                 )
                 break
             except APIError as e:
+                if request_max_retries in (0, 1):
+                    raise
                 if e.message is None:
                     e.message = ""
                 if "Developer instruction is not enabled" in e.message:
@@ -859,11 +867,11 @@ class ProviderGoogleGenAI(Provider):
 
         model = model or self.get_model()
 
-        payloads = {"messages": context_query, "model": model}
+        payloads = {"messages": context_query, "model": model, "timeout": kwargs.get("timeout"), "request_max_retries": request_max_retries}
         if func_tool and not func_tool.empty():
             payloads["tool_choice"] = tool_choice
 
-        retry = 10
+        retry = 1 if request_max_retries in (0, 1) else 10
         keys = self.api_keys.copy()
 
         for _ in range(retry):
@@ -874,6 +882,8 @@ class ProviderGoogleGenAI(Provider):
                     request_max_retries=request_max_retries,
                 )
             except APIError as e:
+                if request_max_retries in (0, 1):
+                    raise
                 if await self._handle_api_error(e, keys):
                     continue
                 break
@@ -926,11 +936,11 @@ class ProviderGoogleGenAI(Provider):
 
         model = model or self.get_model()
 
-        payloads = {"messages": context_query, "model": model}
+        payloads = {"messages": context_query, "model": model, "timeout": kwargs.get("timeout"), "request_max_retries": request_max_retries}
         if func_tool and not func_tool.empty():
             payloads["tool_choice"] = tool_choice
 
-        retry = 10
+        retry = 1 if request_max_retries in (0, 1) else 10
         keys = self.api_keys.copy()
 
         for _ in range(retry):
@@ -943,6 +953,8 @@ class ProviderGoogleGenAI(Provider):
                     yield response
                 break
             except APIError as e:
+                if request_max_retries in (0, 1):
+                    raise
                 if await self._handle_api_error(e, keys):
                     continue
                 break

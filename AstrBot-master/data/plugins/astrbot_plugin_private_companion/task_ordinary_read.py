@@ -20,34 +20,35 @@ class TaskOrdinaryReader:
         redact: Remove configured secret values before returning any text.
     """
 
-    def __init__(self, *, current_workspace, authorize, sensitive_roots, redact, readable_source_roots=()):
+    def __init__(self, *, current_workspace, authorize, sensitive_roots, redact, readable_source_roots=(), primary_authorize=None):
         self.current_workspace = current_workspace
         self.authorize = authorize
         self.sensitive = tuple(Path(p).resolve() for p in sensitive_roots)
         self.redact = redact
         self.readable_source_roots = tuple(Path(p).resolve() for p in readable_source_roots)
+        self.primary_authorize = primary_authorize
 
     def check_access(self, actor):
         """Check current identity and revocation without requiring a shell login."""
         if self.authorize(actor) is not True:
             raise PermissionError("task_authorization_required")
 
-    def _checked(self, path):
+    def _checked(self, path, *, primary=False):
         path = Path(os.path.abspath(path))
         for part in path.parts[1:]:
             low = part.casefold()
             if (
                 ":" in part or part.rstrip(" .") != part
-                or low in {".ssh", ".aws", ".azure", ".codex"}
-                or low in {"ntuser.dat", "login data", "web data", "local state"}
-                or low.startswith((".interaction-", "id_rsa", "id_ed25519"))
+                or (not primary and low in {".ssh", ".aws", ".azure", ".codex"})
+                or (not primary and low in {"ntuser.dat", "login data", "web data", "local state"})
+                or (not primary and low.startswith((".interaction-", "id_rsa", "id_ed25519")))
                 or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?", low)
             ):
                 raise PermissionError("sensitive_path")
         windows = Path(os.environ.get("SystemRoot", "C:/Windows"))
-        if os.name == "nt" and path.is_relative_to(windows / "System32/config"):
+        if not primary and os.name == "nt" and path.is_relative_to(windows / "System32/config"):
             raise PermissionError("sensitive_path")
-        if any(path.is_relative_to(root) for root in self.sensitive) and not any(
+        if not primary and any(path.is_relative_to(root) for root in self.sensitive) and not any(
             path.is_relative_to(root) for root in self.readable_source_roots
         ):
             raise PermissionError("sensitive_path")
@@ -60,7 +61,7 @@ class TaskOrdinaryReader:
                 raise PermissionError("redirected_path")
         return path
 
-    def _handle_path(self, fd, expected):
+    def _handle_path(self, fd, expected, *, primary=False):
         if os.name == "nt":
             import ctypes
             import msvcrt
@@ -76,7 +77,10 @@ class TaskOrdinaryReader:
             final = output.value.removeprefix("\\\\?\\")
             if final.casefold() != str(expected).casefold():
                 raise PermissionError("redirected_path")
-            self._checked(Path(final))
+            if primary:
+                self._checked(Path(final), primary=True)
+            else:
+                self._checked(Path(final))
         before, opened = expected.stat(), os.fstat(fd)
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino) or opened.st_nlink != 1:
             raise PermissionError("linked_or_changed_file")
@@ -95,12 +99,17 @@ class TaskOrdinaryReader:
         target = Path(raw)
         if not target.is_absolute():
             target = self.current_workspace(actor) / target
-        target = self._checked(target)
+        primary = self.primary_authorize is not None and self.primary_authorize(actor) is True
+        if self.primary_authorize is not None and not primary:
+            workspace = Path(self.current_workspace(actor)).resolve()
+            if not target.resolve().is_relative_to(workspace):
+                raise PermissionError("own_workspace_only")
+        target = self._checked(target, primary=primary)
         next_offset = None
         if action == "read":
             fd = os.open(target, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
             try:
-                self._handle_path(fd, target)
+                self._handle_path(fd, target, primary=primary)
                 if os.fstat(fd).st_size > 131072:
                     raise ValueError("text_file_too_large")
                 raw_bytes = bytearray()
@@ -111,7 +120,7 @@ class TaskOrdinaryReader:
                     raw_bytes.extend(block)
                 if len(raw_bytes) > 131072:
                     raise ValueError("text_file_too_large")
-                self._handle_path(fd, target)
+                self._handle_path(fd, target, primary=primary)
                 try:
                     stdout = self._clean(raw_bytes.decode("utf-8-sig"))
                 except UnicodeDecodeError as exc:
@@ -128,14 +137,14 @@ class TaskOrdinaryReader:
                     if index >= 100000:
                         raise ValueError("directory_too_large")
                     try:
-                        self._checked(Path(child.path))
+                        self._checked(Path(child.path), primary=primary)
                         info = os.stat(child.path, follow_symlinks=False)
                         if not stat.S_ISDIR(info.st_mode) and info.st_nlink != 1:
                             continue
                     except (PermissionError, FileNotFoundError):
                         continue
                     entries.append({"name": child.name, "directory": stat.S_ISDIR(info.st_mode), "size": info.st_size})
-            self._checked(target)
+            self._checked(target, primary=primary)
             after = target.stat()
             if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
                 raise PermissionError("changed_directory")
@@ -165,6 +174,9 @@ class TaskOrdinaryReader:
         self.check_access(actor)
         if action not in {"read", "list"} or type(offset) is not int or not 0 <= offset <= 100000:
             raise ValueError("invalid_read_query")
+        primary = self.primary_authorize is not None and self.primary_authorize(actor) is True
         result = await asyncio.to_thread(self._query, actor, action, path, offset)
         self.check_access(actor)
+        if primary and self.primary_authorize(actor) is not True:
+            raise PermissionError("primary_authority_revoked")
         return result

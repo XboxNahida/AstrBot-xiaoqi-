@@ -34,4 +34,4 @@ def request_policy(request: Mapping) -> TaskModelPolicy:
         raise ValueError("单次请求超时必须是大于0的有限秒数")
     if type(attempts) is not int or attempts < 1:
         raise ValueError("最多请求次数必须是至少1次的整数，包含首次请求")
-    return TaskModelPolicy(provider.strip(), min(float(timeout), 60), attempts)
+    return TaskModelPolicy(provider.strip(), min(float(timeout), 600), attempts)

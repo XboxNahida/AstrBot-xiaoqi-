@@ -61,7 +61,7 @@ class PageSettingNormalizerMixin:
         if key in {"task_model_timeout_seconds", "task_model_max_attempts"}:
             if type(value) is not int or value < 1:
                 raise ValueError("后台模型超时和最多请求次数必须是至少1的整数")
-            return min(60, value) if key == "task_model_timeout_seconds" else value
+            return min(600, value) if key == "task_model_timeout_seconds" else value
         if key == "hub_group_batch_seconds":
             try:
                 number = float(value)
@@ -254,6 +254,9 @@ class PageSettingNormalizerMixin:
         if key == "model_timeout_overrides":
             normalizer = getattr(self.plugin, "_normalize_model_timeout_overrides", None)
             normalized = normalizer(value) if callable(normalizer) else {}
+            return json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+        if key == "model_request_attempt_overrides":
+            normalized = self.plugin._normalize_model_request_attempt_overrides(value)
             return json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
         if key == "model_token_limit_overrides":
             normalizer = getattr(self.plugin, "_normalize_model_token_limit_overrides", None)

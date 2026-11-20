@@ -419,8 +419,10 @@ class TaskExecutionBroker:
         verifier: DeploymentVerifier | None = None,
         backend=None,
         powershell: Path | None = None,
+        primary_authorize: Callable | None = None,
     ) -> None:
         self.permissions = permissions
+        self.primary_authorize = primary_authorize
         self.task_root = Path(task_root).absolute()
         self.protected_roots = tuple(Path(p).resolve() for p in protected_roots)
         if permissions.db_path.resolve().is_relative_to(self.task_root.resolve()):
@@ -461,6 +463,18 @@ class TaskExecutionBroker:
             PermissionError: Grant, path, or deployment invariant is invalid.
         """
         path = Path(relative)
+        if self.primary_authorize is not None and self.primary_authorize(actor) is True:
+            root = actor_workspace(self.task_root, actor)
+            text = str(relative)
+            if text.startswith(("\\", "/")) or ":" in text.replace("\\", "/")[2:]:
+                raise PermissionError("Only local filesystem paths are allowed")
+            if path.drive and not path.is_absolute():
+                raise PermissionError("Drive-relative paths are ambiguous")
+            if not self.permissions.check(actor, capability, root):
+                raise PermissionError("Current primary-user capability denied")
+            if _verify:
+                self.verifier.verify(actor, root)
+            return (path if path.is_absolute() else root / path).resolve()
         if (
             path.is_absolute()
             or ":" in str(relative)
@@ -822,7 +836,17 @@ class _NativeProcess:
     """Own every native handle and tear down the entire job on every exit path."""
 
     def __init__(
-        self, identity, domain, username, password, argv, cwd, env, duplex=False
+        self,
+        identity,
+        domain,
+        username,
+        password,
+        argv,
+        cwd,
+        env,
+        duplex=False,
+        *,
+        host_token=False,
     ):
         # ctypes definitions are local so Linux/test import never loads WinDLL.
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -1043,14 +1067,34 @@ class _NativeProcess:
                 )
 
         try:
-            # LOGON32_LOGON_BATCH requires batch logon, not interactive/remote.
-            checked(
-                advapi.LogonUserW(username, domain, password, 4, 0, ctypes.byref(token))
-            )
+            if host_token:
+                # 仅主要用户专用后端调用；实际宿主必须是 SYSTEM。
+                if identity.user_sid != "S-1-5-18":
+                    raise PermissionError("Primary execution requires SYSTEM identity")
+                kernel.GetCurrentProcess.argtypes = []
+                kernel.GetCurrentProcess.restype = handle
+                advapi.OpenProcessToken.argtypes = [
+                    handle,
+                    wintypes.DWORD,
+                    ctypes.POINTER(handle),
+                ]
+                advapi.OpenProcessToken.restype = wintypes.BOOL
+                checked(
+                    advapi.OpenProcessToken(
+                        kernel.GetCurrentProcess(), 0xB, ctypes.byref(token)
+                    )
+                )
+            else:
+                # LOGON32_LOGON_BATCH requires batch logon, not interactive/remote.
+                checked(
+                    advapi.LogonUserW(
+                        username, domain, password, 4, 0, ctypes.byref(token)
+                    )
+                )
             self.handles.append(token)
             # The host credential verifier must already bind the account SID;
             # additionally compare the actual logon token SID before spawning.
-            _check_token_sid(advapi, kernel, token, identity.user_sid)
+            _check_token_sid(advapi, kernel, token, identity.user_sid, allow_system=host_token)
             self.job = kernel.CreateJobObjectW(None, None)
             checked(self.job)
             self.handles.append(self.job)
@@ -1124,10 +1168,17 @@ class _NativeProcess:
             )
             startup.attributes = attributes
             command = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
+            windows_root = Path(env.get("SystemRoot", "C:/Windows"))
+            child_env = {
+                "SystemDrive": windows_root.drive,
+                "ProgramData": str(windows_root.parent / "ProgramData"),
+                "ALLUSERSPROFILE": str(windows_root.parent / "ProgramData"),
+                **env,
+            }
             environment = ctypes.create_unicode_buffer(
                 "\0".join(
                     f"{k}={v}"
-                    for k, v in sorted(env.items(), key=lambda item: item[0].upper())
+                    for k, v in sorted(child_env.items(), key=lambda item: item[0].upper())
                 )
                 + "\0\0"
             )
@@ -1363,7 +1414,7 @@ class _NativeDuplexChannel:
         await asyncio.shield(self._close_task)
 
 
-def _check_token_sid(advapi, kernel, token, expected):
+def _check_token_sid(advapi, kernel, token, expected, *, allow_system=False):
     """Match the actual logged-on token to the trusted attested SID."""
     needed = wintypes.DWORD()
     advapi.GetTokenInformation.argtypes = [
@@ -1407,6 +1458,6 @@ def _check_token_sid(advapi, kernel, token, expected):
             ctypes.sizeof(elevation),
             ctypes.byref(needed),
         )
-        or elevation.value
+        or (elevation.value and not (allow_system and expected == "S-1-5-18"))
     ):
         raise PermissionError("Task process token must not be elevated")

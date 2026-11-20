@@ -428,6 +428,10 @@
     "SHA256": "4e81bae926f5351ab7a58619b4c13a3dfe80c8673a2e66f07441556c26f8a119"
   },
   {
+    "路径": "AstrBot-master/astrbot/core/agent/context/budget.py",
+    "SHA256": "11f44426bdcac7a953cfa0a6e3222735b644dfb75038589d4df35936cc8be570"
+  },
+  {
     "路径": "AstrBot-master/astrbot/core/agent/context/compressor.py",
     "SHA256": "65e3b11133bc2f6e0e3c828f4b5d929167129a7ce9b12521cc574077ddfffc33"
   },
@@ -529,7 +533,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/agent/runners/tool_loop_agent_runner.py",
-    "SHA256": "f7fd639881124b06e969ee3a38fefa16a784f2ceb351131f12fa2c0333ee1f92"
+    "SHA256": "f7c486c7d6c02fd1775b9dd305aec9827612d07ab17aee664fe79c0b73f2c13c"
   },
   {
     "路径": "AstrBot-master/astrbot/core/agent/tool.py",
@@ -753,7 +757,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/db/vec_db/faiss_impl/embedding_storage.py",
-    "SHA256": "675a7748e92f2b46334dea2cbbc81b673e7b51fa420399869b90a50327b114ef"
+    "SHA256": "a483e3f084eff49a41c48fb6e02155d48455194a156f04aa50bd7330a5bb51a2"
   },
   {
     "路径": "AstrBot-master/astrbot/core/db/vec_db/faiss_impl/sqlite_init.sql",
@@ -953,7 +957,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/pipeline/process_stage/method/agent_sub_stages/internal.py",
-    "SHA256": "fb83511dcb867b2d78d27c1f0e61ae20d718b0bed89b832a2feb7652e344ed08"
+    "SHA256": "cc4a062aa8752cd52b55e92de51f890a848b5ec84eaf6e594e481d91f80e96f8"
   },
   {
     "路径": "AstrBot-master/astrbot/core/pipeline/process_stage/method/agent_sub_stages/third_party.py",
@@ -1169,7 +1173,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/platform/sources/qqofficial/qqofficial_message_event.py",
-    "SHA256": "0fb25926704bedcf545b02a53f9031bba3596d4bc5aee2e644bb0abd5d0e0c27"
+    "SHA256": "544769dbdd407e557f329c787833c7ba414e37098fbf0555ebac325b374571ef"
   },
   {
     "路径": "AstrBot-master/astrbot/core/platform/sources/qqofficial/qqofficial_platform_adapter.py",
@@ -1341,7 +1345,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/entities.py",
-    "SHA256": "5303f60ecdb9272984f9a1d355942f6d717239c666e2ab187f9bfebce122c5fc"
+    "SHA256": "2b6a63f82a2948e9c5a195c0f2ead725058433e70cfb35d3969cf96783b277e1"
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/error_response.py",
@@ -1405,7 +1409,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/sources/gemini_source.py",
-    "SHA256": "b16a3ac4cc52c129b7b0fc72c69114b4b0dc1110046b47f27ecde84f3602e742"
+    "SHA256": "a22c39761882fa7fdb2af37b407e0fcb1a302510dabaa939302642b01a4c84b4"
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/sources/gemini_tts_source.py",
@@ -1549,7 +1553,7 @@
   },
   {
     "路径": "AstrBot-master/astrbot/core/provider/streaming.py",
-    "SHA256": "b2555d4aa0a1fa92b82b04923d2581cfb67c29db8a6a838589abdfde3f04eebc"
+    "SHA256": "60d2ca362fcdb0ad836d04e4bd6329f4417c194885d6bad705f8ed1ca029fab7"
   },
   {
     "路径": "AstrBot-master/astrbot/core/repository.py",
@@ -6512,6 +6516,58 @@
     "SHA256": "5602805de991d81061ba544e2d456f88a3c0d1f96f1cb3ad6af6b47db277e4af"
   },
   {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/_conf_schema.json",
+    "SHA256": "d59fea72438271e6cc0f6d5d5a7d2e4a2b52ee29b2b257947e68b0516304bf83"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/context_policy.py",
+    "SHA256": "b812df5b5cf257dea9b1d420fe0499b8e95db83f990155ed2ab4c57dd497c836"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/control_channel.py",
+    "SHA256": "bc94ac3365c156efb217a2ba50572a89b717ea9dd197615e901457cb53158909"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/extension.py",
+    "SHA256": "5122656d00ac21c6dc449872a8bc5e00aaebca8784d7c455f5a588fadb380d27"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/image_policy.py",
+    "SHA256": "9c9ab78657db7bc85554b4bccf5023fec2afb739d9da86152c69393b9d9b27c5"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/main.py",
+    "SHA256": "8a052bac05b641109444ffa0e0669e8d1783c5fc544e43c2d8aff2fe6b525023"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/metadata.yaml",
+    "SHA256": "d651fdf3b6954b7edadf8a175c5d81ea6306b63b0b0cafadeb036802e5519fec"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/model_limits.py",
+    "SHA256": "3c26c03f4cfae1714e4852e6408718ea4bbb2946b79d50e504c76a5bd88c30bf"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/provider_api.py",
+    "SHA256": "5e187930fb6b7f326d6b5d9b35a5f57b828a4df6e9590a3d21c3906bc7ec8283"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/provider_guard.py",
+    "SHA256": "d2ff96a5f5ae81e70dfa372417ca0426ab04978e9465a6c1143abae671307c74"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/records.py",
+    "SHA256": "42b299b30c673bb4cc49c51af7c05bea8ad35690fd963dfa6fb333e2f5f91bcb"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/requirements.txt",
+    "SHA256": "d3db7fd97879e3ca31a1ece505ce73d36e046e945cfd347af941bf1e1bdd43bc"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_desktop_link/server.py",
+    "SHA256": "1ace06db4e7b9298a5cc978a9fdd2de72a6c62789243704df73097661dae8a23"
+  },
+  {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_image_caption_cache/.gitignore",
     "SHA256": "98e9f9fd743cbd6cdd9f033ec68c72ee5c6b88666541b170e56eb4b617b653ce"
   },
@@ -6841,7 +6897,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/_conf_schema.json",
-    "SHA256": "c5929f55d6fee2379b2168c34488a7b6b55a9a67972e5b51708ff2b8841ebd05"
+    "SHA256": "163d33155b5dfdfbadefdbb0f34fc878fce8cdea873b95ceb660bd7d70e7f079"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/activity_capture.py",
@@ -6924,6 +6980,14 @@
     "SHA256": "8cad9997ba6c850d328eadd1c8eac21232d3e79aebcb8621236871cbc51c3349"
   },
   {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/chat_input_compaction.py",
+    "SHA256": "1c20e115141d8f7b5004e713fc117194c4387727231924d813a998d1d0810acc"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/chat_request_budget.py",
+    "SHA256": "617fd388bfd5cff7079b9771835f95378d88eea8ff961d5a1d911d8f28ea86af"
+  },
+  {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/chronotype.py",
     "SHA256": "139fbfbe9e095061f51022404cbf736a1a003a56e9c8b28f32e9e916dc40a749"
   },
@@ -6933,7 +6997,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/codex_gateway.py",
-    "SHA256": "b1af2462c5bf2f58aa6783893ca1daade9599013cef6cd9bf53e2c167696e448"
+    "SHA256": "44eb67fe461a0c37203a65010ab5f74ed5ffae2fff3d6c2228bfc7abf0042bc6"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/codex_rpc.py",
@@ -6941,7 +7005,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/codex_runtime.py",
-    "SHA256": "f236aa9ec68fa897e872446b4b4cc2b626e18af5060e4ce7c765c3e9e6a4e607"
+    "SHA256": "d622b07c707a52ff022e79bb9c5e5a0dcef7deae4bffa2a1a32b993d0fd882d4"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/codex_store.py",
@@ -6957,7 +7021,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/config_migration.py",
-    "SHA256": "5166ee14d630f892710ce01e8a2a9ab257e2032b2d29690e6443b3d54b590235"
+    "SHA256": "6237fd2d150a21e019e544e5816b2f41c265a6d676df4ed3af691f9c11f703ab"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/constants.py",
@@ -6973,7 +7037,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_route.py",
-    "SHA256": "bcec1bac6394c391f97b7839b5faa976762093148792b4fe6c8dc461a4bb158a"
+    "SHA256": "215f1c8c1007a42edc07bd381fabd77a3671f63144eb26cf85e1158cf353cb81"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/conversation_task_state.py",
@@ -7077,7 +7141,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/event_dispatch.py",
-    "SHA256": "cd699deabc0eb16ec87bea656f8689c69ead56bc2bd6b9aac87c9907aa81449a"
+    "SHA256": "c623247c94176092eb0317f0b74751d6bf49694dc1612cd12eb0e3848e3ba95b"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/expression_scope_ownership.py",
@@ -7089,7 +7153,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/final_response_persistence.py",
-    "SHA256": "ca8b5604c10d2a22375c1aabc9fb7043d037d3abbc568980fa88f2f4a1ec413c"
+    "SHA256": "bab86d3219963f6cee23eb21eb73c6cb64c6053d0a08b21762586d57d383b96e"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/forward_message.py",
@@ -7125,7 +7189,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/helpers.py",
-    "SHA256": "9c097a846aee54e7ba7132c9719b13d1f3f285d9c3ea005e065b7f3b2456f275"
+    "SHA256": "5f78c59576954fe9c1d8147f944027597da775fc6a33c24444268d283c124bac"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/hub_optimizations.py",
@@ -7189,7 +7253,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/main.py",
-    "SHA256": "aede4d99cccb4f60c5b784b2576bd766ebcb7c56546a75f9134e61de2da0ea1c"
+    "SHA256": "bf7c614712246b74a81a089f581ac021292ffff4eb3fa134d927006c11f65f26"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/managed_memory.py",
@@ -7305,7 +7369,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/page_api.py",
-    "SHA256": "4675bdc8f5157dd57f3c4211e8ed0e995487dad4fde282b672508d8e33da72d5"
+    "SHA256": "1346395014a83c832e56a94be18faf75c1aad7060e4c2b6ab8a91dd54e30ea90"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/page_api_qzone.py",
@@ -7313,7 +7377,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/page_api_settings.py",
-    "SHA256": "b6e4678cffe610044014f143d6bb5138dd11b6b53720bfe99e79402f90d8a5dc"
+    "SHA256": "cd724fe409d0897cb5d6ebf7f8a424153cfb2f77cbba6c7fdc74e8670838ac6b"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/page_api_task_tools.py",
@@ -7333,7 +7397,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/app.js",
-    "SHA256": "28bc09e4d977425706e55baf36180df9ef8ab8b4197a9a9e9ad9dd7d6cc240d2"
+    "SHA256": "982ec883c685e296f8e66432b1ea358771311d359174f4fc43213d2ba34a42f1"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/css/header-tools.css",
@@ -7349,7 +7413,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/index.html",
-    "SHA256": "212863b2772e533e3ddb32852798e366495e96f95a8a693e7186d94a52778905"
+    "SHA256": "3eb83c1aa20b29b9c95ea9a839a0e69e0d6bf4263156bfd088fcad5ea965fc79"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/js/features/daily-outfit.js",
@@ -7357,7 +7421,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/js/panels/provider-tree.js",
-    "SHA256": "926bbac76fd1708a297794a37a9cc59527c950fc4a52d0104cf3c1f6ef302684"
+    "SHA256": "2bc8a0dfb7d91d2c6f003424895d81e285c0ee9deb9cf45e5f1c111909206878"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/companion-panel/js/panels/qzone-panel.js",
@@ -7377,7 +7441,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/app.js",
-    "SHA256": "28bc09e4d977425706e55baf36180df9ef8ab8b4197a9a9e9ad9dd7d6cc240d2"
+    "SHA256": "982ec883c685e296f8e66432b1ea358771311d359174f4fc43213d2ba34a42f1"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/css/header-tools.css",
@@ -7393,7 +7457,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/index.html",
-    "SHA256": "212863b2772e533e3ddb32852798e366495e96f95a8a693e7186d94a52778905"
+    "SHA256": "3eb83c1aa20b29b9c95ea9a839a0e69e0d6bf4263156bfd088fcad5ea965fc79"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/js/features/daily-outfit.js",
@@ -7401,7 +7465,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/js/panels/provider-tree.js",
-    "SHA256": "926bbac76fd1708a297794a37a9cc59527c950fc4a52d0104cf3c1f6ef302684"
+    "SHA256": "2bc8a0dfb7d91d2c6f003424895d81e285c0ee9deb9cf45e5f1c111909206878"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/pages/陪伴面板/js/panels/qzone-panel.js",
@@ -7473,7 +7537,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/plugin_bootstrap.py",
-    "SHA256": "772013acfab4e460b92e55041e9f0c2aba65915e66ad97380d69f31f87764cfd"
+    "SHA256": "9bb3e5c6444b729c1d8596df5566b169052585c7a9f7ed0559ce974129c517d6"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/plugin_identity.py",
@@ -7481,7 +7545,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/private_image.py",
-    "SHA256": "84679f377adb0bc1e209e7ca1b7d29b62adcbb53c7c90ee628aefa208deaa5e8"
+    "SHA256": "9ad3853e9cea131fb964c9de70c095f96b73116d346ac1836cfd9ad56dc5aa07"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/private_reading.py",
@@ -7697,7 +7761,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_account_setup.py",
-    "SHA256": "f2606578e64d6ea0fb3b9e4a7246310a46368a2d1a9c7e53150ee36aa0e4c82c"
+    "SHA256": "6d604a59adcfb5a5756f6168afbaae24f306ecfa5dec195f7f4ffd59238a3036"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_acl_scan.py",
@@ -7721,7 +7785,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_catalog.py",
-    "SHA256": "aaaefe727f7d75661dc3ff6d4494b898554251831ecf3eb973280aa986bca4af"
+    "SHA256": "b0209bd6b2fd175271801699e2ca7b478c3696a249d0b097f654c0b6ff0dade1"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_context.py",
@@ -7729,11 +7793,11 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_execution.py",
-    "SHA256": "1e0064bf0200c9d819832fd7dcac7c8a4a43e5c51f9e4f07ba98383fcd273569"
+    "SHA256": "d094c57553e578ab7841049dc9f605f5e293d174dc8c4a12b6c894cc5260a0cf"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_execution_tools.py",
-    "SHA256": "4f6679a7331983a224a40fc202401cd65786ac05fdae2a56132be334446c325a"
+    "SHA256": "fe11419a11cad783de2a1841f4939fb2a04efbf65844109a128e6827a6783877"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_feedback.py",
@@ -7753,7 +7817,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_model_policy.py",
-    "SHA256": "e6ec82c0ccde4907f6dbbd5f805fb9983bd2c2bb0eef5e35d35a6e0122f5cf04"
+    "SHA256": "2d17e5426ccbd8c1f8eb731541ce04e21b3ab91e10a770d389d83472c24fac94"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_model_stream.py",
@@ -7765,11 +7829,15 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_ordinary_read.py",
-    "SHA256": "e9554ea7f5e4b4c12a319851c56fa719c0102c93cd58f9fa6dec6835f0646a8e"
+    "SHA256": "e7b37480ea870230bde59ed511b3ed98a82abe972935912d83c20974f578e35e"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_permissions.py",
     "SHA256": "ae0905ffb6bf1f4086b44e976b346fea7efdb2a4405bd6af2af46dae132246e9"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_primary_execution.py",
+    "SHA256": "c85a80d0ccc641ae67dd0e250106233e79f791cf2e4ddc69afb7c7d1a8951e3f"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_proactive_policy.py",
@@ -7777,7 +7845,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_runtime.py",
-    "SHA256": "98f7bcfe733857a639c87f139309511226eaf50663d709ccd16a290cee520df8"
+    "SHA256": "9cbc54fd32a3ee33a9f887368eac2627da90e83b7a8521f7bc0f878464f46c26"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_service.py",
@@ -7785,7 +7853,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/task_workspace.py",
-    "SHA256": "d5984f96e4f0ce7b53089d66ad6124bcf9f19b2aa205a08e4a35353c2cb64fa4"
+    "SHA256": "491f19af4e7ae13c721daa19f74c4e08698acb880a132c1014b4adb679080cdc"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/__init__.py",
@@ -8972,6 +9040,10 @@
     "SHA256": "8e8cd7cee5ee57a0f61003210248462c3275e6ecbd0c79c7f579fbdb45359dd6"
   },
   {
+    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_reasoning_output_boundary.py",
+    "SHA256": "4c2b7fba0608579b1a1ae043440e48042cb79b1d96d49e1901f51855221b15f7"
+  },
+  {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_recall_reply_guard.py",
     "SHA256": "d91627ef2dd497f9e89646f12583bb7176efa1bd9a8912a11399d8ca19230945"
   },
@@ -9521,7 +9593,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/token_budget.py",
-    "SHA256": "f140a23d02fb66afe9d46d165983981fa789f1b80501840448d47ff0d3563231"
+    "SHA256": "412dcfea0075e4f6479cb38258722bd3e2d04bd708f3032cf6ccf6264c3e41e1"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tool_history_sanitizer.py",
@@ -9897,7 +9969,7 @@
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_self_learning/pages/dashboard/index.html",
-    "SHA256": "3299512e7a2abc1e29ae84d29d218eb545227f7128008537b8e700659d3a8d88"
+    "SHA256": "7f6c4c032fbffa30146af95e288c64afb74611ec27890ad36322381e1c54cdd8"
   },
   {
     "路径": "AstrBot-master/data/plugins/astrbot_plugin_self_learning/pages/dashboard/styles.css",
@@ -11610,6 +11682,18 @@
   {
     "路径": "AstrBot-master/data/plugins/meme_manager/config.py",
     "SHA256": "204214149b9e24a2ea1c5f6234527adf7668270bb2593cb7041f9fdf0d7cc81c"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/meme_manager/data/t2i_templates/astrbot_powershell.html",
+    "SHA256": "d41a240dbd441c4e975adc7867de72f3590cc32a337195a95d58baf9e9ed2b74"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/meme_manager/data/t2i_templates/astrbot_vitepress.html",
+    "SHA256": "f77775d78015ccde13d63b3b9a571631dd50711c453d17eb05aeb70257fb4371"
+  },
+  {
+    "路径": "AstrBot-master/data/plugins/meme_manager/data/t2i_templates/base.html",
+    "SHA256": "23714149d06b3abdcee3a5ac1aed3a95785efd75a49a3a3f4a8d26e0f84253e1"
   },
   {
     "路径": "AstrBot-master/data/plugins/meme_manager/image_host/__init__.py",
@@ -13988,6 +14072,2062 @@
     "SHA256": "8cf7b389f13fcd82648b2faa13de1b64a913c8634418707672fb036bdd54d168"
   },
   {
+    "路径": "AstrBot-master/webui/_redirects",
+    "SHA256": "66584af744075248a042165adbdbd6a0551fa708a85650ea1e3e777eee17080c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AboutPage-CEHQGCjT.js",
+    "SHA256": "a64e555fe0d909bb99709c8073b28b365e985719f91d06cfe5aa1a25397b6adc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AboutPage-DEQmpVBC.js",
+    "SHA256": "c0f11b197a6d0b824f19d23c455c9dbd3e883bf957306766bbdabf53a388613f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AboutPage-DvjZLbkJ.js",
+    "SHA256": "590922287d68bb2ceb66cf42e95f3b25de612eb9d0059b42c8af8482be61a578"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AboutPage-jqXWhMKw.js",
+    "SHA256": "6b1b65adb57e2197ca9e8d320debf310b090bd51cd3a2b0d6984ed3f57ba2ee6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ActionRef-B2fuE4TU.js",
+    "SHA256": "1de134c2a9c020b75cba80c25119d72d10832b6d0a2a1b8947f7c244ab7b326f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ActionRef-BSqtKEBG.js",
+    "SHA256": "38f56afe4ffa523d21f118da6f65f93ef8dd3b04e0e917e65610dc8715e3bb8c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ActionRef-B_Xn1dGn.css",
+    "SHA256": "6aecae85bd451d44e24883054aa26267f74cea4bc4880a03580019d085af4da7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ActionRef-BoeYN7aC.js",
+    "SHA256": "139f298b5a126166cdcac6051e30bb521ee38b369afa72b8b15060cc94bd0d4d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ActionRef-DTSndizd.js",
+    "SHA256": "ad07aee12c231e565130d5031c55e41be7b2c6fb284baba7df22848b14a9453a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AddNewPlatform-Bjp_QI59.js",
+    "SHA256": "326b5136e57585a6d926e0aaabfbc37891562e87d2c8c096f3e6ecc1a1c46866"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AddNewPlatform-CVJIyLIL.js",
+    "SHA256": "30f2795519cb2baf2c3c2abcd2c013a110ea5de5710993ac0b38a07320fdea64"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AddNewPlatform-CbpvK7j_.js",
+    "SHA256": "7ac994094b6b54c14fe4aec9af12ddad1b76d746b576bcd1c9a2778365b3696c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AddNewPlatform-D5NrN1RW.css",
+    "SHA256": "e983fd1232ca974280f43e70105f95d02ee7407d1e58d50f6a77cdecf24acabd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/AddNewPlatform-DmMRBDLy.js",
+    "SHA256": "851c7a25ff93e3ceb8d55c4507cd69efabc38050f7a6649b3c33c3c5ce486256"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/BlankLayout-BFJGPugB.js",
+    "SHA256": "9a2fad3e45e9c1a03e4c46beb85508dfe6c651921141c14f2bc5dacfcc8485ed"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/BlankLayout-BvWnmZuy.js",
+    "SHA256": "02c6172bfb1477ec9022f77aba70a2de609e4dfddd57bac37c97176e652e62b6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/BlankLayout-C5viGOSV.js",
+    "SHA256": "4a80d42c48b185ed93498e2d5ec3de97cc91573d1ea53653305ac3c0e2cf6450"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/BlankLayout-DmCkTwyl.js",
+    "SHA256": "2f8c996850175c976b39cfccba113b72664f146bf1ac52efcb25c4dbb2e29dd7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-B1ZBFP9S.css",
+    "SHA256": "9fa729a7340b479eea3157d640b3109e9aedc79aaa62eaabc39e8a226cc34448"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-BrH9ac9G.js",
+    "SHA256": "a81cda9d70e3efdcf31994d9a78787e8cad5cd91368e22d3deda5fcc8370538f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-CRYcFIxr.js",
+    "SHA256": "41e2c5faaf90c9d2273643363298c89bc000d50e441020ab25f3d891fb53c7ab"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-CUN2h9w4.js",
+    "SHA256": "42d444ddf925132e40dda5aff03a6f83f045adc7f32398a13654f22ee375e8a8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-DAQp7rsX.js",
+    "SHA256": "4abfc50da60ad0be9d2435cf393157b8c09703dfe7da9376772176724f303518"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Chat-DaWvGyrk.css",
+    "SHA256": "f878b7c806e38d7091e1f1928dd2b7de3cfc5e68403ddf0d4d07f0990ddc45ca"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatBoxPage-DSQDNIeR.js",
+    "SHA256": "eabe957afc17a74bb1e0487c2c9d1461811626f80910fd11c53daf09482a1b86"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatBoxPage-Db_V-ksp.js",
+    "SHA256": "0e065512b56fa239f26c458666053cf70d4188b84892b739289306ca53d9d606"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatBoxPage-Dst_Y8nS.js",
+    "SHA256": "840a801a1d46b2a3edd1c614aeafb10ce011cf63a9591eee9278b54ffcfad54b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatBoxPage-RUatSrB3.js",
+    "SHA256": "0b501a3bc086093510febd620be03e303b5dba56e4f7f6c3629e843100a47b34"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatBoxPage-wITcYeZo.css",
+    "SHA256": "09e35d0576975715366d172be91ba0d140247c01f3d927e50f187614d2ac4cbe"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatPage-BJ8O72jy.js",
+    "SHA256": "904873fba8cf18b2663d62a73df8deda0036c81c342265e7f2d5eaa5d8d10235"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatPage-BYHHfP1Y.js",
+    "SHA256": "a2d8b38dfb805947188f870300892f64ce87c55e8495a3326f122d6c8987610a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatPage-BdWgFy5x.js",
+    "SHA256": "0595246599d26a22710259788d492ed3e25a50a9b57aed21ce5f9a8ef52fce3d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatPage-DHEwabxo.js",
+    "SHA256": "274cd21fcd18c206e1d4a937c4a23252109fdcb4aab197129fe180ae22f451d6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ChatPage-eUJ4JNI2.css",
+    "SHA256": "2a219f9a77d1fa8ff498c5e70085d4400e61322b3ef7fd5f14fab9b475c54d1b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockNode-Ba4ew-Vy.js",
+    "SHA256": "c5015d68fd33f4a1faecde9859dbe25182658c65a98aef9cfa14b53fe4b76ebc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockNode-BkM5ggz8.js",
+    "SHA256": "ff732c3fa3b43bdce98246446eb886e55095de96e6f942cec4a65c1dd0b60172"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockNode-D3h1JeBA.js",
+    "SHA256": "50603bacffb107ed651397be1b2bf0a866f982138a03e325903545d2e28b2c46"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockNode-DMcufhbl.js",
+    "SHA256": "cd3e543f3f7475c36861b27f1fc2e55a528cf96a0d579e6aaf861865a274216a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockShell.vue_vue_type_style_index_0_lang-63z04cBa.js",
+    "SHA256": "6b407fc00652c566e65ab3ec79d92a65bbf1792534a398711b6730e254c995df"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockShell.vue_vue_type_style_index_0_lang-C_VvRaVA.js",
+    "SHA256": "4d0e70a0908e2b01d867fda9db601ac6b65b638b9631b5217e6383de33572ce2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockShell.vue_vue_type_style_index_0_lang-D977ePyi.js",
+    "SHA256": "5d3cd9de2dc3e2e4cc14964f91f271c84bab0a3b99a13b53426ca3be4f5137bf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CodeBlockShell.vue_vue_type_style_index_0_lang-DM3UP7Za.js",
+    "SHA256": "147f5a03ccecfebeefa584f93f56dc9c2bea18cff9fa045add06a63bee263edf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ComponentsPage-BScUz_Qt.js",
+    "SHA256": "d19ca61074d12ed100ba977346d5d1addcef1b51b67743035549810f9ff94ef9"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ComponentsPage-CFvUR06u.css",
+    "SHA256": "022351ea0396257f39478e06cb2f26b50bfd6c36cd1bf779d94789273503401e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ComponentsPage-CJDI447m.js",
+    "SHA256": "fa894661c319c2d94d4bf61099e461bdb6e8ead92e6d42a733b4378fedb545c6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ComponentsPage-CWxuAT1b.js",
+    "SHA256": "bac4e3c5210ecbfff3910d884e706ede6d723a9c76d89a102d8be28a248e71f5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ComponentsPage-ZhS7M2Dw.js",
+    "SHA256": "45ece6f3cc37569563f14a45781057911c42a9157a69da30add3014420c9f87d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-B0p4nVJ3.js",
+    "SHA256": "ebc0182a3c089316525ec31938be838744cf7f84f79262b809af740495772cdb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-BQ3RcAeZ.js",
+    "SHA256": "5728ad1a38816246d3c0cb7d8226b12e7010c0225b56455eefb1e67e892d3d74"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-D43SGKps.js",
+    "SHA256": "6455fd6387ef08f9e9ee5d271ff3634b79a49bd265f25953ce71d2809497d5f9"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-D4pQ4Ko8.css",
+    "SHA256": "413e539fad282a329fe8b1c22f4ee61d4cf00f9be0061dd783b8b7acffb935f4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-DB1Yefzm.css",
+    "SHA256": "76b98d4020af6cd229d55b2ec6503803c4832d183ca03eb4782d2b4077f7e6be"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConfigPage-DxpeSDpE.js",
+    "SHA256": "cf3d0bd632db355a7cf8899bcc7d017eb241a90505390606deeb35470dbbfb3b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsoleDisplayer-BLjrsGKy.js",
+    "SHA256": "cbe57cf63ee561b3b1374c64452d80e0827fdb7bdf49969a011ed84b7512ffbc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsoleDisplayer-BWmabxoh.css",
+    "SHA256": "94e393c34f29530af3f2237361b83b46c9d3c8fcb02bebbdf127ef5f9f326306"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsoleDisplayer-C2F4Y2B0.js",
+    "SHA256": "f5c5e1cafca58811458fafcb4dfd5df217544abca21b908a125f5d29e105a166"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsoleDisplayer-CDo3_bUW.js",
+    "SHA256": "cab5e423f85a2e0bd60683fe5209e12da834716e7c02753dd64458af74cabdcc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsoleDisplayer-zZ1C77LC.js",
+    "SHA256": "92a9b8dac8f46aa0a394b93485c37b3278b56a47dc3650127d87eb44da83a7e1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsolePage-BW97hzK8.js",
+    "SHA256": "1d9f3a6d34736fd708c4f3b59b958bb290c5c2d918a2f1d2affd57e260e7e935"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsolePage-BZ9CbF7n.js",
+    "SHA256": "4434bb52ed0ba15b7e45c5f9d01dbc99e4924693cd37456b9643e159a04ceee2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsolePage-BbX6F4RK.js",
+    "SHA256": "b91a77c7e2791359f508232942673521ef9abc046e2673eec197485cc9c72a49"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsolePage-BkkbI59Q.js",
+    "SHA256": "c6ebe03b7fe491c00c275126f1a1fd39226cf3e418d19da7076e813d1347ce10"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConsolePage-D4WLfIj6.css",
+    "SHA256": "3bdf922e32945ec2e3e66890f9bb3305e40eb35f2afc5fcce2f9aacd8861ffa2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConversationPage-B9ZHMfUo.css",
+    "SHA256": "66183d47794515e6f3a0de37cbfff869c0f3b07ec6834afd3c9cde0f5d4f7df7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConversationPage-BBvsxVbQ.js",
+    "SHA256": "b23baa2276a63258763f7b9c42b895fae95df7317af2d6bf08c1f406ed3046a6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConversationPage-C39cBbM8.js",
+    "SHA256": "115b159a582509b82d29b1c130468c0a4ecbccb42bd728645885885bfd89744b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConversationPage-DL0ZD0EB.js",
+    "SHA256": "fc1171624038f5981ab37cfefa5baf826e5299201337c90b23ef7f461ee4b9b5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ConversationPage-X3AK2heo.js",
+    "SHA256": "57cf19cc9a4ff69e998b8d30e0cc71da5f7c1b90435234c778c55f7c78b9ca55"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CronJobPage-BKW7JGPJ.js",
+    "SHA256": "35f20b7ec892e06f4aac7216b0a83dbec125372bc458b26b5527df745eb8a6b0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CronJobPage-BOVsfv-9.css",
+    "SHA256": "3e7f9fb0d91db25352b28a5a059798f05189602298e49b2dc1b2ca9a6483467d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CronJobPage-CPM6CnGn.js",
+    "SHA256": "116606c40807df9ed736d457ce963760b035c97342e85bd32ca8a6bf64028362"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CronJobPage-CoOWLyVu.js",
+    "SHA256": "69cc63707063769ce16912f32d764e4368c703946c122c585c7eaef990823845"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/CronJobPage-DWZlbO7Y.js",
+    "SHA256": "cb702d469be6e3f6f6bf2bcf7c33fff588daae277dd66b23c752bb2c33c69834"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DashboardTwoFactorDialog-8npj1GNt.js",
+    "SHA256": "b67fd20fd4e4f1c21379049f08ef34e0308088a38c76162660ef7686d13150b0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DashboardTwoFactorDialog-BhQ0KSRN.js",
+    "SHA256": "9feba41254f773fe911de011898f06b2b78b89fd5023ead31adbc984e1b5e11e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DashboardTwoFactorDialog-CIWMdO9U.js",
+    "SHA256": "78597ef903621139edf8b75461e962b0fe01ad70feb60014137b8010476ecf13"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DashboardTwoFactorDialog-Cb0oWWQn.js",
+    "SHA256": "2b55492306143a2911232adecf5e3b4d1109cd2f44ae986204ea5e40bf1b7161"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DashboardTwoFactorDialog-KrpGeqXu.css",
+    "SHA256": "fee9246a51671803441615992b4ba7b5d35aea960ccde82b885f1742afee671a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-8w4Ka3Rc.js",
+    "SHA256": "fbf757d95628a31c7437fcae74e06a6f560fee1ca2b33b65590433b3c24d30cd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-Bq4-8vXn.js",
+    "SHA256": "800e8a67d30dd5553c1e6d6df8e1cbf567e0ca14fabf8f4b8731147ce2c3aeda"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-DHX0cKqx.css",
+    "SHA256": "781210c8af95a0f3560b38d1ee83abcb97694da7cc65c16dd0145a7d52b11690"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-DMxGSjEI.js",
+    "SHA256": "b0e50a9453ca002a530dab06b3c3004b212130bbae79c98a2946062636fe7b9a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-Lt2OYwpW.js",
+    "SHA256": "0100822124eea182c8aa460d400017ab6cfb596f51308d0fd7f87dbc58f25199"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/DocumentDetail-s-t6hr5P.css",
+    "SHA256": "08b6b08868a5374a4cd65ff3e0249846bb53d90c029cc259f6e5162ee8d9a719"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-BSz5WmD2.js",
+    "SHA256": "e61396704e927fec00d8f066a0be050d10ef5955c7c2ff43f1fbdc3b1c97f819"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-CkdbSrTo.css",
+    "SHA256": "6744270ee0d25c4135eacadd3e65489282c3060eed06c474085d4b8345f1a81e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-DACdW0ac.js",
+    "SHA256": "62c9306f322bdc4ce9d96d4af31fdc6399ccccea5576d8e06944bcb27ac715d2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-DX2GW5X8.css",
+    "SHA256": "c8d61850eaf50ddcb97c3a78959576adf13b21f6ca042fe1e3831808d6e8deda"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-DgQKb-Mb.js",
+    "SHA256": "1e492eb73cc5a7392e63c4644687a5a1934b667aa26b646bffd95be2cf7ee0ee"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ExtensionPage-tENtLf9C.js",
+    "SHA256": "03e002ed2bcc49ac268e7ca531f95b000de208f71f2f4f51afa20d854e9b8cd0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/FullLayout-B7qPEkS2.js",
+    "SHA256": "8d1d59600eadd3bfd5fc46a1ff1e58bc7262dafa8a747c1e2c9e7e8c21539428"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/FullLayout-BCEN6IH4.js",
+    "SHA256": "6d8ae54f97f5ab782b8e0883665e2f6226218444d66a4123f1dfc82f9ee1de84"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/FullLayout-CeNL2OKr.js",
+    "SHA256": "0b6be854f15eabe8edc717d445fb4a172be91da71fa1b81adeb7e6209be66378"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/FullLayout-DUf-RMVi.js",
+    "SHA256": "114e45d9e2729cc027bd18316d45b1d7a2b655caf0d44d6eb956d83d3154db46"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/FullLayout-l40WtyOT.css",
+    "SHA256": "f73f7e0baa1eccf27798087089a468384a09d48726618a37e3ff0355c405264c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-BXwl8BCx.js",
+    "SHA256": "2d1e6126edc078f7335ef723259fced3e59971306af0ae9f2c2fdec31d316619"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-BeXnC-5s.js",
+    "SHA256": "5f2559a57672d284733db75455ca8f9c7fc80ca15ddfc0337f411d6cf1c7924c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-C05SRpFD.css",
+    "SHA256": "60804212c25b3a23e951b156ee6433a6e9d4ea08361305cb7ff9712db48b0fa3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-ClbmCoHb.js",
+    "SHA256": "f113d2ff484bc95e392b708a2b91ad6c719250b3dea55de281e6ce2be0a74eec"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-Djk2B9wl.css",
+    "SHA256": "690332dabc52a698ebc946d5217a921807f6208a84cedbb055563f3fef12dac3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/InstalledPluginsTab-i_gQD78l.js",
+    "SHA256": "0bd5c43dbbf09cfbe49675d4b951045aee32a0aef6febd57574c8cf7c99d5418"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-BoDkb7L7.css",
+    "SHA256": "31de18183e059f41175f5fa6c0178520adacd35ddca8f3bd565efda9e31f18d8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-Bp31gCoy.js",
+    "SHA256": "9952b3c8b4e2055351967d6db12293313f245b0bdf862f5a29cc9866fcbb75e0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-Bq3pknM4.js",
+    "SHA256": "55946fa6277868dc2d4393291aac87b4fdad66e27863882cc5d4f5992d56e4a7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-CBzILyD3.js",
+    "SHA256": "74bf3855e24e5be8aa143b3513030a706b6fac8f62f15126f14ea5dc91034b06"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-DmSxY-mG.css",
+    "SHA256": "2f64658c7ac91915732346863c0ff261b981aef701cfc08f19d47ecf4571f73c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBDetail-Y0fFQXZA.js",
+    "SHA256": "c97f80745e3829badcb7e1b74788e9b040c537e7a83d2b45e29d1efa7d39278a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-BVXRhPLU.js",
+    "SHA256": "561c9f01162984589a0684860daf4acef593cc88adf576b6f1770e0a7c2e23c5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-CmZiHvam.css",
+    "SHA256": "e81d0de506237aeec1335d92ac537b1c23311ed65281e32d20858f5879a2d7ff"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-D5vnfMG6.js",
+    "SHA256": "fff2387f1f073500a04fbfda6dfa64943076bd40404b71394c3e6a67c699c051"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-DN0JdAuc.js",
+    "SHA256": "f90b524cb163071d85a4845ddcae52226b9f90f1cf44f33112de946360856f8d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-DWSbO8p_.css",
+    "SHA256": "25cbc3543a354796ac8a60a28c80bbf61bd81bd33e0cb0e0da90b1b195db3d47"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KBList-DbKl5MXG.js",
+    "SHA256": "9ff4f947c2367e0f81faaf819d7201c5ccfb2e11c19be5315de6bcfc2d9d1a06"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
+    "SHA256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
+    "SHA256": "30da91e84c893f875e252689faebdc590b2871145e8adc7f9a9d4dbd8ce0b251"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_AMS-Regular-DRggAlZN.ttf",
+    "SHA256": "68534840bcfdd2bffb6f0e8deb48684dd01e7f04ea2813267577afb906de1d13"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf",
+    "SHA256": "07d8e303ce4fc12b4bb54f1004170dd190a1f3db45d400fe68060df3e0897268"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff",
+    "SHA256": "1ae6bd7475590e97e7f145a89e09ccde322f7a6bc0b91607b1c8b8ee28290fed"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2",
+    "SHA256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff",
+    "SHA256": "3398dd02302557a793f2863f88e02d96ce10df2abffa07c8e9fa90775116e65c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2",
+    "SHA256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf",
+    "SHA256": "ed0b74372feefcbb9c0666b2e210da37b7e49fa7fbbf3eeb11db5f693dacfbb7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf",
+    "SHA256": "9163df9c7122432e6495b4229fa9071cf9ae86a758ae5efc4924ec2e1a6dbce1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff",
+    "SHA256": "9be7ceb88004ab8ad124082246fbfcca4091e36385d4ec6ed1df67375dad50fb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2",
+    "SHA256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Regular-CB_wures.ttf",
+    "SHA256": "1e6f9579e90e2cac37f8f60a597c436e075c114385652b7cbeb0dec0421291b3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2",
+    "SHA256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff",
+    "SHA256": "5e28753be717dac97f559f49bc10be9cf3c124ddcabda6659d11cb68febc6463"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Bold-Cx986IdX.woff2",
+    "SHA256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Bold-Jm3AIy58.woff",
+    "SHA256": "c76c5d696297d51b9cb1639c7da4334f0e7dec81b42b11213b5e25ef671bb822"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Bold-waoOVXN0.ttf",
+    "SHA256": "138ac28d1663b3037e9c5f52371fa5c63d8324f4a38d22cd573e6ea3a3fd0cf8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2",
+    "SHA256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf",
+    "SHA256": "70ee1f64a20f2048c21940ef46d0144fd215baa953ca69afd1e31e98544f708f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff",
+    "SHA256": "a6f7ec0d846ac7ad975adb8959c37ed49b94acbc4ae436db9ce9e20287e4a64c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Italic-3WenGoN9.ttf",
+    "SHA256": "0d85ae7cc30f23790a7f1a58c4a112fdca8aae769b6ba11429af1d98b1b6cb3a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Italic-BMLOBm91.woff",
+    "SHA256": "f1d6ef86f3b11a528bd5185199bd2443ecb2b0dead96d88674b5a2c12be24bdf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2",
+    "SHA256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Regular-B22Nviop.woff2",
+    "SHA256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Regular-Dr94JaBh.woff",
+    "SHA256": "c6368d87e8a1a3a5d337623d83d8dc4b868f242a9ad476237d6f8d1e0f168cdc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Main-Regular-ypZvNtVU.ttf",
+    "SHA256": "d0332f52868370fd83ae7fa46470f90c8f2eab2fcf12bc4f88080b340c95a830"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf",
+    "SHA256": "f9377ab0271cda59af24bcffbd46a4d0c8a3572ffafdbb38de2ad5ea7b0d5ee5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2",
+    "SHA256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff",
+    "SHA256": "850c0af5c2238497febaf5e461d880bf458c341f42f4f330f1b1ab5698b1998e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-Italic-DA0__PXp.woff",
+    "SHA256": "8a8d244581371912b8f3f5a23e2437cb2a59cd9bcaebb0346e722c05737a2571"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-Italic-flOr_0UB.ttf",
+    "SHA256": "08ce98e51b04d58945a301e639e02b6998af29fdfd61a7b8afdd07bbfc479d4a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Math-Italic-t53AETM-.woff2",
+    "SHA256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf",
+    "SHA256": "1ece03f79f95277d57dc7f6b435a74e1379b0d46104a8530286b60ff49369ea0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2",
+    "SHA256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff",
+    "SHA256": "ece03cfd83e22c212cdef66feb8442d25a083beb988db3f1883f3f9738d750ba"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2",
+    "SHA256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff",
+    "SHA256": "91ee67500cc0129aa0ace3ac5c61ff1692102f0f31d02b69347fba35dcb75bf2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf",
+    "SHA256": "3931dd81faed86ba021bb2bbdc36f5bed9a38d6b4f4077aca59b265aa1b02083"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf",
+    "SHA256": "f36ea897e19f4a2e571d1e900e4e3710e438deb05a842486045ba0a3e616a4ad"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff",
+    "SHA256": "11e4dc8a6471ff6d6ee561d53d10fde8f7489e798257ff449c5d37c197435605"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2",
+    "SHA256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Script-Regular-C5JkGWo-.ttf",
+    "SHA256": "1c67f068fea8bb09bf099c088b1cf64bd27516a6e07f4684344873564bb66a67"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Script-Regular-D3wIWfF6.woff2",
+    "SHA256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Script-Regular-D5yQViql.woff",
+    "SHA256": "d96cdf2b3bdd4d64a8fd5f74a4c467f123a8a73931cd435889f08ffaf9bf947a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size1-Regular-C195tn64.woff",
+    "SHA256": "c943cc986384f59e86bea5fd7dc50a9c4dfe567a7c05eb40d6790720dead97c9"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf",
+    "SHA256": "95b6d2f1a50173bfedb8c63e1d1c99b10427d0a4df4201cb44513b226951a22b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2",
+    "SHA256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf",
+    "SHA256": "a6b2099fb555c60e3a0db3a08842ebf1d732c6eb4e4bf44913613bed4fc4e39b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2",
+    "SHA256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size2-Regular-oD1tc_U0.woff",
+    "SHA256": "2014c523c3210bcc166648c4d4cc57f05b747df07a24277bf71c51e67dc79e3d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size3-Regular-CTq5MqoE.woff",
+    "SHA256": "6ab6b62e9b62dae2c00dd90f791bd10950be0ecc3490d7d6045f51c2e8fe0949"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf",
+    "SHA256": "500e04d54f0d51666332c9d2089aa803be22aa878eca539e59fa53c6e522b082"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size4-Regular-BF-4gkZK.woff",
+    "SHA256": "99f9c6750b489c9462bf04900bd3f939df9b829339daaaaa99ef5495cdddea58"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size4-Regular-DWFBv043.ttf",
+    "SHA256": "c647367d1dd4e162468717d020e1fc0f1dc5c26ebfdffbe55261713bf88c5877"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2",
+    "SHA256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff",
+    "SHA256": "e14fed02b1aba7ce9f5afd5844b5d0321b22351febc720e0de8b8723527609f7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
+    "SHA256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf",
+    "SHA256": "f01f3e87d9c6a61c0c081ceb577abd864eb00a612f7ac1620dd6915fad2ef5aa"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KnowledgeBase-BVVw4dI4.js",
+    "SHA256": "02b3b0b740a4b81b5638bf8ca5acf38a00f8ae22bb8fba47e13ae56033da6388"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KnowledgeBase-CmizZA5U.js",
+    "SHA256": "4d1eece467f66c05c649037c17d305f97c5e7ec3a3c2683b7b3b61a59741d5c7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KnowledgeBase-DRfTpRUk.js",
+    "SHA256": "e5b5ff73efe8e0e5fff1b942ecb75b15049fdb74ee638fabb434993aa39af51e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KnowledgeBase-Dm_JuEKr.js",
+    "SHA256": "1ebf0c5dcaad279e07a84a46d1cef2cb9e0bed9a029bd975e839af5c4ac47172"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/KnowledgeBase-phzfgg7D.css",
+    "SHA256": "50c567272a954cc5eb2523c7027d61df54f0f6d797baeda45702c8ea89455f04"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LanguageSwitcher-BJGWdZ3V.js",
+    "SHA256": "d49b40658d3787e86b3847e75615a8ecdbb82767d26b61c3cbcdb45d8816390f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LanguageSwitcher-CzMKrGGI.js",
+    "SHA256": "95d251fe3da93fc43679459f439344e439a9483887f08292c72773c2db263bea"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LanguageSwitcher-Df_-1jwC.js",
+    "SHA256": "133b0f6b5110bdec4ce17c54d1b36dabf09f28c1145405081cc3ed908938fcb9"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LanguageSwitcher-DgxPT6ox.js",
+    "SHA256": "efa6bf4515ac1cff046800368969b6f7a6f974a4fbd775707acba7ce96a5d50f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LanguageSwitcher-Di65FO25.css",
+    "SHA256": "e4f1bebba2287b18c5623fb3ef9c932a042ba9b9efda1c0cd8e2d8197a49fe82"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LoginPage-BLeaxWV5.css",
+    "SHA256": "b529ee2d4f2aa638c28d3899eb96e975da4d8053c9b35251a351f915c6f4796c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LoginPage-C8y_mcZd.js",
+    "SHA256": "5038d443c318268ec425f8397d21f4be387a7ff22dfb308550f2c127ffdc8117"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LoginPage-Ca6ActLH.js",
+    "SHA256": "c9ebcab5f0af912fb5c643bb88d6f14aa78f88617efd184428c81c1b66dc7966"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LoginPage-Cz_tlYCG.js",
+    "SHA256": "f17155ca7c6955680e440b5c8f794a2ed5332e65032b690c30e1cf6c8ca89ab5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/LoginPage-xr9echHB.js",
+    "SHA256": "d352d8881fef1ae7924ddcd95009350a790fe38af92f084f8f71cfb7b90ace04"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-B2bBBOoI.css",
+    "SHA256": "2025096704186e35c6b6018883d56eb5aaf0946673e71c1f3080ce318ab82457"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-BPUlpEsw.js",
+    "SHA256": "9ca9f2235224400b428381a184e7648d8e374a500599117e8b1eddf19aa121f0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-C9BKmwXZ.js",
+    "SHA256": "a8f9081ea55475c882abf69132fe647d68d1e4f842ecf62e34e1b329e42b748d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-CFH9n8HA.js",
+    "SHA256": "4926b697e8020337a860ddccf0d9e7317b26be9abe90e728e0a26833ab153711"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-DFug05Nw.js",
+    "SHA256": "ec3a5e975c02fdd72236b45005a05310db06de4c7e78f38d5bddbcdf8a80c9e5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/MarketPluginsTab-Dsodmc9u.css",
+    "SHA256": "3cfd91ae80d72605e442aa459ff335883ca069d0f2187670a6db6fb70fe5820b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/McpServersPage-BLvfjz4T.js",
+    "SHA256": "a2635c5d0f33c8ae8577bc1e102a1050ac9bee5acbd9d1cfd7d9edd892e320fe"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/McpServersPage-Cfo4nMyi.js",
+    "SHA256": "4aee2a58f4a1a2dc287611b12bdc2834799f6bc62d2cf15eac7e9ecb1fddb05e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/McpServersPage-Cv8mG6qe.css",
+    "SHA256": "c2687cbcd085d54d4fe480d5f1c0b4ac0cc4830032dc859d26837d94bd38526a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/McpServersPage-SZvI3mDv.js",
+    "SHA256": "2cd1419936ef692ceb1439e41fd23c7e67fa902004c631307bfdb81a1e163c57"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/McpServersPage-VvbujOnn.js",
+    "SHA256": "dd319704f0c2b5af6c9a1a565c612bf3a8cdcc2a2315683e74a3e0d5f1a7ba6d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/OutlinedActionListItem-C5Gi_QHb.css",
+    "SHA256": "f85dc1f049ada87473dfe64b02cb1b5eaea2e26880fd5846a40f1834710053a6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/OutlinedActionListItem-CS-UR-rN.js",
+    "SHA256": "ad824d5e6ff05af9ca8309d843440bd81d9100d4f531eadd6f6731fdb2225f57"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/OutlinedActionListItem-Dz-fsQvm.js",
+    "SHA256": "30fa8c2fda802866cdeffa8a7cf8c12a65a06b6254a42810af44e079d1cd661c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/OutlinedActionListItem-N3fXSdKj.js",
+    "SHA256": "f1bd98ed7418110b124a5e684bda352e9a0a64b45ba542170d9a49f4ad354b6f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/OutlinedActionListItem-f0w7G4JK.js",
+    "SHA256": "1a5ae3b883af3fcce71f7ab7ec92761dbe3636c6ba11929854224475aff2cedb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-BjeEurE3.js",
+    "SHA256": "443d1f06fe11b229a9d269baa205b96a1f3fb461427a7a1a3e71ec7286e3df45"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-CSXdSAc7.css",
+    "SHA256": "64223d7330d6bc531b965d9a33d3acd7e0b47c5ee21c2ef2823709dd401e3340"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-ClUYXdCM.js",
+    "SHA256": "243f276c5c2f9b873a22230c3cfc4425be32fb6c21a3e2d0841497d016237494"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-DM7X9EP7.js",
+    "SHA256": "07dfceb6c380c27382afe1742db664020827aa94623bb6215ec159ca2d2bc44f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-DMB2PD1h.css",
+    "SHA256": "f56b3841305a7794fedb2ec60fdf74d039eed6f6d6e720995ff0d0b0305d7268"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-Df7TRiSX.css",
+    "SHA256": "85647ec9bf72c7e9f88d3967f3f80a832c6b1e62e1763e8f2d8e3ae6316cd39e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-HB-9KbIq.js",
+    "SHA256": "0ddeaed331cfca429b3e979139f8e0f3c71ad97c8dd54a03e56579bc461ed179"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaForm-dPoXsYyl.css",
+    "SHA256": "24e5e3d6015729037fb456fac36e063df2f8f8a26b27904e10b1fb6a412957e6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaPage-BiJSEBNC.js",
+    "SHA256": "52a4fcbc90d73ad0d4abedeef9a22a4fe79088ffad0f970ad8ac19c346b396e5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaPage-BzwElwRu.js",
+    "SHA256": "ec995b8f99cc4c929110c2e8bdfd220be6ff005bca2d6f0c0b310c00ce6bbf33"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaPage-HO7wSsUL.js",
+    "SHA256": "0d9aafc153f05c04459749e2b7b6ad317c44773cdd59c247ae0372352cc6e224"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaPage-P9JHulkx.js",
+    "SHA256": "28c66e8f3039268f373151979bc03e805c0ab0bafb1b8088c15ac034540540ee"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaPage-el4J_ho7.css",
+    "SHA256": "52a4a55ee482bed0a5f88ac437e1b9c5f0efb18aa90ce0bb6735c9a67d08b24a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaQuickPreview-BSpwxQAO.css",
+    "SHA256": "ff6892bc8101eab857d442c8f9d1a7308b2bf9b07ab26e957715a853253381f3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaQuickPreview-BUUwW_nq.js",
+    "SHA256": "ceadeb248cda2db5380dbfb9b67c5924bd23f8bdf42e6594ce408f9f78fe8c1e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaQuickPreview-CCQN9Gzt.js",
+    "SHA256": "6e8b563b2cd7420aecb8f91791eecec398ea3aba7e1d9426c011a2ae9d30839d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaQuickPreview-DQ-wExhk.js",
+    "SHA256": "b7d6023d3cd66b359b194c5c76a3065aab87c4a7265b10336b029065fc7d96da"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PersonaQuickPreview-U6u_x6DX.js",
+    "SHA256": "a787d8d3ae8858394ede0392b0564f819688dfe0ccc8be3dfd00db0b954cc1e4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PlatformPage-BFkjcDH1.js",
+    "SHA256": "39f3848638fbdcd548b29fe75d17850f3062594386a88aa2fb526b1a0aa82b43"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PlatformPage-BNOIek5_.js",
+    "SHA256": "20e597fe2e5631014e8e142f2492116ffdc9459549d1e47fe10e3414592463dc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PlatformPage-CudIPYFw.js",
+    "SHA256": "ac6a5281e4f2bbac0f70808e6aa8a1b62ebca4fb86921cca237d5b90f621b17b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PlatformPage-P_U_CJ7x.css",
+    "SHA256": "e92fda254d419c87e4161b1223ca871c61f2183ec7959bfeb69aa3974da331a0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PlatformPage-SEBBG9W7.js",
+    "SHA256": "102362c9efe40162e5da261731289fa0bb84a2829c8edf6acf06554ca6f782d0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-BPZapbZE.js",
+    "SHA256": "74b6d0165e3b747eb8dcae5e941f7cca66d984cb7de4c50947bed41a0223ead8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-C3oECpAg.css",
+    "SHA256": "2649cb9a954b911dabb8c7d6bb003b2f53ba4fbecf3342d3fef2291648081c5c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-C6gkYMEK.js",
+    "SHA256": "2e36b271b8f8eec669d6f6507b4edf319af9bbbef9f9ede1e926e4abb6b218f4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-CWZNaLaY.css",
+    "SHA256": "07a12b4b8293e9c65be9859d622ff8da90a9c96ae24c555ccae67fcec8f549e1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-Dd2PBt9K.js",
+    "SHA256": "11d3fabea78ec3109ddac6e5c416d570b6b4f832438d6363b078f48713b1dc3a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginDetailPage-DnoWQCgL.js",
+    "SHA256": "4d3ab48dbaeefacd90d52ce8c14d9009cba270a221ec7b05bccaff2810844d3f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPagePage-BH4z9ldw.js",
+    "SHA256": "776282a1464546ef9f93ad3a07d4fde8744e840234afce3dab32e2511c67dda1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPagePage-BR2bSaXK.js",
+    "SHA256": "4228334d22a9cdf398812091cd84f9d70ba97281eed5b4234db79ce86bf6031d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPagePage-Bwr1lMrD.js",
+    "SHA256": "e2072d6cfcb0452c8b6d53beb5f940e8fd2fe24a31e40f1cf0465b7341bc88c2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPagePage-Dg9ofWpK.js",
+    "SHA256": "6095e7efbd0467ba9d8a41703f0b69fee7f52076bb64ed84f3aaba0f67fa37ec"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPagePage-u-sSYJb7.css",
+    "SHA256": "4bc34a819aedfe6c4212afaaca0d58e2803423bff374b4a8a2463c8945a7ccf6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPlatformChip-CFnImn6K.js",
+    "SHA256": "f2c5625af7353e439ce7087538a4d9ad5d7c0624acfa7714e96a723b009f0540"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPlatformChip-CVvOTkNL.js",
+    "SHA256": "fcaa3486da777052d0d81cee30b9d345f4b0a60318337db3556e0883f9fa271c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPlatformChip-ClfAicmv.css",
+    "SHA256": "2544186d22fcf7b386f85fa1a244e467eba11b263591975084ca728e0547c2a2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPlatformChip-SGnaPwMN.js",
+    "SHA256": "fc1cdd327a0e8a8038bf10796749b4d9a573e3803d83cd5524d604848dd71c7a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginPlatformChip-doeSWuYS.js",
+    "SHA256": "6d24c270bba566523ca1dc9d17e31e8d2d1999a8fc96ad1da4954b2b08f2cb87"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginWorkspacePage--L9qAJmT.js",
+    "SHA256": "3b25053299aaea8a7c6f2022036358d7757773e92ead455c240a79fa5db0f838"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginWorkspacePage-C52E5jWL.css",
+    "SHA256": "50063142a55b2be520b56c36668c3aedf0b1d156db4761ea7aaa72471eeaf258"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginWorkspacePage-C_5YcSGY.js",
+    "SHA256": "68d66cbd7a91e35c7d151275b0c258cc875fe6d61d766d8eeaa07e5c3fc91f59"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginWorkspacePage-DvNDyYIw.js",
+    "SHA256": "6c7d3dbd20998975e04c47af5639e9ae76dedb3b23974e6d957a787ffdf9d741"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/PluginWorkspacePage-DxisCMQY.js",
+    "SHA256": "bee50dbbb049bce0795adee404bc4551f7a952aed7c899bb93f282fac75374c4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-2St01yt9.css",
+    "SHA256": "446bd54e4d9991464f81d0261b2f8d158aae8a0669e0161b6881ca2021e2c2d2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-C0PxElFy.css",
+    "SHA256": "4b1470cea7786cfce75c284a9b98024ca52e75a3a022d4c8c7b4f60ec18c0c12"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-CMaf45Dg.js",
+    "SHA256": "f1d90b89963fffff0f1047b7a34c646621909b4efb3678c07d21b21496880fea"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-DqHveGTp.js",
+    "SHA256": "2a4e059f86301f21391c45d6e63e411471b7eedaf2d11c07f0fb781a435b4768"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-aEXCpDcC.js",
+    "SHA256": "4142af48e3f1bd1784d3b0ed6eb4d1efadd937dc6a196fff7ce437180687ac67"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProviderChatCompletionPanel-u8PrczvQ.js",
+    "SHA256": "2822d54b9ffc894e6c0cc72cd8afd41b65ac862517994001bf3be8ec9e1260e4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProxySelector-CFuHlJqJ.css",
+    "SHA256": "5b0c11aeef25c1a01f0f1a9d303e5ba64b095a153afd9a04cbdcf6c042352445"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProxySelector-D1gpc02W.js",
+    "SHA256": "7fc3df516031f3b5a64c9a652ce7baa5210ccab8309b5c58efbb6f007484c902"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProxySelector-D3n1jUVs.js",
+    "SHA256": "92c084aa5e9717cb6600270c1489bc19bf2b2d8c00c8fef6da07a65c571b8138"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProxySelector-deKXoDYS.js",
+    "SHA256": "678b04c2d78677ac92a70d7b6c5aed25769554fa3b4e87a71dffb2f4fd13375e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ProxySelector-evwPhkpe.js",
+    "SHA256": "4c4573ba67aa457209798c7544264a572e652d120d3e651c7c0cd36d5a55fe9c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1O4a0Ew-BGsTXAXT.woff2",
+    "SHA256": "71f028fd2349990b3f8aa643abe767e82e0f596be407ae66f0004ff164121bdb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1O4i0ExAo-5tcqmc2S.woff2",
+    "SHA256": "e279fd5005b5936e4f4d20fd21e1fdd6a35d724ff576623d31e7c425c356b7ac"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ReadmeDialog-6twkkKG2.js",
+    "SHA256": "a47dfc499e7cda4f05b266b08d8508c50923c73ffe161dae04c4d2181a2f5c02"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ReadmeDialog-8rcLr_ie.js",
+    "SHA256": "47cbb2448aea02f6fc63c3cba0d30e620ff04fa1e523905ca77efa338124f710"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ReadmeDialog-CZ6I8Iwa.css",
+    "SHA256": "b309023c768eb236d3363f55d0fce4d4fe1b76cac5986d8ade2bc2fa7fe87325"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ReadmeDialog-DZctYk5c.js",
+    "SHA256": "92af8717041b6fb4c819e8981d295e7b25e02d71b5580b063765b69caf1ece9d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ReadmeDialog-GcaGRcbi.js",
+    "SHA256": "3799b1b2c6caa9e54a6eeddb7d3a86f5c45d84d54613823ece4bbde6f29688da"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SessionManagementPage-BwRZl6Ih.js",
+    "SHA256": "c3880c51b1e85a9f32989cfbdde3c4d5c5df3656300a32da61822a64e25430b4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SessionManagementPage-C31nX4Oj.js",
+    "SHA256": "4db88c7bff3b02c536420531db43feb759a56e4d82465c59afb13c59909ed54b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SessionManagementPage-CqVeOfBh.css",
+    "SHA256": "7aa66e0d65d9098f10a5232c3d9aea6f733adeb81bd0a0cc16ad0e7e17dce5f8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SessionManagementPage-XUKkldNA.js",
+    "SHA256": "5c50124520bad314204ffc712424557a3a28f816b36016a6b5f5177455d6b2e4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SessionManagementPage-pEK5eZLo.js",
+    "SHA256": "8a6763ee6766ddcc0f45bbdbd33f1f39e9610a82a62c1bfb20978ee9d0144254"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-BaIQ4cM_.js",
+    "SHA256": "9be6f75c6c5a6857d1e6feadee77de0c3793dd88f30f2731730fe4027df13879"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-BbD2B6ro.js",
+    "SHA256": "a3c56c6817e10eddef4ae88190be0faaea1762cf90220b590a6102f2ba6f98af"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-CDBfHA2b.css",
+    "SHA256": "be0242a64b5280f3cf815f18531b5348f2a8c0f47fc1ebec088474bcc252aee8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-D-SJInSR.js",
+    "SHA256": "2bb07cefb2c562834c2e1dfd4d92dfe2917e54593d22423329650d28d89ccb9f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-lc4RSToF.js",
+    "SHA256": "23c4a378a4a35abe2079d56492435a133296dd5ae15f00c54d2462df1eac086a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Settings-rDy1yyK5.css",
+    "SHA256": "52e7f47acc9c76f7039f3eaacfd831fef1d920d56b9c594d86af6b08ebb527f2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SetupPage-B3-36-97.css",
+    "SHA256": "25c4468f2b621dca8bed5dd67e440f3971af24390710f758ec9b592a33c897ec"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SetupPage-C47v2IqL.js",
+    "SHA256": "a872b9833c5b98720c7b3c761bbe832bf66375096d6b86cad8b1010bc8da51ad"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SetupPage-C8qQ1S-Z.js",
+    "SHA256": "5055b5cd411f1809a97c062d2df6b470cae1ed6d565b7ef58d26b095cb8fa89b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SetupPage-DYg69I1y.js",
+    "SHA256": "5f9306fa4736e7b62536af873f7e25288a3a6e99db130a6792038bf4743d5708"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SetupPage-aCJro228.js",
+    "SHA256": "0381e755da858726f26d88ee96e958162b7144e2246faf3110562da84ae44d7d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage--epu-0z6.js",
+    "SHA256": "ecdab96188d3f08a09e72fa4b92b4b8db3a4202c938f6c73efed3f2fb3a263a6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage-BJW1hFtl.js",
+    "SHA256": "0ab5cd63385db6ddf2fd5a8668736db55a0c010c79bf045b5a922d7af5db9956"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage-BXRNq38a.css",
+    "SHA256": "62fa2c1db9d6ffcc505cf476d04089995d5d250cfa3897b7073de787b7e0210b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage-Cn0KUJ2g.css",
+    "SHA256": "7c942ad15cf0f049ddfb5db0aa5a33df67667429b3419558fb218ac6a2dcbb8f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage-D72WPNa_.js",
+    "SHA256": "67b2a75fbe65237dc76c9e2ec4fadc2ce216c535d22aaf135ed75829ad4e1dbf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SkillsPage-DMrmWvba.js",
+    "SHA256": "fe0333456ab5e9957059fd50daba798e911d805a7d530702ea995b889d7977a6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StatsPage-BT4vbDGy.js",
+    "SHA256": "4fd4691b92e45e85ab411760f4ec8ea1d67a9fba75dc331b73382524c7394145"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StatsPage-C1XFm5Rw.js",
+    "SHA256": "7c40ccab69e09a3a618856934e78e8f4774278601dec963f73d79c3d6260e1ec"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StatsPage-C39xMdE-.js",
+    "SHA256": "6cd90901b40da0a0566c6e73907dc38a6043d038536e2017ec4455a17b80197e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StatsPage-CvKntSVe.css",
+    "SHA256": "d8ac3e66318100484815d852de00e3f89e59b58932b106f65c26e36e57fdf49c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StatsPage-D4eyYjOE.js",
+    "SHA256": "3e0668fd4d913d57ed701a3a563e89c3384c35217e7eb6cc48f284dbb4abb328"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StyledMenu-C2JK0ZEV.css",
+    "SHA256": "f70f6ebb5753d8fe9d4f20d2dfa842bf336ea30cdfd7973d06be5fff2c18889b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StyledMenu.vue_vue_type_style_index_0_lang-B7gvaxCX.js",
+    "SHA256": "42429ee1a48ee7ed0e0079188f5249ed06d703b477d4ae4d0a9458329eeed221"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StyledMenu.vue_vue_type_style_index_0_lang-B8UWngkm.js",
+    "SHA256": "5c2d03aa228e131e3ab2fa2c89c138a7ee13baac812b0fe1d6a2187518cebff2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StyledMenu.vue_vue_type_style_index_0_lang-D5JiP4G-.js",
+    "SHA256": "4507ee9724d1b3bbe0980f748bd2098a3ba99521ab3a3936379322370cc1f7e3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/StyledMenu.vue_vue_type_style_index_0_lang-DNccUEZB.js",
+    "SHA256": "19cf70d3b4ad3cf20f0e2d17a91cf4367ceb128c31f21aa21a1fce830250650c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SubAgentPage-BPRCp3RK.js",
+    "SHA256": "89791fd83e19ceefe3b4e8151532fcfefd738b326b3c3737a1151f8d3382dfee"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SubAgentPage-CV1S45O3.js",
+    "SHA256": "f9a70049e65ff66f659d04d25f7ad478a38e1a29c8a3a4dace865f85e6333af3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SubAgentPage-Td9rc0D6.css",
+    "SHA256": "95b91a661fc866e9d67f5c435c939a5da2abb9aa1f3c567278add5ce3de87f4c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SubAgentPage-Wny9L1IU.js",
+    "SHA256": "e9bfc3ba3ec8bc9938502799216210828211e7300bdc40f44c04c8a2dcf96af3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/SubAgentPage-_1Ki0o-m.js",
+    "SHA256": "1883a5f00127b089f8b8382c92e37219b1f3a38d76b74e1f19664ff811fdee95"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Tooltip-AgcJiqqh.js",
+    "SHA256": "1b97a550fceb6c62bb2940cd66757fb2d5f22b903ce9fb9dc873e1394ed6d5ef"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Tooltip-C4-dnTH8.js",
+    "SHA256": "7db9df22302a8878e7a97581310876ebc1a22bcf38b304144b73cebb2f683f50"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Tooltip-DhskzkTy.js",
+    "SHA256": "3e2368ddf29c97a45f74a40c99880b7ae93bdc90f1e35f9146231d75559c598b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/Tooltip-z5tmPMiz.js",
+    "SHA256": "acf9b48461cd52bdf91ee89ff55f84b55add498282a8e21a6ab825be059c2fcf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/TracePage-BeGhK11H.css",
+    "SHA256": "12fc80d870fb1f5d7232d3536c695f80e52fd5f2035141dc8ed3859fea6da0d3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/TracePage-CJES5HZi.js",
+    "SHA256": "f4381557adeeeeb6924aa0037d9e2e68299d30e5d4131a0acd34c8def4b41f80"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/TracePage-DGDZRBl8.js",
+    "SHA256": "7d74ec04a6293a4f9c5c6751fe6bd03b18a913adf0361acffaa615059b294881"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/TracePage-DTkE8581.js",
+    "SHA256": "4b07dc05feb5a372768ead1857c5ba617a3b85961104355e7b569041dc94116e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/TracePage-rNwpd5qf.js",
+    "SHA256": "6394f681ab69e6b55678e7fc49c3067b703b57b08dc350d533b594767a816e77"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/UmoDisplay-Bci_IyQc.css",
+    "SHA256": "fee9f8cb0623ac5542868090c6662771fbcf99c712afc84f8daf75084d0514eb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/UmoDisplay-CYWEpBcA.js",
+    "SHA256": "0ff3258ee9cabca32ca9447e4d729a30dc8059b94b41f12a3791d632d6f46d14"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/UmoDisplay-DPEWgb5n.js",
+    "SHA256": "f4892a3c1152979212ed81ecca5e17a3256b2f37938756dbbb68e808fec179f1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/UmoDisplay-DlCsQvbj.js",
+    "SHA256": "ac62b4f314f09132b01948e36575b90b45cc181697b2591a2dbb3cfbf4b31f6a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/UmoDisplay-sAfzk9aU.js",
+    "SHA256": "b0da508b041890a604fed21d594bbfe9019e873816fae8d9aca3a4dbc4c37154"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/WelcomePage-BOhXaP0v.js",
+    "SHA256": "a9fb070c54daeb1726b7dc69f636bf07d794f5a583875c4dd580185c4f355911"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/WelcomePage-DjtzcwbS.js",
+    "SHA256": "ecc83b7aa02c441356e6104edd48686b55dc5fe83e5b3e891244d147c76dc92f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/WelcomePage-DlwjpfhA.css",
+    "SHA256": "ef0ca64ea1d28f33f36ca2dc2da0036456e3301ec6747eba9de3185cfe7673fb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/WelcomePage-eRgt9NV8.js",
+    "SHA256": "836708c2e2f5814c5a5321e3198f8f62cb84471691619b3f06bb3145c1abaf42"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/WelcomePage-ovy31Rwm.js",
+    "SHA256": "2cdbc1eb85f8a695aadc22d80e7bbd7378d069fbffa3aa3303bf63daffc3520e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/chatMarkdownComponents-Btb6JlC_.js",
+    "SHA256": "d84a678f5fc21a3b4abd02f89aebd3eb3359a3ccc57e55e245a6763a77e55b01"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/chatMarkdownComponents-CGzyJVCZ.css",
+    "SHA256": "cf5cf93bdfdf96a824df1cdeb8a4af6d567ee108f85478f7444f663d2efd1963"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/chatMarkdownComponents-CYtvPNBt.js",
+    "SHA256": "5f51759dc44cd3917175971cab08e8a3bafe5fb4c3a030c4e2173a083e2bf6dd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/chatMarkdownComponents-DMsH1TKo.js",
+    "SHA256": "2339fc497bc96be21179e23cf337b4adcc95c79ee8eb378c7213d82eaf9f75cf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/chatMarkdownComponents-F1X3WR9D.js",
+    "SHA256": "2435269bd90ddc8a61ae05fafb9307ac9c6c2c88c82d398f040115f6ef816750"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/clipboard-CB4uewcM.js",
+    "SHA256": "db3a2d5453462818ab0b516b59b0008aa00abbdf01b590d6eee130ec4eada4cc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/confirmDialog-BnzaGBOo.js",
+    "SHA256": "e6c98c9127ed5a3843338497afc87b1ab4c6094a170e8b5f9d96831280d12021"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/confirmDialog-C680G8yX.js",
+    "SHA256": "e692d58023c089860d6bd3d440ee7fc54151d2f0affd0afebcc814920f0ed476"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/confirmDialog-CutbngcB.js",
+    "SHA256": "e685624a421a9d679674ad76d82163f991c8af86f8ae76b35d6d552344e7033e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/confirmDialog-TpUW4otN.js",
+    "SHA256": "61b64e5e3f89295e2c7db6df0ec4d720d2026a53a016156caba4544ecf323341"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/css.worker-DaIe3gwK.js",
+    "SHA256": "2a3c2e659fb02933a9c49ad117044d6c5a6df10b416d86725d7e02c37d06b918"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/cssMode-C-9Kdhmu.js",
+    "SHA256": "38145eb59d2c43f6611d73cec1aec3dee1f37873306f7ba750a2865d7e8e3baf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/cssMode-DU3HCmeQ.js",
+    "SHA256": "7627a739230b8a26e4647da30286a7b5dbdcd6a8a6f8f24ef0aa2bef478aa5a8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/cssMode-DaNspwQ1.js",
+    "SHA256": "850ac713e7be6dabab85cdaf5af3c83d860b13e818733b0219ae7f67ad1df19e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/cssMode-DvgPRkaL.js",
+    "SHA256": "e47856bfff861b938f6408a8e6ce25076a1c03a2e70a9d0c8c589598e7d812bf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/customizer-CT1GuTnB.js",
+    "SHA256": "1fd80da21da2c007acab54a8180d6e27f97186b4a90a655953e0d75199809bd1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/customizer-DCg97Ce4.js",
+    "SHA256": "a0517348243d246ebd15e86843caf0b38a3398ac074dc0f9dc322f13d2476696"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/customizer-DtFnwKS7.js",
+    "SHA256": "331083543eec1ff4a8c10ededed3352aa7921cbaeec8488c9c675103d06996af"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/customizer-iFK2PgpG.js",
+    "SHA256": "3332537073bf45ef95a226fb35b207c10cd8b02f3253a83e3a081009a03cf257"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/d2_markstream-vue-yoD6TSFD.js",
+    "SHA256": "938a89023f701c36b1a6cf5ce708d721c3461be829bb60c23a5c7ba43419185d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/desktopRuntime-BDd3VoN5.js",
+    "SHA256": "98fe591769ac74a1f5871c040b4fd778d567e344c311c8cb2e321c9138cc0aa8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/desktopRuntime-BOiK9suQ.js",
+    "SHA256": "5383e76aa8e506cc4a87ee34b6009f3830653541a246566d8c1fec8c2da125bc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/desktopRuntime-BYZTj3zW.css",
+    "SHA256": "21a9594c348e0d3fd81d235323b5b7d5f42b8d3992fac9570715d8306ccf2ef9"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/desktopRuntime-CBmFCdgC.css",
+    "SHA256": "b13e0feb450dddc150b2d890e682f7eaea672b9d7fa063213014a9a4202d62ee"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/dockerfile-Zznr-cwX.js",
+    "SHA256": "fd257677714df6f0d9c4d861ba3423be7707768ccd87b58a17cdc59c692c50fd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/editor.worker-BCzxt1at.js",
+    "SHA256": "bc51b64f362f76f56a768d480405d054f29b24aaf3b3ceed3c489d33d70856fc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/eventsource-C4ZOOrvB.js",
+    "SHA256": "fde5cf4f5b53d6eef0c7e4f17cb310a82c2e594a8d14526243db944010fabd6a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/eventsource-CejZdUM0.js",
+    "SHA256": "5eb34029245f0871efed01318419559c3ec209e3c4f8a99314f5f9dec23ec863"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/extended-p72mFE2C.js",
+    "SHA256": "dd6977f974767196c48df8e8b25d17e40d819bd78f99a9430eb8b134e1adcb3b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/favicon-DoIdUZYf.js",
+    "SHA256": "a748c17cf2e10630e3ae5cb59b5fee04ad7199ce005c523129d26f1562a86c5a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/floating-ui.dom-CcvhRy0U.js",
+    "SHA256": "2cbcd29d0887e7330a1801141407df162f5afb2f5b7a9371225f3eb1ddd2c1be"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/floating-ui.dom-rMPa4aDr.js",
+    "SHA256": "1c1ce483bec628fdc426950326d5727fa836aa548ec666bde21a44853d608fe8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/html.worker-CKrFyw_2.js",
+    "SHA256": "4e1f4b07ad0dc784f06922172cba66e31db7c19f6f81fb20c30c80252d93eb1e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/htmlMode-BMOlSCY8.js",
+    "SHA256": "958c71e48302dfac391f201112013c40cedad258f424be8738e5fff6adb0d473"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/htmlMode-B_m0YAYN.js",
+    "SHA256": "8502e9369fb14e1374a8761ba56d849b4c2896e23e407724921190c0eb760d04"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/htmlMode-CpqOPp7V.js",
+    "SHA256": "8800dbcf12804cff0f60488937c2c464494e4fcdc47201c1c2cf8bcb1bfbe69e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/htmlMode-x_vMABRU.js",
+    "SHA256": "c68595596f7e4c6128ae9a40b53b5effecaadfa1d14c96fd69458c887fa10bf7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-0TLVvdlZ.js",
+    "SHA256": "3b45710cd19a474506b622cc5d06bb79299cf205a619087be4d2828aecdd8301"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-8s96twty.js",
+    "SHA256": "28f75332faf5ca6bf32d91640506699df2c9d0bde3a34130edf9c0b783ddda6c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-BEpsKEuz.js",
+    "SHA256": "3c90038cf8344258f5e48451d8f63174bee1b632710cf12fdd1e4fda6f770319"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-BP4SNDIk.css",
+    "SHA256": "09b93d73752786466938535091f035a33db7c41a97b79e65eeb7d41484ffd393"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-BYjp9gEg.js",
+    "SHA256": "4dcd4ece5d85b5760bba59902072be93d26187b4ae45bfb82194ef3748ea0aad"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-Bjh9C-Cl.js",
+    "SHA256": "48514178e9321321c872dc80510caa0246471c8ba2e999100ce82d0578d01554"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-BlHLkT33.js",
+    "SHA256": "3e44571af9053cae6025fcea8cf26df871f8e3d26fcf901fc28c8dd73dd41547"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-BlbOkkKM.js",
+    "SHA256": "ff90e2b826d1301e2f7dc3b782a5a47c44ac9d9fdc2eb6217591ae9a79103fb0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-ByH7jC_o.js",
+    "SHA256": "3c6a2f63714efa16538ebaacd5de6f43f683413555aeec9eb43bc0bb04efd2c2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-ByrilL-M.js",
+    "SHA256": "df067b25b02bafc2c225c06658ec6c8fc478220d6a0c4ca0e7352cce0e3ebb9f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-C2NlYd9J.js",
+    "SHA256": "d81df32a791b737bdadaf973507c6c85562cb2a622cfdfdc51af7669f8f03821"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-CScj-Owx.js",
+    "SHA256": "a7a7e815f64020d39f811d9d05cf6953cd9eb54f97b87c5a5f122777a3f578f2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-CtSMpdtT.js",
+    "SHA256": "dab94fa2e6dff711cdf76784353ff98ed7bd31978ca056018fc4da41c859e4f2"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-Czi6YwlK.js",
+    "SHA256": "73a269dc7d199ec5478098eaa2baa42e0494cdfb391fd772ed6cf684a754b433"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DELHal5j.css",
+    "SHA256": "5271de820e0fd1017d042f663f6b4a84129ce51768609a146ff8c93107d79cae"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DP9oHJwc.js",
+    "SHA256": "ff09750da17aa7f1f9eaa96d1a1b39c1dd3516881e860a8053bf402b11be9019"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DYgUCI5h.js",
+    "SHA256": "f851b2de5899e24dd9c93b3e071aba38ccbea53471b62b59681c13dbe66896c1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DcsRBdQo.css",
+    "SHA256": "b51d18ea62b637a6b119043e03cd199e71503a26a3be941245731a6539cdecd7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-Dg8raXYN.js",
+    "SHA256": "c734ffe97222940baf5d0773f7c959b5a5d43f4429cf06a11223dca68f77e2a1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DiVlSd7j.js",
+    "SHA256": "2e480737c3382ef344a884a1296de7c4c016fb02e00a27c417ea4bf469540e3f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-DlEhfk4K.js",
+    "SHA256": "95ff61a3c360355c58712bb68313728e60467f36aefdc3c879a5bc833e93610a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-Eq7aNFN2.js",
+    "SHA256": "dcd97e510873531ced09cde91ecfe27dd8b0910ee53f9594d75c5569694d8a61"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-Phdh3kzk.js",
+    "SHA256": "0271aec16579a60ca973749afdb4484d7598477319852ad4a32a45d408700a36"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-_Dy2zPzC.js",
+    "SHA256": "af640e0c87d83b4ac541af8f92124ecb557c96296e75418f58330a1197c317a1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-jVnnJP3M.js",
+    "SHA256": "506578138b831c0b42fb981d27bb93aef3951274e620dea2351a8cf4bb18a488"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index-q8Iwlgxw.js",
+    "SHA256": "91c812ee60992a666bc773483592618850e94f152df99ec321f1dde832b4632a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index10-BAZEv1Oy.js",
+    "SHA256": "557f6c32f9050a4ca89f5ae16bcc58b15c33ed79ab53eb5dab96ca073d2c3708"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index10-C8fDoiiT.js",
+    "SHA256": "b2c6f4a954234eed96d47dcaefced5a37776157cf8a47e66dae012de0ab17dd6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index10-CXfbfWqM.js",
+    "SHA256": "f8ded5547447efb4be88e6c8cc7f8346048c07ebf7191d840c6621bbe800526c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index10-wDWWB1r5.js",
+    "SHA256": "8df5a9c91798e3805a2d6d107e1a58fbfc4e9b29a29e25daf3b58a38c904a4e7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index11-BatKlNUs.js",
+    "SHA256": "f938405e3cb7c786cd251e765f4431e52324d47eb63c41a4ba68923d19c8bcee"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index11-CZPXrR4Y.js",
+    "SHA256": "87afd6094a381c457e6c79ed83961cb553fdd24588f4f76b93407786686dd8cf"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index11-D5VufRlV.js",
+    "SHA256": "187cc6c55847a92ba2e9d0f9184e7e1ab70d67b28a11a0b99c3fad00bff968e7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index11-DyM80EIs.js",
+    "SHA256": "63c661979f3675d7eed9b99b415761483a457ce6b613d0866548124286aebc16"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index3-B1XQ8PuZ.js",
+    "SHA256": "e8c50c9af780d0019c342b772832f00615e339de636c8629ac4b8ef4737841fe"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index3-CV1XjKOj.js",
+    "SHA256": "bed43078b49f35b3e1b969f1536b18aef89133843148ddf410c76e39fb77580b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index3-D31pYyzM.js",
+    "SHA256": "696e81b042e187711a8134c5e0e92222cc8abbad91e14ebcf9e5a28d0cef14d8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index3-Db14JRYO.js",
+    "SHA256": "a65aaa3011f343e4531e44ef3298ae3de548e2fb3abd7df3351d84a91f4564ab"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index4-0DXTaNnA.js",
+    "SHA256": "98b2ba69daae5c26cd2a0fac556bf3e57878232e8954521b7380891edc5faf74"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index4-CTEf2rR-.js",
+    "SHA256": "4089f312fcf9e1894f94515f73ee88539e8797fe0ff77d5930d8dfab2a7d405f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index4-Ci_xx34I.js",
+    "SHA256": "33d75050484a0a92db07fb2c19d7235a1e3206a8106cff86e5959c5387f0f24b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index4-Dta9lu0S.js",
+    "SHA256": "49a516d94a33375fc37695331d62077a39df389f5888156afc7ac3c0acb75289"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index5-AGuwijS2.js",
+    "SHA256": "ba685ed20d29be413f5de700ff247d0b26666a8a69e0a310d5d14325638fb21d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index5-Be9Qx7b0.js",
+    "SHA256": "989e11fb5590dd070be5c2ee0e37c799fdd132f1f40fddf225676ba53c3bead1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index5-CUKuPy5T.js",
+    "SHA256": "313453e9933f81715c476c6b450a762affeb8fdff642b162c3f4377f61d2e958"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index5-DfGcKfAk.js",
+    "SHA256": "52f79e6641d9674116d81ff210559a7ec2223255ba48d5d05f0e4dca372792e1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index6-BiuEDP4P.js",
+    "SHA256": "1ad8cd833ece0219e18bf567126b040b4082a766a55ce3a6303ba7b854049370"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index6-CRs54iiy.js",
+    "SHA256": "c4ab2cb7fbaea2352dd54d69b64ad546ff5046eeec2a6cc05810c793315e63a5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index6-dH536zbP.js",
+    "SHA256": "752d38379c5d84cab98251d6c1a0519cf3e04c90e47afa5c9504135dd9aa1f70"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index6-niwTE6_B.js",
+    "SHA256": "20210db94422fc64c469dfa99a430577d6b5b7c2417ee0e1757fb5f8f5810019"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index7-CWwNuKdD.js",
+    "SHA256": "8aee5f8ded15ba2f6a3dd935cb42bba002fdf0bf1885e51792efde111e3b56ed"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index7-DMY8N0lm.js",
+    "SHA256": "7e380eb8d7a5333df0af26607daee9c41b3e4bc02e5e8022b5cbfeb88ab9f0a7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index7-FLKJthi9.js",
+    "SHA256": "db209bf9d5b791d1815efbac97b392880651b073024c02654f02586213edf4d0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index7-ypnbZWEV.js",
+    "SHA256": "d8b8732c744f5e48525fdb4a5835751afcaa4081aaa3067a11fa11f5027b9cb5"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index8-B-EtW848.js",
+    "SHA256": "cd58056aa525353ab3d7c76e36bcd6eb83580a5244ccbaed7eee1e65c89ac94d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index8-CqjmmWmU.js",
+    "SHA256": "6c4000bded973ff2c5e31f00749618abbfab642da2be67d2cac084f8d551276f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index8-CuvwKcl0.js",
+    "SHA256": "c99057820483388382309948c307c94a867a3d193d48818a601e24df2a3a17ed"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index8-CuzrB_RP.js",
+    "SHA256": "a817e5d4a2fe3634214da1d5b61c3b9ecfe801b64ce5f5505b07acbe00eb9d95"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index9-1Ie7edKW.js",
+    "SHA256": "12f12527f78b2a647005c7f9ed7f6e18fed5f7c969b669b802ea9eb8571d2fd4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index9-B035vlaf.js",
+    "SHA256": "9c9e1ec8007c6856005f9952c466a109f17aecfc38b1222c70220d0c042e30c4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index9-BQSUScVk.js",
+    "SHA256": "3c064695f21d007cd138e75f9ba8ca920aefce72a6186cd782ff095d7ed0f022"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/index9-BxRXMg5_.js",
+    "SHA256": "12eb4cf694411d7ce9551e2b63be138c206c77ff4deb330b2c776304fecf1b23"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/ini-Drc7WvVn.js",
+    "SHA256": "c51673fe0f3366f651e237a20a7ba7b0021ba78ae7c8b163fb05a94ab28ad05a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/inputValue-De_-AW4_.js",
+    "SHA256": "22ae6613316fdf15cd53b7bec4a47288ab7b7cce92c3839c7279de8a0e9350db"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/javascript-BSzvYwI_.js",
+    "SHA256": "0079bee370e53027fa9f0bfb87c600f80bec77a2a1ae618a743ef48f775702ea"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/javascript-CghA8fDM.js",
+    "SHA256": "11a93f7c52556e51be4fd7db0adf548739cd4dd2eafa993a46144c050af64e8f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/javascript-DrErRRtg.js",
+    "SHA256": "a8bdae945daf864ee09614b6fc698b7ac4e326ac8e8700c8e8ac245ff6a1312d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/javascript-MjVhtYZz.js",
+    "SHA256": "12f1c68e7d392aabd7f6158739d50c4778b5b71cda0eb08881f2f68e8f32c71a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/json.worker-B7c_PmGb.js",
+    "SHA256": "a6bcbd8394f88f5be3662cfcad8fbba0141b9adf405811e2a4fda632ddd87ad6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/jsonMode-0jpQSjiJ.js",
+    "SHA256": "4063f064a92ffc4703e015cc4aae07b16732e0f7e17ef5e19752220a9e97e0fd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/jsonMode-CEYkJnHc.js",
+    "SHA256": "f5acfa0d33a1d5e0a7bf3e3fb96786c197ec862ff92f8afed3ada7237dc608d3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/jsonMode-D5f-BSZ_.js",
+    "SHA256": "7d10bc62a92fdf7b49882c4a1674100c57633bdd9b6e37f52a71ea66ddffb8ac"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/jsonMode-DWqMUtEQ.js",
+    "SHA256": "1c5fa074c6fc156bdd330c90b83732fb0787b2af1657ace4f461d6032c99a7a3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/katex-C5jXJg4s.js",
+    "SHA256": "9e8127e147ae576d0129e22677e6949eff48f7a5f4313e2629967938126dcd16"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/katex-CBSAILhF.js",
+    "SHA256": "8a4f1cdf17448540dc6e1749b6bd6d9c3575b5579a21e9931f1aad5918915874"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/markdown-DSZPf7rp.js",
+    "SHA256": "dd93207d8c63297f54f25e8614236b3b6f078fb254fb8acaac4a9721ecf2a93e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/materialdesignicons-webfont-subset-Bf1r-IpU.woff2",
+    "SHA256": "66b420d9befe02f51cc76cd15d58771f335daf26d5c922666f7979a83947b992"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/materialdesignicons-webfont-subset-D4bC8xjM.woff",
+    "SHA256": "c31a8fb36eb17ae87cd7e3c2bf26516a2e206a18349915daa73fbb57d406f54c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mermaid-BqLeyera.js",
+    "SHA256": "c2fbfbe9b512c4901fa4339428f015bf66607f2f1e220bfc24c5a9e9d959dcd1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mermaid-CVfZfnaj.js",
+    "SHA256": "f06873707930a19cb1d6df7f7f81c6964c4ac527ad3e26966cc7f261c7cfa5b7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mermaid-D82JpXls.js",
+    "SHA256": "ac0dac12e6b18dd23f95e21912a2b6a43180b13e3f0439fb7f32bdf64f5b333b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mermaid-DNyNgCgS.js",
+    "SHA256": "13c002fdf25936385c7a9a5555cb79dc2e0ee807650d51ff9adc301d4ee7df6b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mhchem-BbGQkeOt.js",
+    "SHA256": "da5370f475fceb3283e5ffb6215c62e0164659e7976ac25f97618880289f4b1c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/mhchem-MNFFEueS.js",
+    "SHA256": "2930924da518a315aa199c00644d29bf30b3030e96802f0f35a880000d81b6c7"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/misskey-DyDC7ZfL.png",
+    "SHA256": "9f74289ecd302adfc56f2edb69b88f510c6eb947a1050b285f9c71e378b66051"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5a3du2ui-Ymb6dZNd.woff2",
+    "SHA256": "7f655207c2f6c140c327d6bd263bccc7a11833084f4fb0c51d9a24b7cd753651"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5a7duw-BYSzYMf3.woff2",
+    "SHA256": "51ca196f49a33e79e7870ff88ebd2829a3f627a51e7d690986618f0e7ad2b52d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5aDdu2ui-W1qJv59z.woff2",
+    "SHA256": "6d5a79315528df191b9d86f97b0c4272a8b588fcb166773fe6588ac795de0613"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5aHdu2ui-DLTJy58D.woff2",
+    "SHA256": "791e3f213c155a5b1f4bbe4cbf8e33f321cfb7f46248a5ed11077dc79209a63c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5aLdu2ui-12T8GTDR.woff2",
+    "SHA256": "790b255c10c32e0b10bdcd961abad098c9697b7ffbabc1b09aca0b17af3201fd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5aPdu2ui-DSNfmdVt.woff2",
+    "SHA256": "82ff72b28e6610f2c62de49d0f295c160a157b2718fa814bb6c512ebfdebb31d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5a_du2ui-Cv-Vwajv.woff2",
+    "SHA256": "ea6a530b75d93de7dde68b1271c5b67a1af45031810db7cd4883f6620b7b1d3d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5ardu2ui-B2hlT84T.woff2",
+    "SHA256": "6ab64433de6077ca5ad31b05420450ce986a616a4ea47b6ad16f3217055dafc3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/onebot-fwgbsrHC.png",
+    "SHA256": "2ecdbc7f708dad8f3e2f43ea19c11f38c63394a39bce918b98ed58cd96af2b38"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/platformUtils-BSWCAhso.js",
+    "SHA256": "2251488b1491327741c3b8f7c55b96d59516e3dd6106b4152688a4c0d918eb02"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/pluginI18n-8ES2uHyu.js",
+    "SHA256": "25fd62777ad5514ecdb6fc760e27e50124f1d08ca7b0fdb89568e44795c26488"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/pluginI18n-BA_shOTp.js",
+    "SHA256": "c43c4d976b57340d35c2c0dcb0b71c3fe48f29e5035b2db160bf8f4fdd697284"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/pluginI18n-CSafTQXl.js",
+    "SHA256": "58cdbffb63142d22188bc47d26de7f3d596032c7b9abbaa7e94dc312f455d7bd"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/pluginI18n-DdR0eidv.js",
+    "SHA256": "56b0bdff6cb2c2a265edc11e5e2ad45bd1635f6dc40d8c5af8ea4939fb555fd3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/plugin_icon-DGnc4zMG.js",
+    "SHA256": "868bdebef55c294506e9575b17a1f6158f342f493e8e796dd49048ce4aead18f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/plugin_icon-klBjcUDx.js",
+    "SHA256": "d73c0e11bbf956e41449a1df80e3da3f826573b755041ef3a4307fd6eb0270f1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/plugin_icon-xgxlkBou.png",
+    "SHA256": "5261989097c32756ca6e85b0ebf8b1709fa38e9cb5f1204725ef604b0cc3bc3c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/powershell-Dd3NCNK9.js",
+    "SHA256": "ede7ec791f93ed83a51bded8275dd1442d959822662efc803e2610ce1106be6c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/python-BXI9A5-4.js",
+    "SHA256": "f54fb3d6649622e2e8eaa51eeff44ad1a258aea37bb4cd02d5847424d1de6572"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/python-BfDwzm0O.js",
+    "SHA256": "f4547b4cac3fca68878d55d2f66affa1151d1d029d0e7079a30a6f631b5cf001"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/python-CJ81oyuo.js",
+    "SHA256": "e9dc33d288d15132d0596187e58bcbf4df3b41ae5cf4b5bcace9a4605b931520"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/python-CzX-rQrU.js",
+    "SHA256": "eb3c72936431d319af0aaa5befecbaa28e205ae3faca5be7603594f22b495d2a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/qq-D53z62OG.png",
+    "SHA256": "7a369eafa37355ce7e2163a34a1a12833a6deb46d1a2ffe3322df3fd85c73bf3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/safeRaf-DGuzXxDK.js",
+    "SHA256": "5d867c3d7076b74a532192a675dd058bf921ebcdf95b1226046439eee9cbb8bb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/satori-DvyZ9Qos.png",
+    "SHA256": "7f1988af1e7d7b97e1063bf6919b373006e087d63aef6fcc6893813b2e4a707a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/shell-CX-rkNHf.js",
+    "SHA256": "eaba15ec587feaa145438a4084831074491c2407acac256f166a75887ac7ebeb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/shiki-DXbYs5-d.js",
+    "SHA256": "28c639eed8d99f2e97b1daa1907f245b3df769cbfabe832f39e21f2bcc45752a"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/shiki-fLKPqooi.js",
+    "SHA256": "101d3efbc88f624f400825f712bbebd80c7c61f5b265890f3717dd9bfae2328d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/shikiLimitedBundle-BrahQz6M.js",
+    "SHA256": "01bf48322cc688719ba71dd76aa8c05911bf3bf1f1ac81e1b0a3183c3e90d5a6"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/shikiLimitedBundle-DOWErH6y.js",
+    "SHA256": "33a30c297ef9909f24b929a5fe672e8611793c72e9606a823b1b2dac907f63e4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/sql-CCSDG5nI.js",
+    "SHA256": "befd20ed42a944cde9f3ba9eaeb1600b33fe15b9d57cc71e099fd61f039d5c85"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/streamMonacoDisabled-C86_ftmA.js",
+    "SHA256": "dbdf542cf9b970907adf9c66354b98dcc2b24ab431414b9bec55dd08dbeb0275"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/toast-2XOpESDh.js",
+    "SHA256": "9486d8659d9ed87a5045dd9f94d54ef3eac2ed35d687a0458c20caf7d34ac218"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/toast-CImMo0LJ.js",
+    "SHA256": "9d8fe6cab2899f7c416cf7dd6c5abebc27231fb36588751138c3771569852b68"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/toast-Dfj8R56l.js",
+    "SHA256": "0392ba72e70a6a5111577ae2614bd71b0404ce43b9a5d4fb1c3a7f374a36b6dc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/toast-L5afAc37.js",
+    "SHA256": "a0ad825353d0ae3d1d3ddefb405de227659f47f3eb76cec7176299319fd533b4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/typescript-BUfPJ8UY.js",
+    "SHA256": "0b01464eac1ddb488106381f07e235c6c1bc6f43ee629331d043c7fb7cc05cd3"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/typescript-BcL_yqGk.js",
+    "SHA256": "03becfe60844fe52c8814efcf177f9234417c3bc51aec71e7c5e6b5c840a89cb"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/typescript-DZ4PMCtB.js",
+    "SHA256": "b17cffd11cc227c7aea38842203be676f73d3d7c7d7ec1456079fc2f0bdcc42e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/typescript-ZYtB6qAQ.js",
+    "SHA256": "dcd8376a46fbd8b1b05dbb20b33213868b26fc3627ce65cba71cb8627ebff12f"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useDragUpload-BkdCtjTt.css",
+    "SHA256": "0cc375e8561d0449f6006bdc3ef59e880fcb688544da51b0159251c9d7ee84f4"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useDragUpload-Bqju2SC7.js",
+    "SHA256": "8e5399b55c54e1c60d145f31bae45f1a816fbac28bb848e483cb1c6bd0f762db"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useDragUpload-CHk_Wd_v.js",
+    "SHA256": "2d1c08740117af3526e042d7cba452cddea19fd07db5ed03e1369555bdf6d412"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useDragUpload-DcKjMJx-.js",
+    "SHA256": "ec7d535e64955f9ceeed331b1267ce9296ae0bfac3e15bd4a60b189f3ab93ccc"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useMediaHandling-BP9CBh0H.css",
+    "SHA256": "7675efc5e43f29682b5a55988c23db58215abfd34dbc52d597337b64d95eadf0"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/useMediaHandling-CiQsrftz.js",
+    "SHA256": "0f0e9e51652be3ebdc520c2feb3db7228dce3f8f67386b9876ddefb701c78c8b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/version",
+    "SHA256": "07a453d4c3be2337898ffc994fef8bcc0a98df2cd7eead285b496682eee6ff1c"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/vue.runtime.esm-bundler-BKjxI6fs.js",
+    "SHA256": "e47fab14031d5f6f14a2866b03438556625c9995218cbee7ae96da8b89e0fe83"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/vue.runtime.esm-bundler-BUIvGn9X.js",
+    "SHA256": "0545d7042881b3904c1fb17a0849a2e3e82fb8ef94fa05191e00872153414a24"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/vue.runtime.esm-bundler-Bo39e2CM.js",
+    "SHA256": "1238347141613e9526448d7324cfe6556effde884ccd4c80831eb3608964a275"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/vue.runtime.esm-bundler-xTdsnHat.js",
+    "SHA256": "ccf42a6f2670acaa991f0ab63797d09fdd9b4936100b22e8cc8f01aa15a4fc96"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/wechat-OKdslIg4.png",
+    "SHA256": "6a207b6660b2f924f606ba417600ef3417900268f88bc6f3303b79e9c668f782"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/wecom-CG6W-50z.png",
+    "SHA256": "7dfcf4e40cc404acc6e7e4a2b96b772923ec8ddb5c801567e08a0354822cf20d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/workers-mermaidWorkerClient-B3ROdibT.js",
+    "SHA256": "48a052f6c3420463c89903e57ca59f0fda96175fc0e8bce06828cb3d3d894fa1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/workers-mermaidWorkerClient-CNyLl25f.js",
+    "SHA256": "a98f256980fe9ad611d120ab15dc7c07ec9ef31ba8576d27e69f9af35493152b"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/workers-mermaidWorkerClient-Dh9X_6Sh.js",
+    "SHA256": "4de426963588f6325010be3142ab38ceb15266f61e01b35c5727895cbc909f9e"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/workers-mermaidWorkerClient-V1yAUEt0.js",
+    "SHA256": "1c82e587982c8d3b5801e50afeccc356e428d316b6897c4372dbaeb4b7eb0bab"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/xmas-hat-CQ7_KCRV.png",
+    "SHA256": "c90ab3e7be067092c3871cef05069023304d5296fd47c40f56d00b521f4f23d1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/xml-B7xFgH1d.js",
+    "SHA256": "8e3bced9727e56bc58ee9e8cca4c293d4aac341d8f612b0fb293fc45f5ae3bc8"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/xml-BW5god9W.js",
+    "SHA256": "f1d759ea7e182da03820e274bd38c0b20f3f72ee90adbf4cb8174e6cb189c738"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/xml-BYjbxFe3.js",
+    "SHA256": "2386809e9f2dbfe2d818af3f82b5f9c43a29cd01cb217a785d648c5b10039d8d"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/xml-DSVmcDvm.js",
+    "SHA256": "bf1395c29aa7470cbc65a09eac782afebc8ef0fe1e02b709d341a528e8383a76"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/yaml-B6HQCaQg.js",
+    "SHA256": "af199d9bde497e9d10067a5f6ccfba1972c97dcfc33d91c5406641917a93fb39"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/yaml-BcXHg42F.js",
+    "SHA256": "b28d6a2ea5b133bbf4be27753f5bf9a7c38db5a791cb753027198177486ced77"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/yaml-DMtKaCMH.js",
+    "SHA256": "890a5e4a81389bee17aa8a75cdad04d47e0a46de4fb70b4fed545753f23946d1"
+  },
+  {
+    "路径": "AstrBot-master/webui/assets/yaml-e9AV9vx_.js",
+    "SHA256": "19c065703dba70314c4bb1fa3a81948d119435a4c49823f7e5327b9f2026d931"
+  },
+  {
+    "路径": "AstrBot-master/webui/favicon.svg",
+    "SHA256": "5f17f2a86bbee1f6e0751c138f4b4bf7eed65ecef93a4bfecdf14982224e26cb"
+  },
+  {
+    "路径": "AstrBot-master/webui/index.html",
+    "SHA256": "2b60e745b0504eaf1d2a3e7443286361f7f0e5af2aabe4816da0b8cae9f5956e"
+  },
+  {
+    "路径": "AstrBot-master/webui/robots.txt",
+    "SHA256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+  },
+  {
+    "路径": "AstrBot-master/webui/t2i/shiki_runtime.iife.js",
+    "SHA256": "d969e6bfd703e275db96837e93f1e4ad64d7460dbdc87973ea887f3931eddf36"
+  },
+  {
     "路径": "AstrBot启动器.exe",
     "SHA256": "77843f32d73cbf4ec21670292e9aade6250eb97295eb4a0f5850e27990ff8341"
   },
@@ -13997,7 +16137,7 @@
   },
   {
     "路径": "README.md",
-    "SHA256": "e92e91022c23d4f42908fe300548a95098d19b32f017e488cce648c3168e9ee3"
+    "SHA256": "499eddf074faf3ee36dc1c13ddd18bcd48a94268b99e46beb7e6aec7cb9b17c8"
   },
   {
     "路径": "deployment/配置受限任务执行.ps1",
@@ -14010,6 +16150,10 @@
   {
     "路径": "docs/Gemini媒体与历史接口.md",
     "SHA256": "7b8a77a84da1460475e36f8adb45e76b791f8a0fc9c601669aa7669247b312ce"
+  },
+  {
+    "路径": "docs/Gemini按需联网-20261110.md",
+    "SHA256": "481cd9ca8ce5c264b9c57f4e41ccc720ab8e6229254190d3a76c7c977127f4fa"
   },
   {
     "路径": "docs/人格模板与远程面板.md",
@@ -14032,6 +16176,10 @@
     "SHA256": "30e3a96fcb8703e63ff100335e07d639378a325c085d7eb3b801a66fea8736bf"
   },
   {
+    "路径": "docs/推理输出与任务结果反馈修复-20261115.md",
+    "SHA256": "94c472a7e1c5b9d3836038764bec75f1788bb2a0a37447b4846235a58ff5ddad"
+  },
+  {
     "路径": "docs/文件投递接口使用说明.md",
     "SHA256": "88a42ec43392e2f465037f36a62c2eae6d2e3b9bd79f5f71c5a77eba779f4f9a"
   },
@@ -14042,6 +16190,10 @@
   {
     "路径": "docs/统一会话队列与后台更新-20261110.md",
     "SHA256": "24c64aa012a8d14c8ba014840d016182a80c0640da3c76011dc6ce76c96f6d73"
+  },
+  {
+    "路径": "docs/聊天无数据超时重试-20261110.md",
+    "SHA256": "2d434cb4f2d4033957cc1db56646d54e2467793a4d0564919f6854f9851b7e7b"
   },
   {
     "路径": "docs/脚本互动接口使用说明.md",
@@ -14200,6 +16352,10 @@
     "SHA256": "b66a26d59525d745f5f5ab61b9457bdaa3997816bf8c272b1e68964c0ae81d8c"
   },
   {
+    "路径": "发布说明-20261120.md",
+    "SHA256": "4eeb7f7bc2e004b668679056373f5286875ae36963037ce5ff6b4b46c35db352"
+  },
+  {
     "路径": "发布预设/data/cmd_config.json",
     "SHA256": "2ad9fe10e5e2e2e977c7a7736588d209902b5ff934e147a6481449b6194b011a"
   },
@@ -14272,27 +16428,2531 @@
     "SHA256": "ab6a2cc4029696f9ab4f1899c36bf2f109e81cc9c0b2e58fdd289a9282b28c8a"
   },
   {
+    "路径": "桌宠/.gitignore",
+    "SHA256": "8e3c379ca6e4459d02a5156d4405d5af2adb6c2f59665a7d1804c8c46d876dd0"
+  },
+  {
+    "路径": "桌宠/HaGemi.spec",
+    "SHA256": "3f01a10ebeb4593ececd9d9b6014342b3836aadd844c2d7239b8ffec4ca7e55a"
+  },
+  {
+    "路径": "桌宠/HaGemiDynamic.spec",
+    "SHA256": "7d1c6dd6e4e59a87ed89ad095d8e6193057d644625044f935dafd6ab08711fce"
+  },
+  {
+    "路径": "桌宠/README.md",
+    "SHA256": "d67ed63ac011cf106ce41f2940291de992fa721887bca57241139fee00124146"
+  },
+  {
+    "路径": "桌宠/README_macOS.md",
+    "SHA256": "4b1c72fb50bdb451fe080e8a3396b676ef2d9631d27e58355459c93035921632"
+  },
+  {
+    "路径": "桌宠/app_paths.py",
+    "SHA256": "e1a3950b12252784e5307a0b13dd1d97ff596308a7f0a84cc643076afc128da4"
+  },
+  {
+    "路径": "桌宠/assets/app_icon.icns",
+    "SHA256": "67aa7b6daa818f0996449f34c3121607fda7042e61e5c9a960b6a2302eb0c1db"
+  },
+  {
+    "路径": "桌宠/assets/app_icon.ico",
+    "SHA256": "a75dd2bf47e0a38396e10028ac5c0d7aa5ba070564fa8f500b010f1806771ef7"
+  },
+  {
+    "路径": "桌宠/assets/argon_sticker.jpg",
+    "SHA256": "1d7a95a06ae5382c4dc72dd5b31f1ac6a1d9e8d36a595d1e80439d1673b46886"
+  },
+  {
+    "路径": "桌宠/assets/avatar_bust.png",
+    "SHA256": "ffc444b42a4626bde73ee46c04eac8a792ba3bededab05245c2810beacbb5969"
+  },
+  {
+    "路径": "桌宠/assets/avatar_default.png",
+    "SHA256": "80df376102fd16e93b7280e1b7f1ed4f41faf05d9ff1c0ee84b8c4b6e6821e1e"
+  },
+  {
+    "路径": "桌宠/assets/avatar_relieved.png",
+    "SHA256": "8e691b5ecedd72d095981e6fa4e8ca021ae3d90191a035aa3e295a0cf7e1eaa9"
+  },
+  {
+    "路径": "桌宠/assets/avatar_shocked.png",
+    "SHA256": "006cb162323827d391b050a405568f5c05e8e1946a4c1bec807ff2c7a25cba37"
+  },
+  {
+    "路径": "桌宠/assets/avatar_standing.png",
+    "SHA256": "80df376102fd16e93b7280e1b7f1ed4f41faf05d9ff1c0ee84b8c4b6e6821e1e"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/LICENSE",
+    "SHA256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/auto-render.min.js",
+    "SHA256": "bb53eb953394531aae36fdd537065c4244eb8542901a3ce914601d932675b8ac"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_AMS-Regular.ttf",
+    "SHA256": "68534840bcfdd2bffb6f0e8deb48684dd01e7f04ea2813267577afb906de1d13"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_AMS-Regular.woff",
+    "SHA256": "30da91e84c893f875e252689faebdc590b2871145e8adc7f9a9d4dbd8ce0b251"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_AMS-Regular.woff2",
+    "SHA256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Bold.ttf",
+    "SHA256": "07d8e303ce4fc12b4bb54f1004170dd190a1f3db45d400fe68060df3e0897268"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Bold.woff",
+    "SHA256": "1ae6bd7475590e97e7f145a89e09ccde322f7a6bc0b91607b1c8b8ee28290fed"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Bold.woff2",
+    "SHA256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Regular.ttf",
+    "SHA256": "ed0b74372feefcbb9c0666b2e210da37b7e49fa7fbbf3eeb11db5f693dacfbb7"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Regular.woff",
+    "SHA256": "3398dd02302557a793f2863f88e02d96ce10df2abffa07c8e9fa90775116e65c"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Caligraphic-Regular.woff2",
+    "SHA256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Bold.ttf",
+    "SHA256": "9163df9c7122432e6495b4229fa9071cf9ae86a758ae5efc4924ec2e1a6dbce1"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Bold.woff",
+    "SHA256": "9be7ceb88004ab8ad124082246fbfcca4091e36385d4ec6ed1df67375dad50fb"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Bold.woff2",
+    "SHA256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Regular.ttf",
+    "SHA256": "1e6f9579e90e2cac37f8f60a597c436e075c114385652b7cbeb0dec0421291b3"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Regular.woff",
+    "SHA256": "5e28753be717dac97f559f49bc10be9cf3c124ddcabda6659d11cb68febc6463"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Fraktur-Regular.woff2",
+    "SHA256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Bold.ttf",
+    "SHA256": "138ac28d1663b3037e9c5f52371fa5c63d8324f4a38d22cd573e6ea3a3fd0cf8"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Bold.woff",
+    "SHA256": "c76c5d696297d51b9cb1639c7da4334f0e7dec81b42b11213b5e25ef671bb822"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Bold.woff2",
+    "SHA256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-BoldItalic.ttf",
+    "SHA256": "70ee1f64a20f2048c21940ef46d0144fd215baa953ca69afd1e31e98544f708f"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-BoldItalic.woff",
+    "SHA256": "a6f7ec0d846ac7ad975adb8959c37ed49b94acbc4ae436db9ce9e20287e4a64c"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-BoldItalic.woff2",
+    "SHA256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Italic.ttf",
+    "SHA256": "0d85ae7cc30f23790a7f1a58c4a112fdca8aae769b6ba11429af1d98b1b6cb3a"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Italic.woff",
+    "SHA256": "f1d6ef86f3b11a528bd5185199bd2443ecb2b0dead96d88674b5a2c12be24bdf"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Italic.woff2",
+    "SHA256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Regular.ttf",
+    "SHA256": "d0332f52868370fd83ae7fa46470f90c8f2eab2fcf12bc4f88080b340c95a830"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Regular.woff",
+    "SHA256": "c6368d87e8a1a3a5d337623d83d8dc4b868f242a9ad476237d6f8d1e0f168cdc"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Main-Regular.woff2",
+    "SHA256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-BoldItalic.ttf",
+    "SHA256": "f9377ab0271cda59af24bcffbd46a4d0c8a3572ffafdbb38de2ad5ea7b0d5ee5"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-BoldItalic.woff",
+    "SHA256": "850c0af5c2238497febaf5e461d880bf458c341f42f4f330f1b1ab5698b1998e"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-BoldItalic.woff2",
+    "SHA256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-Italic.ttf",
+    "SHA256": "08ce98e51b04d58945a301e639e02b6998af29fdfd61a7b8afdd07bbfc479d4a"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-Italic.woff",
+    "SHA256": "8a8d244581371912b8f3f5a23e2437cb2a59cd9bcaebb0346e722c05737a2571"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Math-Italic.woff2",
+    "SHA256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Bold.ttf",
+    "SHA256": "1ece03f79f95277d57dc7f6b435a74e1379b0d46104a8530286b60ff49369ea0"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Bold.woff",
+    "SHA256": "ece03cfd83e22c212cdef66feb8442d25a083beb988db3f1883f3f9738d750ba"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Bold.woff2",
+    "SHA256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Italic.ttf",
+    "SHA256": "3931dd81faed86ba021bb2bbdc36f5bed9a38d6b4f4077aca59b265aa1b02083"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Italic.woff",
+    "SHA256": "91ee67500cc0129aa0ace3ac5c61ff1692102f0f31d02b69347fba35dcb75bf2"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Italic.woff2",
+    "SHA256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Regular.ttf",
+    "SHA256": "f36ea897e19f4a2e571d1e900e4e3710e438deb05a842486045ba0a3e616a4ad"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Regular.woff",
+    "SHA256": "11e4dc8a6471ff6d6ee561d53d10fde8f7489e798257ff449c5d37c197435605"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_SansSerif-Regular.woff2",
+    "SHA256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Script-Regular.ttf",
+    "SHA256": "1c67f068fea8bb09bf099c088b1cf64bd27516a6e07f4684344873564bb66a67"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Script-Regular.woff",
+    "SHA256": "d96cdf2b3bdd4d64a8fd5f74a4c467f123a8a73931cd435889f08ffaf9bf947a"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Script-Regular.woff2",
+    "SHA256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size1-Regular.ttf",
+    "SHA256": "95b6d2f1a50173bfedb8c63e1d1c99b10427d0a4df4201cb44513b226951a22b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size1-Regular.woff",
+    "SHA256": "c943cc986384f59e86bea5fd7dc50a9c4dfe567a7c05eb40d6790720dead97c9"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size1-Regular.woff2",
+    "SHA256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size2-Regular.ttf",
+    "SHA256": "a6b2099fb555c60e3a0db3a08842ebf1d732c6eb4e4bf44913613bed4fc4e39b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size2-Regular.woff",
+    "SHA256": "2014c523c3210bcc166648c4d4cc57f05b747df07a24277bf71c51e67dc79e3d"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size2-Regular.woff2",
+    "SHA256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size3-Regular.ttf",
+    "SHA256": "500e04d54f0d51666332c9d2089aa803be22aa878eca539e59fa53c6e522b082"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size3-Regular.woff",
+    "SHA256": "6ab6b62e9b62dae2c00dd90f791bd10950be0ecc3490d7d6045f51c2e8fe0949"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size3-Regular.woff2",
+    "SHA256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size4-Regular.ttf",
+    "SHA256": "c647367d1dd4e162468717d020e1fc0f1dc5c26ebfdffbe55261713bf88c5877"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size4-Regular.woff",
+    "SHA256": "99f9c6750b489c9462bf04900bd3f939df9b829339daaaaa99ef5495cdddea58"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Size4-Regular.woff2",
+    "SHA256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Typewriter-Regular.ttf",
+    "SHA256": "f01f3e87d9c6a61c0c081ceb577abd864eb00a612f7ac1620dd6915fad2ef5aa"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Typewriter-Regular.woff",
+    "SHA256": "e14fed02b1aba7ce9f5afd5844b5d0321b22351febc720e0de8b8723527609f7"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/fonts/KaTeX_Typewriter-Regular.woff2",
+    "SHA256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/katex.min.css",
+    "SHA256": "19095127357ed6d29fe0a63a6b000c913a89f7f1963b765dd3715e97c9852e75"
+  },
+  {
+    "路径": "桌宠/assets/chat_renderer/katex.min.js",
+    "SHA256": "e8d885505949f3a5f4abdd5dd0d53696bd1371ad26ffbf4f310dcd77c8cdae89"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/写代码.json",
+    "SHA256": "c4e04815f6325d4a0c532d74783506688646564a40831c637696b947af889925"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/写代码.webp",
+    "SHA256": "f9c44769673b4c403afb55de46a34fdef8207581d4b2767fef28da55e92e4532"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/工作状态-思考冒泡.json",
+    "SHA256": "b23ee8831c58c35b991e9a1a26ebca80074144a61c42837bc7173739c67a89eb"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/工作状态-思考冒泡.webp",
+    "SHA256": "6f1b51c7360e58abbda072ab889f4db1a4cf0c8118df8266940fca49ab39c245"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/待机呼吸休闲.json",
+    "SHA256": "6636877459e11b1a56ebc7d73bccf811a57594d2524a568077f343d620a8cac7"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/待机呼吸休闲.webp",
+    "SHA256": "1c221e272485f96994af9f25c8b53887ea59646a9eb5ba8f8738c38e417615cc"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/点击回应-开心跃动.json",
+    "SHA256": "5a427d133808be70f90cfd3e40ab9ad8dec7a8dd4ba61405784b4f55270df491"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/点击回应-开心跃动.webp",
+    "SHA256": "54a4ceb97a59ea9cc67cb7a24853519d4341e48027b86412f4ef264f7c0058af"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/被吓一跳.json",
+    "SHA256": "ba59d8070f6b249a979ea12f9c9e2714a09f5f2577ce510e845cf6971de3e4bc"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/被吓一跳.webp",
+    "SHA256": "6b4765bc913bf41ead07b060e060ee1af684277eb1fd7b56f69f596d5ce573f2"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/被鼠标拖拽悬空反馈.json",
+    "SHA256": "2d215af5704d7750edaf4d778df64833bf2abb1a152ee09b2479b8f72324a6cb"
+  },
+  {
+    "路径": "桌宠/assets/dynamic_actions/被鼠标拖拽悬空反馈.webp",
+    "SHA256": "1625746e48ce3d01ce831e01414b15a64102dbf76c73774c1e53595de0ac3408"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/actions.json",
+    "SHA256": "173aa8bee168c8132d6ee762b9eafa1b6a5d17cd5eb47e591c17fd0f9712d9ff"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/下五子棋.m4a",
+    "SHA256": "7cf93a46e3ae49c7b401f46dbfe94fa34a67af1b22efc0ecf3f18ea8fbd9b660"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/优雅猫耳娘舞.m4a",
+    "SHA256": "b90fe45d77e1e7064244b1ce0a0f72274a359007209919918362410565587719"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-分文不剩.m4a",
+    "SHA256": "2661697803c9976f2c639ecd26f242326ef5cbf5ad7812bcb3277406b17d2394"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-数金皱眉.m4a",
+    "SHA256": "20a39e85eddf6e747e20a64884b3d9bf04a4aeb372bb552c40934667dd98d692"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-袋空如洗.m4a",
+    "SHA256": "5cdfe017aa101c91975188c9b5455014e940daed17aee899e32b7010b3bf154a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-金袋叮当.m4a",
+    "SHA256": "bf8f939f71979b0d9733fc02fb2de26a3e55a41f46dd584dc56ddf0f35554a20"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-钱袋如常.m4a",
+    "SHA256": "aef6e1092063973fd8763d8c58071da171e73e3ad2014a90a41c50004e00e03d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/余额-钱袋满溢.m4a",
+    "SHA256": "c356182d4ebaab74b4582121752a4c89987f9810002e54123a4d8879ebe47d37"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/偷吃零食被抓住.m4a",
+    "SHA256": "83411c3d10c47e6db156c4725f251f57a03c6b00d3d075ab95dc9f0d3b869500"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/写代码.m4a",
+    "SHA256": "0f3ffa8798d84d2b5b5bbae20ee944173ad6ce92dbfb754b51f32cab83506133"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/写福字.m4a",
+    "SHA256": "b9c290d4c7e15957bfd04c74fd3ae8fa44847b9acea804fb358442c615e0f13b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/凭空生花.m4a",
+    "SHA256": "312e878f9c809dfc0dca9b534335f3a3dbb423177801a01335a713177302e701"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/动物环绕.m4a",
+    "SHA256": "4dd6f24988d966a75e2f45ae542e60f4767a55305dfcea4be83d4493952602e2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/原地左转奔跑.m4a",
+    "SHA256": "1ea9cf51836207b9d07c9feada0a862834c8f10a41631a0d0f2cf9ba51726126"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/原地漂浮踏步.m4a",
+    "SHA256": "00939fe833f99e9fd461643a5ab6dc902afc45dcbf5d29f33718d8b1c994c656"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/原地跳跃抓碎头顶物品.m4a",
+    "SHA256": "f47005c62f8331067525d896a9cccbea6c4b375f8eca588fb7579f9352668d04"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/原地蹲下玩玩具汽车.m4a",
+    "SHA256": "3a9b9394a012750e7e433f3cebdbac6b2978c62f2e1c7d4b0f81aac8b43995ee"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/原地重力下蹲压缩.m4a",
+    "SHA256": "99b2bb0462dc64ed4b4cb5f978026770a9563b366cbd81b773ef75ebdcac6a1c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/变鸽子.m4a",
+    "SHA256": "d6777994a759f380e2722bda0fdda2a482117f5e604fa388b9d11e682fb055ba"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/可爱宅舞.m4a",
+    "SHA256": "a1d1f8aa5c84c5feb70db4105cbee045f5848048d1477c610962d3edff6b8e0a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃Token.m4a",
+    "SHA256": "ffadea70b48b275c2afe500bc17544b115614f838c4470097c5ae74d1cbbd8f2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃冰淇淋融化.m4a",
+    "SHA256": "c3a3792afbf9f0bfb0a9b6025dde919fb5c8a1cef340297297c258b8a5a1c8bd"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃午餐.m4a",
+    "SHA256": "02180a1c2072b7edd481aa315d3fe19ed6130b4528fe6147d6a36a041572bd4e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃大闸蟹.m4a",
+    "SHA256": "33ba6c8ce07ef54dabd4030d9c582a394cf2af747600bb623abeef1f8075af2a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃年糕.m4a",
+    "SHA256": "eed0405275b7cedd4c0e4e005182839a4da42aead62e9dd6370cd716b1f6f28a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃早餐.m4a",
+    "SHA256": "1a4bc2ee19f5f0adaba42646a118bc9b56e87d5795a08f47bab681f3dc8cdfa2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃晚餐.m4a",
+    "SHA256": "03cb7eb31dddfa7446b4b65aa346e746454906daa616f3de099c1865422dbf23"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃汤圆.m4a",
+    "SHA256": "e092095d06de77e5ec712f23413169d505957d9eb7ac93dc26fd360ae52b3886"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃白饭.m4a",
+    "SHA256": "04ad14f080416379b0916206c6c37d975699211c858a0466f62e512c1dbf182d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃粽子.m4a",
+    "SHA256": "e40455c3c2582a9052e3b5805dc73f4ee430ea03d42fc6ed3f78a3b079da79be"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃糖葫芦.m4a",
+    "SHA256": "1edf685b3d0a254440d71cc0f73efef137321234ad6465ea20d8ff2fd9ff198e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃腊八粥.m4a",
+    "SHA256": "c42091c05817446958bea0b1503b87d789dce0de3cdf572d125493bc8a996496"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃西瓜.m4a",
+    "SHA256": "9d5f17a74832c8d7ca85d77556840fb7609476946df006c677e4064fe674226b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃重阳糕.m4a",
+    "SHA256": "eaf344cca704708488cda36f2c8d45348bb35b68f90f8fdaf48de592f53b8e70"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃长寿面.m4a",
+    "SHA256": "c1705b268c6544cbffee52438d14245ffbce4cbf0a3e7d141dd3ec00aeff768e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃青团.m4a",
+    "SHA256": "5aff37f45b895fb5782317923baa2fe77b1ea4eac87c6c695fb3c9989cbd2a70"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吃饺子.m4a",
+    "SHA256": "17cd570e83b3fc5fa5f5df9b9a481b9219266ac839d0ffc98bf9daf46a69d3cb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/吹气球.m4a",
+    "SHA256": "6b2e9fcaf117f43833d5ce23d8eed8589474ca1144ebf76270949cece69c4e2c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/哈欠连天.m4a",
+    "SHA256": "565089a30449c05fd19f4dd097352f2a38a2e2325491578e81a8849880f1c719"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/嘟嘴吹泡泡特效.m4a",
+    "SHA256": "7ffd5a777655536aad8b8ae1562407184e9b700e61e40bdb316bd99723f6ffbf"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/堆雪人.m4a",
+    "SHA256": "80b918bcb9506afe63e5abfb162acf7cd2197485664ac9be3196961d2dc8af81"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/大口吃零食.m4a",
+    "SHA256": "570b55ceb48f32030fb2c9f323efc462d2439853ce82965fd84c535cba6b7955"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/小幅度原地360度旋转展示.m4a",
+    "SHA256": "74d52cb39e89424c2655d3e1f5c33cde9a968ff3391516f149fc54a29139506c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/小提琴演奏.m4a",
+    "SHA256": "4ba6fc504fa46324fcf5ac8fc825feb74fd7e46cec6de2745b277f8c3a243f8f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/工作状态-原地踱步张望.m4a",
+    "SHA256": "fc218205de9299fd4e8a9e89e904bb9ac68b520739ca1a2156353b3cd5473d82"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/工作状态-忙碌点按.m4a",
+    "SHA256": "4b70d67a400c1bfa03f30681064fb231679a4e97546b7d1b446df7f50145c0e3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/工作状态-思考冒泡.m4a",
+    "SHA256": "7e766e24a89554ae3187810a0ecbe8e7322e786ecc693b5006b764b333e97ee4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/工作状态-清点归档.m4a",
+    "SHA256": "c44f5423ebab29f467ecd132a0196ea62a3ba219c9b62fff579263fb4a695698"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/工作状态-雀跃庆祝.m4a",
+    "SHA256": "270590f92fe27753457df42d0c15d1ca4d31314d01c6815ee1e8c1f3a5dc09ea"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/悠闲哼歌.m4a",
+    "SHA256": "6a241c7ca7590002e886d6619cc1369ea597b7f722537b9302159d02365772ca"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/扑克魔术.m4a",
+    "SHA256": "bd690ba38d71f4b8441bb1a4a1a80d6b47a852ed6928dce76bf432d9d0ae0f16"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/打瞌睡被惊醒.m4a",
+    "SHA256": "0a43208cce5239929a61952db3ed2c542031d8dcb60bfde2ed8a786e75da05c2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/抽陀螺.m4a",
+    "SHA256": "ca4f53a42de91c2352f78fea29c4a79e29b623f82542d6297febaa26147e306b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/拆礼物.m4a",
+    "SHA256": "386627cb8b4afb460458b932293c1e960306fa6dfc20bda845d3bc345f0a7789"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/插茱萸赏菊.m4a",
+    "SHA256": "c68da414938d342de283742169a0b29833d3c1707eea1ab30e177342c2abeeea"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/摇扇纳凉.m4a",
+    "SHA256": "d830a829616b508dec5f1444be3d5a437e4d9dee4b6a9815e9af9bbce9eacc3f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/收红包.m4a",
+    "SHA256": "027fbf5085be1d25ca72b3f7815753ba7e2f4e58196d7b0d2368db5219864271"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放孔明灯 v2.m4a",
+    "SHA256": "0477cc7c99138c737d1f67756c90b17a8470b17470e9d155a5072b7cfc67b778"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放孔明灯.m4a",
+    "SHA256": "99f0f87af699a7ac47ae2fee45320c0485b89c927c47268e7b58b415ffbe4de3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放河灯 v2.m4a",
+    "SHA256": "705fc61f16511d791baabe3120d797d82803527aed69cddc363208ddc94395eb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放河灯 v3.m4a",
+    "SHA256": "e7394093d6347196b7b59385bb57224e7ab8cb11238bdd3a5424c9fb21faaa76"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放烟花.m4a",
+    "SHA256": "f97b49a217b9cb20f2b9093a1050dfc523be6ecd94ac9b32f7f81ac8e9c722f9"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/放风筝.m4a",
+    "SHA256": "77deaceaa42819018081004e709ef2ec2a497fd41c7f34e14a41d989ff0557de"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/整体换装试色.m4a",
+    "SHA256": "5cf708d887ef1818342daf1b7bd2c4f3178e3191ecb62d7361a66d82248c6351"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/星星精灵现世.m4a",
+    "SHA256": "2ff0ecc2a7f270759494a8243a953f8f390ae5332725ce74dcbdff5b19f3422a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/是啊，吃什么.m4a",
+    "SHA256": "6505671c98105bdcd9e8cc7f4251502deb0052c31db17e63eec05d9cf2fce3d4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/晨间刷牙.m4a",
+    "SHA256": "45c739e98b0b0ff2b688e1c5d65176baea20a0bfe73af362f6bb5006f11a1de0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/涮火锅.m4a",
+    "SHA256": "6255ace48ab3327f4fb003398b4bc0d94b26f4bc207e706326dac75671785027"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/深度思考碎碎念.m4a",
+    "SHA256": "59fd876fbe3f4473d81eddee3c9e36ccdc30228e488d16a4a6f50a79fe654eed"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/点击回应-傲娇生气.m4a",
+    "SHA256": "7d700f31b2f65e42a28d0d4f94f82920d786b1353d844439d092584b404fbfb8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/点击回应-元气挥手.m4a",
+    "SHA256": "c5457f4568b26e6f7cedd9addf715671888d98f46d284dce80cabfe608b41b88"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/点击回应-害羞惊讶.m4a",
+    "SHA256": "c5a56cc2db932a7b59895715b32298571c440da21e7371b322839a1445d983e7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/点击回应-开心跃动.m4a",
+    "SHA256": "b057d44cc7d7c3c940d523435889d77365ba89e3fddf8b66f51feb7bc7737a11"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/照镜子.m4a",
+    "SHA256": "2a12f5f41a7bdb6f63a421c9c73f8fb400499afa61efbdd3a36bd76169abde9c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/猫耳娘屈膝礼仪.m4a",
+    "SHA256": "a555e413c0f4917095a6b0ca21f14fe6ccc4882e4fd0e4ce600cf5ef0eccd7f4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/玩水枪.m4a",
+    "SHA256": "d44104d85377f72a9e744ce10ed1d19a9af210e8eef89c64b730018109edeab6"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/玩游戏气急败坏.m4a",
+    "SHA256": "151420051525f1908b0c9b20d4cd4c6f12bead962bee45928d7649b7a748a377"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/用蓬松紫色猫尾拍打地面.m4a",
+    "SHA256": "db44303ce2752fde418c2e25fb666144255e824c64d0a58b219b15df5a6ebd9b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/碎碎念-发呆碎碎念.m4a",
+    "SHA256": "9b2e76417303890cf0a1bc287dae7a257e1ec41b4154374a5503b0dbe28e2935"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/碎碎念-对屏碎碎念.m4a",
+    "SHA256": "131ce44143cc34fd46e56a4cf27eeea180e14710923cf30bf47ae3e684c07b43"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/碎碎念-擦桌碎碎念.m4a",
+    "SHA256": "cfc67359e5bb373181b740315122c95c6308de0cb069e5b8ea48a54a3f796265"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/穿针乞巧.m4a",
+    "SHA256": "14278f11e45707f9acfc865d2a6f1456a851b89fc5bb91aeb877651fd9e66f9b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/舞狮头.m4a",
+    "SHA256": "fff0b0b87774299826b042af4c6ae3633564d5ebf5de25f217a9b2f65e017746"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/荡秋千.m4a",
+    "SHA256": "daaf611c5a4cd51905c35cddb763cb2b3a3c73ccaa475f155a3c18ae3f4c6e8a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/萌化小幽灵.m4a",
+    "SHA256": "f6a4803c9d39c416f934d113b06c4578d52dfb543301b88ae0130063d48e8f88"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/蝴蝶蜜蜂环绕头顶开花.m4a",
+    "SHA256": "5a56c3d2d3bc2dcc8570e4bd671694371316e0f2225b7244b3829fa4f8e4acad"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/螃蟹走路.m4a",
+    "SHA256": "5e6ed0fe24dacd363ed1cdbe0d96cc2255f064e8b31cb6b7acc0ad7f0739bd2e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/被吓一跳.m4a",
+    "SHA256": "5077b29eccb93ed8cbbeb7da3a0a240bd74925cec06e31bb0c070fe4e87b3b98"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/被落叶淹没.m4a",
+    "SHA256": "8643e9862fbf544a70fb681e6a7cd100051b2fd34f9a7d0592da8270dcc64a4b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/被鼠标拖拽悬空反馈.m4a",
+    "SHA256": "7ad9baf3dc87348d040610f9a1d6689cbc9890428c0175652bf0c805a2fec59d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/装点圣诞树.m4a",
+    "SHA256": "473e555f259df6aeba1345b0039e7886a234ac2638eb9ea2022ea7f1ba88d068"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/讨糖南瓜灯.m4a",
+    "SHA256": "5abd0bc1923082eb797b567ac903c9f9a975ef4c3acc4faee09de1fe8d309a2f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/超大伸懒腰.m4a",
+    "SHA256": "d3f329ca557f1f074597602998b92433a50b5c1ea83793339f3c41f4e6240c96"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/轻快摇摆舞.m4a",
+    "SHA256": "61172ac63bcfda9c2c9f0c2dc2138dee84adadc6acca5be9df88b408551f7d06"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/轻快记录.m4a",
+    "SHA256": "8d4558a96785092d19c99968a8941335f8b7198f822febb4174b07cd383e71b3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/audio/骑木马.m4a",
+    "SHA256": "cd5266e8548a53fe644d8cb7849706b265fdd85f0284c1695afaae8f050e02f9"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/avatar.webp",
+    "SHA256": "5f09588ebe5d3b1e8e8eb325da2d1375ec6629798c8b50e4a4c6afc1916625d2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/manifest.json",
+    "SHA256": "1ddf50568f446b913459cfb8b686d79d9cf17b8f1999f577a6011e7a93227b3d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/下五子棋.json",
+    "SHA256": "7b173a318a4ac5be03bf5c1ce389dc154b36a83e18194db81d5863bb1bf84d08"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/下五子棋.webp",
+    "SHA256": "91c8f44412473ad9fc848e288f34659ef840210181d7f6d1f8c8946d613a3e87"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/优雅猫耳娘舞.json",
+    "SHA256": "4e7d09cf40b4fa8a77bb7c6c472d38e07c6736de2f41d96d4cd228ae3f2f6de6"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/优雅猫耳娘舞.webp",
+    "SHA256": "41e4219ffa687a268429ca8d512a9e44e551736efbd2ff5be1859ea8c5ce3a58"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-分文不剩.json",
+    "SHA256": "a467ded8aa7ba8ea210254c3cb72ef7bc9885113ebc02e89076531b908857655"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-分文不剩.webp",
+    "SHA256": "7b2164e9e54f8cd2302a946f048389da7339a237ff8db8baf9fc5d1fd536500b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-数金皱眉.json",
+    "SHA256": "e14ab40178b02810e101b7aabfe9fdf144b665a7b965cdfcd8eb1096cf87cd31"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-数金皱眉.webp",
+    "SHA256": "69eb593278403cd86653baef7aa1e10aec134acceb36dbb099f8eca1b0d33ab8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-袋空如洗.json",
+    "SHA256": "37f4dacbba66845f5a458a7ca897eb30e213d73256c27b803290f5ae64be97f2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-袋空如洗.webp",
+    "SHA256": "36ffc23825708cc64aced613464b599751fbf328df9e2565f0a302dddd9340f4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-金袋叮当.json",
+    "SHA256": "53e885d4ecdf047b1524d0d9bab3f6db9762358c6c863b7116af4b98c0ee101c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-金袋叮当.webp",
+    "SHA256": "bea98fa1536249fc7ddebda86df4cae4a12f4617dfec5deb0710d9e1767702e2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-钱袋如常.json",
+    "SHA256": "361cc161103a89e96448d6515e5c48b56f1046d22aa91afb6379f75c1c889736"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-钱袋如常.webp",
+    "SHA256": "b4ed239e8faa685ee85b5717eba7f7ef168b1cec6b77a5c35a1f3f1ff85f58d3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-钱袋满溢.json",
+    "SHA256": "744e1823170dc2f53468d796c706647c12481ae322b162de308d34fa57fb7950"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/余额-钱袋满溢.webp",
+    "SHA256": "bf235ca1b3cffac3d7a8f63a74ffabd36ae427940492da3759155efcca4e7d4f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/偷吃零食被抓住.json",
+    "SHA256": "6f3350dfd2673be09da82350638e524fbcc61b8d748a53a8e7753c7d57d756cb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/偷吃零食被抓住.webp",
+    "SHA256": "e8b5283ca8400516202ca13603c1c53c55b28ca2af38f7be6a1222f94791b28b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/写代码.json",
+    "SHA256": "c4e04815f6325d4a0c532d74783506688646564a40831c637696b947af889925"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/写代码.webp",
+    "SHA256": "f9c44769673b4c403afb55de46a34fdef8207581d4b2767fef28da55e92e4532"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/写福字.json",
+    "SHA256": "24c071772f86bc6d8053bfa9245e98bf5b30073465dd0e09296bdd4d03c13da7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/写福字.webp",
+    "SHA256": "3509d0625d990b34bbf35b9fa4fc22077b27335a85cba093d6665324c6977e1d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/凭空生花.json",
+    "SHA256": "5a9a50cb2090406a4b5bb43628421eb88e8613aabff03779102c534b91abb102"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/凭空生花.webp",
+    "SHA256": "34ec85657323100dfecc6345fcfd1fa4d970f8df1dbe08f5c48b0d15d95913c1"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/动物环绕.json",
+    "SHA256": "76ed9647f7dfbdfb37bcb7341006003d49517b83146c114af5223d3885db6da3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/动物环绕.webp",
+    "SHA256": "946ebe3dbe67727c228077da07e1fe47de70e97aaedeb933ff5ef27a2fbebf73"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地专心玩魔方.json",
+    "SHA256": "6f621e113078f58fc68b3f4d91318c573268c4f3acf728833981efa2459dd236"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地专心玩魔方.webp",
+    "SHA256": "44cbd1c73e35dd42f03bb8830da757a5b8f971fe847fa8f09778dddb3e534726"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地小憩沉眠.json",
+    "SHA256": "2bc4f75feb9cef578e0557ae3164d0b3c2b80a37dbc065e427d3f528a4f0f8a4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地小憩沉眠.webp",
+    "SHA256": "cc6283960f3447db3b478d085d577c20d6c68542e29b1a06cb303879185ec78a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地左转奔跑.json",
+    "SHA256": "f889da19451c437b2abf92fb80291dd137cd63569e38e5fdae05936b2a2a8f1c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地左转奔跑.webp",
+    "SHA256": "0089f6a7f71758fb1eafa588e97e12eb498be87998d4f527c12f433b8350f201"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地敲击桌面互动.json",
+    "SHA256": "4f9693aa858383bbff5748840951facd87a5efbd7cf584d6d5f749fe1bbdb13d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地敲击桌面互动.webp",
+    "SHA256": "d26effabe1eb2621586df573cfd40286d894ec42c8ffadd7f2e75295397dfc2d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地漂浮踏步.json",
+    "SHA256": "609c4986049f5a1ffbcc9ad032631bdb9b0f2373755f6c1051d794c25d96588b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地漂浮踏步.webp",
+    "SHA256": "9e322fffdd62d208ec764d83947535d5f175232df74274ac557dbfd984bdb65a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地跳跃抓碎头顶物品.json",
+    "SHA256": "e527a90391ab0b9f843d2dcf5fa6750a0388a0c374ccf68de325f3bbfd0990c4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地跳跃抓碎头顶物品.webp",
+    "SHA256": "5010c6bcc46d7b53eb0a2a709ce52b5324c039857d9d8c6b25b1356cb619889f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地蹲下玩玩具汽车.json",
+    "SHA256": "10a4b6ccf77c795642352c546cec3181f6db3aa4d11505b48b8d4a68368f2e4d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地蹲下玩玩具汽车.webp",
+    "SHA256": "f2fd6649e9bf857dd2aca7058e4d578e79a625885c8aaba68a47738fa0210c60"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地重力下蹲压缩.json",
+    "SHA256": "7cdeec9391e9fc40332e0e5876f294fab65c652f9b98a9e5a36488355479c9fc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/原地重力下蹲压缩.webp",
+    "SHA256": "9ab3af22c86997a7ae31955826239fe345804e6706e73711143791e3905a3801"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/变鸽子.json",
+    "SHA256": "77a73805db7e7cc55d9890f7205a6eeb7f2f5a918643d0dc05a2dd2d74e00fe7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/变鸽子.webp",
+    "SHA256": "1dfe78b3876eea8e70826571a0a031a56ef486b8516a975348f19c7bbf8558e6"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/可爱宅舞.json",
+    "SHA256": "7f2f713ad0dce3ab77a1877edd2befc12c725108218a5baedc8d6d6fcb63de59"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/可爱宅舞.webp",
+    "SHA256": "0c4843a601c97f82e5b95e3a16235c543b2ef2455f19bb4997efd10f8249c1bb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃Token.json",
+    "SHA256": "f099b92260f0ec4c1de99e9bff870a7294453647e9eef25991b67122e3e89d7e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃Token.webp",
+    "SHA256": "56ab4a9b5876a0a493ee300f32d55f1dc19162ffbfb4323797ea1e9669aaafb9"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃冰淇淋融化.json",
+    "SHA256": "7afc0496dea863daabbc7ae9e449c33f76bade9ae67fb7515891467d39340af5"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃冰淇淋融化.webp",
+    "SHA256": "1e831be2cdb65b3c35ca06082fb2189be4cc53c53af0b6969fbcf74718d228bc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃午餐.json",
+    "SHA256": "4e9eb04f805da83f43964ec9163e868a9c1198b70c46b453a5741dd5dd8e501e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃午餐.webp",
+    "SHA256": "19e47b0908f40a460fdad4a4313780b0a08b37f7c40753c90944f8ca99e8aaad"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃大闸蟹.json",
+    "SHA256": "30d46aa321e6f0a598e22a7685e9cf52a038cb1a242f23273a7bf0a89cfa0608"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃大闸蟹.webp",
+    "SHA256": "3d7caa7d67516239b31a395e2b953ae4687aed46e6da9bc7d9ee6874a7277525"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃年糕.json",
+    "SHA256": "09b98db49294ec4b75a1d17bb9fd26dfa75e5258a02edd241893b940dab113b0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃年糕.webp",
+    "SHA256": "fa4f974b8ced832fd0306aa690c281daa0bab423230797d0c3651976f0e650f0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃早餐.json",
+    "SHA256": "d0715599cb5deb9ee01dacff9de67ac7a991f6fab1a782e78eee5bc7e79d674b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃早餐.webp",
+    "SHA256": "3696f4d58f73cd621c5f92d426c4568d77d762f4a02fe066765e361d7040c159"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃晚餐.json",
+    "SHA256": "8c6770ec892b884e0dc6c0baabf1f4946a543cf91e9268cb7637de7a9a80e992"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃晚餐.webp",
+    "SHA256": "6982587c03ebe6b23e584806c7082a3520330e7f832fa7746d147753dee162e3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃汤圆.json",
+    "SHA256": "2a162b75532a2c286402bff370c809a10d4fc7b2c88f4fd9c05f777846bfc5bf"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃汤圆.webp",
+    "SHA256": "946abe8f207066555653b7e590c69d7c2f73142297328d18ee1c310d2b430e7f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃白饭.json",
+    "SHA256": "baf212db33871995194762607528646575179d61191a1ad0be7b3e418f1ec3aa"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃白饭.webp",
+    "SHA256": "9d66f8ae697ad06b57171634d54a6184ff15eda7742bce0c376aa6598d8e1952"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃粽子.json",
+    "SHA256": "0e909d64644a240afe71c98463bdb900f2febed69e909e3eb983a0609eaa68c2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃粽子.webp",
+    "SHA256": "a98b34bb96e2193bc54c13c742f1b908957f59b0e12fc26087287741b3c6a288"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃糖葫芦.json",
+    "SHA256": "99df815e9ab7ea090c30cb9e0ebfa16195e54f16f03a16ff08945f82bbcff92d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃糖葫芦.webp",
+    "SHA256": "fe74eed5c5a5ae7a65a8879856c1a73965aab77ad0007f4bc584bf5f0240f3be"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃腊八粥.json",
+    "SHA256": "934e0cf749d5a7a4bf2a40af4dfe1b6bcfc29fa80c7285aee1de7f4a199fa753"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃腊八粥.webp",
+    "SHA256": "a4aac5ba29ee27cec5abbf69bfc1924c994e52a66d0735da5308f99302e3c3a3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃西瓜.json",
+    "SHA256": "1fa725be4143ac749d3a15e9b0325c49c2686869e9c029b8096fe64f76d6ad7c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃西瓜.webp",
+    "SHA256": "a4aea36da59d6d63b11017ac61ca119fc7046a658afd390a59a9bc6bacc2cf93"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃重阳糕.json",
+    "SHA256": "3f71aa29a69072cb9dabfe9796f51d626669b45726ef06d9961affe225c8ca14"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃重阳糕.webp",
+    "SHA256": "40a47e6b50674bf80cf7e6d044e752fbab8b2b415d7b2b46a7b93cc0b880f8d6"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃长寿面.json",
+    "SHA256": "af43fca0e79c035fed3353e0df23b7764977437bcbcd99d4093489f0bd7c8b82"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃长寿面.webp",
+    "SHA256": "9355f9413a777646b1344eb35c61da45d812ea96c58520875ec6ee256c488adb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃青团.json",
+    "SHA256": "aa3b4460fe531abc12579e9595e434f686335036b422a6ae95bab013582aa164"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃青团.webp",
+    "SHA256": "1518c0b49d5d0fdf62e174592ab13cc0d1f560fe0152eb29619d6081df7e3734"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃饺子.json",
+    "SHA256": "80a876f9c76c1047d91edc599fd53d62d99c3f0ea1c5f9b53186c8e84f50370d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吃饺子.webp",
+    "SHA256": "3f040b940856a2cfa84c55fa8ed975e9b8b96a63a2ee50c6e791a60bdf896e93"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吹气球.json",
+    "SHA256": "94b53acbf3a03af09d4196e55a4a96559dd14fbb4cde6d90f983287298d11962"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/吹气球.webp",
+    "SHA256": "5985e55b2c8969c3ef1ed243242d840d9e1099da223215214d2942ed51814369"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/哈欠连天.json",
+    "SHA256": "8a504817ec9e264b829d8cfc1e29a35b655444bade2f8f984270ea6dfe23c3fd"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/哈欠连天.webp",
+    "SHA256": "6000934e56dfee8ea2962393afbdb01879d24243c8eb4649d7d7829e2b90d097"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/嘟嘴吹泡泡特效.json",
+    "SHA256": "1aace2292dd90d317ff7fb29a347cf263400ddfe5b2ff212a15868562828ca3c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/嘟嘴吹泡泡特效.webp",
+    "SHA256": "450fdb7cfbb382282a282c538fd5099c50e6ee1f624b1d6fad5ff7eca7cdd507"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/堆雪人.json",
+    "SHA256": "ae8c11a495772069599c88c9f53faf1f09f2b407ec5df84dda7d7c707e829675"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/堆雪人.webp",
+    "SHA256": "e7af283a3010dfc0ea752460874f8e871a02de1642b1aa0ceb0e57a8fb619ad1"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/大口吃零食.json",
+    "SHA256": "4d898eb0cf39ba87010d08dcaaba41ccdfd22ef94082ea49000cba3bbee23b2f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/大口吃零食.webp",
+    "SHA256": "76c1e0110ba7d08e7727d55aaa9d0b86adef8fc50480d7b51326ddbd2e702410"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/小幅度原地360度旋转展示.json",
+    "SHA256": "8d9301fa0f4e31591ef8304a8027b10f32c2fc2c80ac042179d2b9d5a541ef16"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/小幅度原地360度旋转展示.webp",
+    "SHA256": "54049e85bee0959d8d376a520ee1dba1a46bbd8af157568a5394a5b6e15e9853"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/小提琴演奏.json",
+    "SHA256": "6f57083bd9697fcf63d4c60e96479ae1c616919c8903016d706fe841a1a9cb8d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/小提琴演奏.webp",
+    "SHA256": "bf89625599bad62eef258c0d0990443cefea54cfc7a6ba8c623772e5d1df9786"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-原地踱步张望.json",
+    "SHA256": "253993f519d3a447821edc7ae4387ea0b79552838b3fa1e6d62c05a05c6be5c0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-原地踱步张望.webp",
+    "SHA256": "2fae47f42a0727b17bf5d9266efcd961f5c9405ea9452ced75d9ba6f3faa0f66"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-忙碌点按.json",
+    "SHA256": "abffb94f487707153592121643c8be018a54c8b6875cc58c4d5ebfecacd9610b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-忙碌点按.webp",
+    "SHA256": "d7551e95090e763d7d1b341794b95907861e7dd66cb423e187b8c2cc0529a7bc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-思考冒泡.json",
+    "SHA256": "b23ee8831c58c35b991e9a1a26ebca80074144a61c42837bc7173739c67a89eb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-思考冒泡.webp",
+    "SHA256": "6f1b51c7360e58abbda072ab889f4db1a4cf0c8118df8266940fca49ab39c245"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-清点归档.json",
+    "SHA256": "f53818ade6fbedbb8e3525ba2e68865a72a0d2ebe61fd71459834fee8f1d96bf"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-清点归档.webp",
+    "SHA256": "e8272f0effc69eec82e0aa7bddc17b73b9af80aa51ca8bce15272bed64e392c0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-雀跃庆祝.json",
+    "SHA256": "1013b34aefac5ce1414742c4c1cb872d5e59aee8abd819635b526f60c75cd741"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/工作状态-雀跃庆祝.webp",
+    "SHA256": "23de69afe066e0ee084fd7f110ff61d4e8ec6b4378e365d74ff4b0ddc5105937"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/待机呼吸休闲.json",
+    "SHA256": "6636877459e11b1a56ebc7d73bccf811a57594d2524a568077f343d620a8cac7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/待机呼吸休闲.webp",
+    "SHA256": "1c221e272485f96994af9f25c8b53887ea59646a9eb5ba8f8738c38e417615cc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/悠闲哼歌.json",
+    "SHA256": "d9e05b4de8e5b893394711c6e56f68759cffe887a6abc419153594e4108e6b92"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/悠闲哼歌.webp",
+    "SHA256": "b999315cb54bd511b1c96a37141d4d1e43cad3ecf6e509c3a0a93eb68fcbf07c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/扑克魔术.json",
+    "SHA256": "d6ad3d3f7f75dd1e1aee39defa00e0032bc74605a6b6e294bf9e75dbf7e11413"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/扑克魔术.webp",
+    "SHA256": "299aa9f10312e30291a6dc3ed26e12c5dd12e7550e5774aaa76a8f64960e4ef2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/打瞌睡被惊醒.json",
+    "SHA256": "e813dc16fac36989a34cd6e13d8738d8c9c3b2cf360b98e574a7399c03a80d9f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/打瞌睡被惊醒.webp",
+    "SHA256": "f85c72fcf8e6ac8c72f6d98628ef614af75c6f431a0240073121194ac13d03ae"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/抽陀螺.json",
+    "SHA256": "73931c65c65b606226f5fecbc99ab4d7e3435bfa3e591b6a4d3f30594d8a5557"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/抽陀螺.webp",
+    "SHA256": "55dd2405a8ffb403c6aca7057a8a003d7c45c120705751fb6d831a7113202600"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/拆礼物.json",
+    "SHA256": "dc1413e53a1d2fc6a54b96976913094df44993c8a61227be46a8bea3f01e3212"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/拆礼物.webp",
+    "SHA256": "6af61388b3fa883be487efbd203d3fa7bb1f02905a2889b91261eecee59a8b65"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/插茱萸赏菊.json",
+    "SHA256": "c00bed446bf94c9c75acfaa50bab7d63cbba0bc01d79bdea0c834a755f94e09c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/插茱萸赏菊.webp",
+    "SHA256": "88af9a870baf7c38c1af00a9ff91c727d81a28cc65d8a64309100cb5317b17f9"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/摇扇纳凉.json",
+    "SHA256": "5f6c10d9ac86d955e2a28cb570a3f866dc5bdfc71a3deaf8c160de9ba51a8454"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/摇扇纳凉.webp",
+    "SHA256": "3c74dcd21e5106f604e75cc9e44ca09c55a3c76022e8b286c3df5ef980312d38"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/收红包.json",
+    "SHA256": "417ddb3f605ae64e90dd0cfb177793265717efbfcc7030bec09ae90c478aac08"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/收红包.webp",
+    "SHA256": "ec6bca8c9f83ca0050018910ff3b02e44d140c6f1b98358d36294f5358f140eb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放孔明灯.json",
+    "SHA256": "fea9ef79d80bbbd72618bab86d1ce9aa409f07b296cea0b11b7d45635d5d5a06"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放孔明灯.webp",
+    "SHA256": "b04770b0f56ee7d8fb4b9b0ae52f3f4f6a332ccd87b345a6a5af94cea0134020"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放孔明灯v2.json",
+    "SHA256": "05dc10042d73a3e633782bc0476489c00d3ecb7dc5cf0440dcf90e1b4a3147b7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放孔明灯v2.webp",
+    "SHA256": "72c4c52d0ca2db24462a6d8b2b017c120da24112d74c9211cd1a25a739c840ff"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放河灯v2.json",
+    "SHA256": "ad89e9d9ec543df33906d210d127bd1479f6ad2ac7b5781e5ad14b331649b839"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放河灯v2.webp",
+    "SHA256": "87ce9ffcd863bdcd8df140e43ff9294b7cdaa165cac3a718adaf181e088ec313"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放河灯v3.json",
+    "SHA256": "f101617044153259e151e72b734822faef74c34ace2e28a30335fa1a9280cdc8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放河灯v3.webp",
+    "SHA256": "a61085a8685488acd19c71e4a61b0a12dbfc6d5e5421dfee79d5d1d1a3ce6404"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放烟花.json",
+    "SHA256": "0ac93355faaf3f4ed92625448d3f9d317120fe726cfe6c48cc8afe8b6e4e72bf"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放烟花.webp",
+    "SHA256": "430929bd28a511763c118c9c5a856a23702fa0bd9a83028e7139d79b177a2f21"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放风筝.json",
+    "SHA256": "84e3cb2969e0daa1321785b5a91a344ca26f13583c67cb93709943e7aa7d64b0"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/放风筝.webp",
+    "SHA256": "c09cce275d51888ced4a49ecd0354f2884ace4eb19a08bcb61f167473b52a705"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/整体换装试色.json",
+    "SHA256": "593757985f9139cc25193dc93138639a464e09913056822ad827d258b2826838"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/整体换装试色.webp",
+    "SHA256": "801e046dd11afc0dda47bd7063400d8badcfa95150f2686c1961422326cc9ee8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/星星精灵现世.json",
+    "SHA256": "7fbf3f7c09969473776b805c277e1d368bcda0fd83dee0beddffff5c1652a26a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/星星精灵现世.webp",
+    "SHA256": "fb36d2bc40a330df5ba631ac541841a56ab4b3863cbadeff00d2737b755f1566"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/是啊，吃什么.json",
+    "SHA256": "0316bacae697b29b5061c24362d392c9654d003623f590369e2af34c2772fa9e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/是啊，吃什么.webp",
+    "SHA256": "e138d1dde748ef4671b832cf66ae56cccd4d8690d0ea7c7ef97c2add51a46616"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/晨间刷牙.json",
+    "SHA256": "8a1fb9b58038378155be067813cddc40bc7ad3fe45abfbaaca00fba1a3a60a0c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/晨间刷牙.webp",
+    "SHA256": "e51f6a28dc26990ca3cefdc181ccbe4632abf7fd416cb3736e44a805d929c05c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/涮火锅.json",
+    "SHA256": "fcb68b37e7fdd3ab03e95c7a555cb4bf147a8dd042124c934505816dda3b0d9f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/涮火锅.webp",
+    "SHA256": "26a2fed72f86c48fd3be73e9c3d7f02a227fa5885ceb6faa22b67981fec2e179"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/深度思考碎碎念.json",
+    "SHA256": "b3326441a7e9b9300ca1a32a1c164b401609b43dd17f37a814c2237861ed0473"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/深度思考碎碎念.webp",
+    "SHA256": "2ca4a6c12a76da96816f0eef6855b84b86d2a1ba3ba9a9467f112e3cba2d5d91"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-傲娇生气.json",
+    "SHA256": "da1968d19147c80b3119e03ab151b946b0250881fcdd1fb551bc827411d285c7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-傲娇生气.webp",
+    "SHA256": "e304d771cfdbb68da6b6d72f9eba34681b3242c42957825180cff83476d43418"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-元气挥手.json",
+    "SHA256": "aa117c1c21038a6074297edf648f9e5ca29291a858d124c089b5c7108f48be28"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-元气挥手.webp",
+    "SHA256": "6f9d64b6a0b4ba643b2f45972c285a5c23f8d34dd5f76c2bf2bc3d947cd63a2b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-害羞惊讶.json",
+    "SHA256": "71585ad3a807bfcbdabcd170fdd140697c2d40d34001885c88ecfdaf61e3d668"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-害羞惊讶.webp",
+    "SHA256": "12922da4e468c35862bec7029bdf142f1918af509a2701cadf321a381886ed49"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-开心跃动.json",
+    "SHA256": "5a427d133808be70f90cfd3e40ab9ad8dec7a8dd4ba61405784b4f55270df491"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/点击回应-开心跃动.webp",
+    "SHA256": "54a4ceb97a59ea9cc67cb7a24853519d4341e48027b86412f4ef264f7c0058af"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/照镜子.json",
+    "SHA256": "86a8b771378a16185834aacf586b15a0be09d53296b7c23a98bba9f1e89257dc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/照镜子.webp",
+    "SHA256": "5541a71e6810b58412506d40b39684a84767aed6d6e2ea29c9686bfd3239f7df"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/猫耳娘屈膝礼仪.json",
+    "SHA256": "8a808a1417fa566442bae1ec6b0b5076a4a7459516d7b5d7f098856d786e2314"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/猫耳娘屈膝礼仪.webp",
+    "SHA256": "15aede9ed62be1bc19d93b92888733dd1cfea4d0bc2cbabae7fa79d69c6759f3"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/玩水枪.json",
+    "SHA256": "c12c17c81ff44b85ad614a61a1c3b3cd26ee4e9422e532bc11e123d37f2d68f2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/玩水枪.webp",
+    "SHA256": "4fbcd7a1492ae591aa521d1734a80847ab5d3b62a392ea138c35823e31660151"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/玩游戏气急败坏.json",
+    "SHA256": "03092eab8c0d0dd10165a07334fb759a3eeb8afa380e57144014291835a85125"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/玩游戏气急败坏.webp",
+    "SHA256": "e4921b7e3da1442f2a888d706912891d428f5ea81f3dab57529e728bffa3aafa"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/用蓬松紫色猫尾拍打地面.json",
+    "SHA256": "700c82be116f769f072eb7ce34bfd9e913d51bc8bf10940215757769c5bb8fc8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/用蓬松紫色猫尾拍打地面.webp",
+    "SHA256": "d8738db02f14b6955f1b7ee38c2747313bd2e4fe51d02ffe76f60069d8ec0818"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-发呆碎碎念.json",
+    "SHA256": "7f70d265f3c39dd8e3e7a5747a1d3b455839eb4a1018c3a53bb08f3010f17f4f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-发呆碎碎念.webp",
+    "SHA256": "81c3f2e44852a923300cfd1139875b462561ba195b06e8509bf19a8db31fc5b7"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-对屏碎碎念.json",
+    "SHA256": "772ab20d61154ee2fe9420069a7b4a5f766a565fa39594f8ee22550814cd4cd1"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-对屏碎碎念.webp",
+    "SHA256": "292c76184337c73c087231458c740a65a8d1cd7337cc61a4dc73950ed71026b4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-擦桌碎碎念.json",
+    "SHA256": "9dfe93da738476901b52e2b142b8703910d5ac0657e94b14b19d3726bb21acb8"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/碎碎念-擦桌碎碎念.webp",
+    "SHA256": "cdefa7bcf2752523760ee84dd080405e07c6880aeba174d9fec6b6b9d29fa647"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/穿针乞巧.json",
+    "SHA256": "6262f3ba6b378595d9d2530d57bf694a8115238b58c6b08857e143cd05d2dc35"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/穿针乞巧.webp",
+    "SHA256": "5af3734352aae6304e3c6307bf967a3d435d01e0059aef51e1c589291d91041f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/舞狮头.json",
+    "SHA256": "75fb3446e5266cb83ab82a06427590c0c21d3d7fc81c0ffa103ebab10c7f05cc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/舞狮头.webp",
+    "SHA256": "8e65a5a0e5e9f9d5515bcc3de132134b7f6be54d3c506c25a468388261954f1e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/荡秋千.json",
+    "SHA256": "2889796601ee9e83bb901444a3d93deab04a8fdd035794e9e90d40713382f049"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/荡秋千.webp",
+    "SHA256": "884d7e1460193772be6737a39beefb257875873617315fafee908c643c573362"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/萌化小幽灵.json",
+    "SHA256": "3ecca889355c72e5a777213be6a09457b61b42cfaef124cadb4024343e879385"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/萌化小幽灵.webp",
+    "SHA256": "6877ead73fa5f8724e5813dd4e09ffce2d79a1d5426e34c145a7cf3b8c5de442"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/蝴蝶蜜蜂环绕头顶开花.json",
+    "SHA256": "b489226e26d32ae584c2b251f6a1e45774c3ae8e0d3d666c244d19727b836b4c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/蝴蝶蜜蜂环绕头顶开花.webp",
+    "SHA256": "2c261d009fbba9cc929f7f24e2fc326f847e273b358493d0d81d7c3b69181f8b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/螃蟹走路.json",
+    "SHA256": "e74effdfca5d254dac2272a53844eab6a338bf4d28d45494088c98c715fa241a"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/螃蟹走路.webp",
+    "SHA256": "16cdb888d5e83139a4deb66a14f5802aee97ca345c0692b3204c25194db36028"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被吓一跳.json",
+    "SHA256": "ba59d8070f6b249a979ea12f9c9e2714a09f5f2577ce510e845cf6971de3e4bc"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被吓一跳.webp",
+    "SHA256": "6b4765bc913bf41ead07b060e060ee1af684277eb1fd7b56f69f596d5ce573f2"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被落叶淹没.json",
+    "SHA256": "986ee2225753e7471a56f4c73fa4a189d1bc3f05b7894be2bea894d1b42a8a1b"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被落叶淹没.webp",
+    "SHA256": "cdd6a90fcd97cffb4914a259cf41c144371a61e9edfad476f17eabdf435fe75c"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被鼠标拖拽悬空反馈.json",
+    "SHA256": "2d215af5704d7750edaf4d778df64833bf2abb1a152ee09b2479b8f72324a6cb"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/被鼠标拖拽悬空反馈.webp",
+    "SHA256": "1625746e48ce3d01ce831e01414b15a64102dbf76c73774c1e53595de0ac3408"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/装点圣诞树.json",
+    "SHA256": "840590b8d74ed1b5eb45c2356e47522aa494ed62d0c9c78e258bd3d291f12c17"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/装点圣诞树.webp",
+    "SHA256": "89d55cf99ae6c04606cd325792d5ade02da479db18af6222c46c9abf9d9f41d4"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/讨糖南瓜灯.json",
+    "SHA256": "b82a2b51fdabd759b467ebfd79e427cb5e7adb736715bbdfd6899c7f55218c10"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/讨糖南瓜灯.webp",
+    "SHA256": "591fd083b1febdae99f651066640d7d405132a541dca3ab203e8aba60523eb84"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/超大伸懒腰.json",
+    "SHA256": "2003ab85ff8d159b998a485ed90836464a4d1a1fcd3466fa1b5a6d787819fe36"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/超大伸懒腰.webp",
+    "SHA256": "26c55d372dfde9131b3b68fef3ded6ffa30cfe7c7d181e290b69dbf512a01259"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/轻快摇摆舞.json",
+    "SHA256": "2ebff2677f92393fcad84244ccc2414233d989eb7952de20bc4ff9ffc85d1e85"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/轻快摇摆舞.webp",
+    "SHA256": "938a7ccc44abb43332e24fe4159e85995eaadba8d9c3bfc28f00f5563d98b694"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/轻快记录.json",
+    "SHA256": "323557cb83f3d81d5247382443a0febf3708df36046ecb8bc79692eedfc12c98"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/轻快记录.webp",
+    "SHA256": "7e256ae431090659f31a19c1ac317e90aeb4bc266296f4cf75d746f04ee2517d"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/骑木马.json",
+    "SHA256": "f6a2e8e947a7340b4d363872d3d107e03791a00b3e2a7a18ce3d84fb4fe26b7f"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/spritesheet/骑木马.webp",
+    "SHA256": "b1da2b6da27cb97dd9561cb127453f59386b5fdb3eae553870e7dc15c50a0e8e"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/来源与许可.md",
+    "SHA256": "3699a892ef75c6e077d34c3e9c273e47b50f535e2750da4383881cdce0eddc62"
+  },
+  {
+    "路径": "桌宠/assets/gemini_actions/资源校验清单.json",
+    "SHA256": "31367155ef423fecf7e8be552ea8d34435df9e2bcb300ddee000e96f072dbfb5"
+  },
+  {
+    "路径": "桌宠/brain/__init__.py",
+    "SHA256": "060e99dd8c3fc5f667d476203d7d51652bfbfe8c1017574bb9b1b0cf2a9b5f70"
+  },
+  {
+    "路径": "桌宠/brain/context_memory.py",
+    "SHA256": "9dd2099723842631230b67e0dc551d98cfa13aa25649a1e4f7be4f33071c1f5a"
+  },
+  {
+    "路径": "桌宠/brain/gemini_client.py",
+    "SHA256": "af332ca6bbe1e533cf086088b54517cd61af522d458bf49188170e1ef9ae08aa"
+  },
+  {
+    "路径": "桌宠/brain/prompts.py",
+    "SHA256": "cc57c2b8edc9cb7b88e80b15834dd62c1c852b608d14978de6744a5d5ade4100"
+  },
+  {
+    "路径": "桌宠/brain/rate_limiter.py",
+    "SHA256": "e56daa35245925d2e7f3ec424d638a76a5b279a85be5c33f32568dc68c14ee8b"
+  },
+  {
+    "路径": "桌宠/build_exe.bat",
+    "SHA256": "6927812bfe6383dc606d81fbff2d6930c4b8bffe8eeddadd2fe2ba582035e942"
+  },
+  {
+    "路径": "桌宠/build_mac.sh",
+    "SHA256": "514b6591dc45fd5d3e6b11b5377a4a8eaa3ba862fc2a90a63373b69b5dccf40c"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/_conf_schema.json",
+    "SHA256": "d59fea72438271e6cc0f6d5d5a7d2e4a2b52ee29b2b257947e68b0516304bf83"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/context_policy.py",
+    "SHA256": "76fa8e9c28b6b2561e32a35062e4e87ae5a334fd9a375309029a27a4c13c2aa5"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/extension.py",
+    "SHA256": "62ba4fc165e7955ab7377166b4f7362bea00b996fd7a67f2589c5e388545e4c3"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/image_policy.py",
+    "SHA256": "571c138a82082a230ae1191f5c0f98afa469790493e98b9546cd50693d9d2732"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/main.py",
+    "SHA256": "79ae7f538ca026cc6ecbfd7db1152fb4f883f45b1515e09a589e456762d0b446"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/metadata.yaml",
+    "SHA256": "b4c4367e8b669cc6c5504983c67bb46cbd8e230a0c50c9f4a744d191e7f4649e"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/model_limits.py",
+    "SHA256": "16e9b11435cb6105dc06b8ea5a331c165e4d5b1f853b8468ca5e965280bdd589"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/provider_api.py",
+    "SHA256": "cedf95c974bf30c9255e7d1cb776720a1c5c2a139fcab1536fb62db6b727ab8b"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/provider_guard.py",
+    "SHA256": "89ac95b74c0aae03f14a845bc8bb7243460e1f2eb8acd00ed0b91cb07911e956"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/records.py",
+    "SHA256": "42b299b30c673bb4cc49c51af7c05bea8ad35690fd963dfa6fb333e2f5f91bcb"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/requirements.txt",
+    "SHA256": "d3db7fd97879e3ca31a1ece505ce73d36e046e945cfd347af941bf1e1bdd43bc"
+  },
+  {
+    "路径": "桌宠/cloud_plugin/astrbot_plugin_desktop_link/server.py",
+    "SHA256": "35e58047092377053761c886fa56128a42042b5e6386d95d6f4864c169694f33"
+  },
+  {
+    "路径": "桌宠/companion_config.py",
+    "SHA256": "db4ae857cd34c9a3f0b355d0a8b1891db76934ef66978ea7f70116024dcc8f6b"
+  },
+  {
+    "路径": "桌宠/companion_link.py",
+    "SHA256": "12528551a2685d20a61c9c67eb5b8402e5a6d2561ca493188bc9f8fa8946876a"
+  },
+  {
+    "路径": "桌宠/companion_main.py",
+    "SHA256": "fe26056b7e865a5bfa51c7665ad449d2d918e643c922ba462d0b329eaeae89e3"
+  },
+  {
+    "路径": "桌宠/companion_models.py",
+    "SHA256": "098a168480ea1181b618d5b063b45c04a3d05a1873a20dc0631eef27415f8f49"
+  },
+  {
+    "路径": "桌宠/companion_perception.py",
+    "SHA256": "3949ce1dc373190aaf68485825a431c54ff5bd7276e48ecb839f09eb2aa13c88"
+  },
+  {
+    "路径": "桌宠/config.example.json",
+    "SHA256": "3f778647aa02e7aa0d2fa23c7b35f9579fb0236c43b20bd080a5907cb0e0f60a"
+  },
+  {
+    "路径": "桌宠/config_manager.py",
+    "SHA256": "94ef0030072430550c18c844a9461cc83cdd5d176d4dcaab4f220b4ec5588024"
+  },
+  {
+    "路径": "桌宠/debug_state.md",
+    "SHA256": "6f97ac1ab6a8facec2b80b35491ee9bb905c22354d024ca13da999561f8f55cf"
+  },
+  {
+    "路径": "桌宠/demo_dynamic_main.py",
+    "SHA256": "c7e087495cee12c399356d5ed915be538fb63690ac42afd70a1b01d1dcbf75bc"
+  },
+  {
+    "路径": "桌宠/desktop_bindings.py",
+    "SHA256": "e06754bc0c41c224f5babde949fdd9757453659019e171b535c636e8a9dd7eab"
+  },
+  {
+    "路径": "桌宠/desktop_control/__init__.py",
+    "SHA256": "ef51bd029a9d6b21d345a47146be2995aa78a528b158923c4b499d57fc1be50f"
+  },
+  {
+    "路径": "桌宠/desktop_control/capture_visibility.py",
+    "SHA256": "082cff74bb202bfd2307b8526ce3d0530706e14df321b5fd9a83502e0a647035"
+  },
+  {
+    "路径": "桌宠/desktop_control/config.py",
+    "SHA256": "ce63b7164ec068fe288100c8dbc6706baf09c72d1de36f7a359f56f3dd07316e"
+  },
+  {
+    "路径": "桌宠/desktop_control/external.py",
+    "SHA256": "538f4d198bf1762a18f11c7fb75012377e16d1d8fc51130e542c373a0974bdff"
+  },
+  {
+    "路径": "桌宠/desktop_control/planner.py",
+    "SHA256": "6a9c3498308f004cedc8234c91489dbbb22cc5906150449cfc095329c5c67e6a"
+  },
+  {
+    "路径": "桌宠/desktop_control/runtime.py",
+    "SHA256": "87007fbbecb598df43d18317c08a63a4dd2820f8a06113709403a3174bdd987c"
+  },
+  {
+    "路径": "桌宠/desktop_control/streaming.py",
+    "SHA256": "a826d27c24a0120dd7586baf873059494694d9ed1fde098805f2e983cc2a2db3"
+  },
+  {
+    "路径": "桌宠/desktop_control/tools.py",
+    "SHA256": "8c6946edf496208c44ad1a95c6f0d916d3b944a0d07b05b0578a8aa554b520e4"
+  },
+  {
+    "路径": "桌宠/desktop_control/windows.py",
+    "SHA256": "969ee6f94a18dc53c06ca1cb8d085ef57daef32bd09555c231ffa023d16adc41"
+  },
+  {
+    "路径": "桌宠/desktop_remote.py",
+    "SHA256": "54324f735e99c7589a9735602ad1ab7881ba709f1dd3a90a00eff8b1d33f94a1"
+  },
+  {
+    "路径": "桌宠/hotkey_config.py",
+    "SHA256": "753694b93d890712ffd50bb4dbfdd1b8654179f2a302cc1f8691d435ccb0bc8c"
+  },
+  {
+    "路径": "桌宠/log_manager.py",
+    "SHA256": "a5b26e2ff606132d4f6399e2e27bfb6688069d49193bf5013773b9b0990e67b6"
+  },
+  {
+    "路径": "桌宠/main.py",
+    "SHA256": "69a87692da5ae4db824fa4bd15d185321fbc870924d0742e39f58421027ab6d0"
+  },
+  {
+    "路径": "桌宠/main_dynamic.py",
+    "SHA256": "eb017dbea8a130ea94f471dff06b1e2d4ab3cc66e02ac675d93e6a60bdda09c4"
+  },
+  {
+    "路径": "桌宠/model_transport.py",
+    "SHA256": "b9090df53f4c8d2945bbcbdbc7612812094deee547e0b14ece41bc96db740a22"
+  },
+  {
+    "路径": "桌宠/original_bridge.py",
+    "SHA256": "19a44b461c94a886cd3b10c03d0819152392740d37b0e507435f455e09fcde8d"
+  },
+  {
+    "路径": "桌宠/original_main.py",
+    "SHA256": "327cd357e48ec07393fd19eaba8bdbf6ea7eff9b9bef81de895ce6cc9bfe04a0"
+  },
+  {
+    "路径": "桌宠/original_runtime.py",
+    "SHA256": "1aef9063df340c79cfd60e85c78b2d2ca5cb32cc4a2dd4a2435a54bef08404e3"
+  },
+  {
+    "路径": "桌宠/perception/__init__.py",
+    "SHA256": "53562bb4894407819427a69a8c6ca697c1db1f6201685c662a40355ab6fba681"
+  },
+  {
+    "路径": "桌宠/perception/hotkey_listener.py",
+    "SHA256": "db2462cb4f49935b86c423961477f09ed7a731b574508fe8c98ba7e1e3a486b2"
+  },
+  {
+    "路径": "桌宠/perception/screen_capture.py",
+    "SHA256": "61c555e6ecc1a19ae982f984fecf30a038a2ba84fde97eee691bbc9ff48026de"
+  },
+  {
+    "路径": "桌宠/perception/tencent_asr.py",
+    "SHA256": "981e708ae65370cee888bb80bcca7536319363cbd1c8965765e1a033c90a9582"
+  },
+  {
+    "路径": "桌宠/perception/window_tracker.py",
+    "SHA256": "b898c3e59ec813a807435a4027ae8d6db19c6a3d86e0911ba1596e7295021775"
+  },
+  {
+    "路径": "桌宠/pet_actions.py",
+    "SHA256": "ddcc759126d796a81ec5988c4ed5636007563f0face8c38ececc6858c6f40d1b"
+  },
+  {
+    "路径": "桌宠/pet_features/LICENSE-MIT.txt",
+    "SHA256": "a0bd72ed57d1fbf8e445ec50f00127b09478c6b0a0abd149c7309cd4e53b2bce"
+  },
+  {
+    "路径": "桌宠/pet_features/accounting.py",
+    "SHA256": "e32742a790cfc5f4d3bb0949efb2b969aeaf43dda3b7f9d6d2ae15beab65451d"
+  },
+  {
+    "路径": "桌宠/pet_features/agent_logs.py",
+    "SHA256": "c3aaa9186aec7c1c7d5fab3ea3d32be89753b3a4c7d73d83c5dc0c69afa4f6d2"
+  },
+  {
+    "路径": "桌宠/pet_features/backend.py",
+    "SHA256": "ffeb09702296cba5ef6e69ad877620cd8a16cf13b5c9daf7ab8bca5a46409a50"
+  },
+  {
+    "路径": "桌宠/pet_features/backend_extended.py",
+    "SHA256": "a9ae258c67f8e0618f65ab690decf352726872d2d94941b5091fbb905edd7fb9"
+  },
+  {
+    "路径": "桌宠/pet_features/backend_state.py",
+    "SHA256": "6cda9257e326fc92501589b5cea7c9b681ef3afa717610652e90f4a357c33528"
+  },
+  {
+    "路径": "桌宠/pet_features/balance_auto.py",
+    "SHA256": "bb683cd2a63009e426a4462b39e1bc22cdeee0419ca241957be9da66ad0cc647"
+  },
+  {
+    "路径": "桌宠/pet_features/config.py",
+    "SHA256": "a028fb496ba74ca821b9771ebd87b41e365fbf70037ae51a974a7d31305c5d66"
+  },
+  {
+    "路径": "桌宠/pet_features/desktop_tools.py",
+    "SHA256": "7529182fe138b0ca50c8de3b2352551b322f46494a47cff4ea6612e48c23c928"
+  },
+  {
+    "路径": "桌宠/pet_features/events.py",
+    "SHA256": "82151ba64cd75c8fd248b1c55470300c2037027d6466e699a850708ea5c740ac"
+  },
+  {
+    "路径": "桌宠/pet_features/interaction.py",
+    "SHA256": "0658311adf86ba6cc7d5d904d7d299386309a72d3c860b349eeddf4530b99e6c"
+  },
+  {
+    "路径": "桌宠/pet_features/interaction_visual.py",
+    "SHA256": "b91d8723cf9dbe71036b4bb7b4faf7e44d13a4ccec289ed5bb4edd4c06ae07d3"
+  },
+  {
+    "路径": "桌宠/pet_features/media.py",
+    "SHA256": "54d8026903cfc6f77b7f2d25891aa2944f1b2e095224058c110522307fff8896"
+  },
+  {
+    "路径": "桌宠/pet_features/motion.py",
+    "SHA256": "2bb239a22e1286d266ea5f7b676efeb488c4d241d493c3001ffcd9cb264624f1"
+  },
+  {
+    "路径": "桌宠/pet_features/motion_bounds.py",
+    "SHA256": "b3264e70aafffca50254597265d303f64c32dfe1249028fe9e3deb26cb530c87"
+  },
+  {
+    "路径": "桌宠/pet_features/report_text.py",
+    "SHA256": "028b73b2466e9da65bfbfb7386c31e4de70fc97d987927f5b75d483ac684c6b6"
+  },
+  {
+    "路径": "桌宠/pet_features/resources.py",
+    "SHA256": "9673f3b69e599461b1938f749091e4ef0b6d12469c9f8aa9b0abbee51c845888"
+  },
+  {
+    "路径": "桌宠/pet_features/runtime.py",
+    "SHA256": "896b776bb7fb173f0fa727cdbf0bbf72a76320c45ec8ebf33048517a1127b554"
+  },
+  {
+    "路径": "桌宠/pet_features/runtime_local.py",
+    "SHA256": "be20e7563a29c4c050d5e98caed546f1b37fd2fada8a13f2cb411b16c8ce69c5"
+  },
+  {
+    "路径": "桌宠/pet_features/system_features.py",
+    "SHA256": "e07b750720ea9c64fb9a4f046c70f26d5c3348f531be8ef85a07eeae7cccb357"
+  },
+  {
+    "路径": "桌宠/pet_features/system_windows.py",
+    "SHA256": "be62b7f746a4005af7f1755e10bf67cb534a7834734829ee8cfd80dea5645619"
+  },
+  {
+    "路径": "桌宠/pet_features/ui_schema.py",
+    "SHA256": "f3a598180fb1a9ba9eb68b9eb1c4225750706dafb1daddce87d2b096cfffe2d7"
+  },
+  {
+    "路径": "桌宠/pet_features/usage.py",
+    "SHA256": "bf5bca0fedac0fc5317f32eb70d43c9c0a34f5931e399e2303885d2f7feb477a"
+  },
+  {
+    "路径": "桌宠/pet_features/weather.py",
+    "SHA256": "c54942041283bbd9109f8daf2909c57610b652f97fabc01d330af00daad1d48b"
+  },
+  {
+    "路径": "桌宠/pet_features/来源说明.md",
+    "SHA256": "b00e493e3bf1b9411b33e84ad922cf7dc1981903d31c7213872f232625ea6611"
+  },
+  {
+    "路径": "桌宠/pytest.ini",
+    "SHA256": "6dfb1f2d67a1a812b22a6900121b87d2a00d375fb034d37fbdcd17dc1ae04c20"
+  },
+  {
+    "路径": "桌宠/qa_budget.py",
+    "SHA256": "25b898fbac4822fb51f7925bbd69eef0871ce3eee54ecd1316a5c8a6783feea2"
+  },
+  {
+    "路径": "桌宠/qa_capabilities.py",
+    "SHA256": "89b907ad6485bee8e029d5e4673225badd0684be86d9cc9f3a51e969e0148523"
+  },
+  {
+    "路径": "桌宠/qa_menu.py",
+    "SHA256": "6a0b2c94af1e147e6bbfdc333d8b7e009f942b67bc73bda3708509bd264782f1"
+  },
+  {
+    "路径": "桌宠/qa_models.py",
+    "SHA256": "5b3e658b57e9462fcb79ca499fd837d0c2206f55095867eaa21207936553feaf"
+  },
+  {
+    "路径": "桌宠/qa_requests.py",
+    "SHA256": "5b15e5e91a448e22b1d930bd35cac6fbcb84c8cdc20ce2a73cb2d0b2d9880844"
+  },
+  {
+    "路径": "桌宠/qa_runtime.py",
+    "SHA256": "86c13c3e46e5d3e67b2519fac9b5894402742839e11177c9d78d5dbc94d65e3d"
+  },
+  {
+    "路径": "桌宠/qa_session.py",
+    "SHA256": "b58ca58afbb0539d98a280031ced5bd0bb3aad94217914d2f21471352da37194"
+  },
+  {
+    "路径": "桌宠/qa_store.py",
+    "SHA256": "cdcee703898bc6b3a842d14ea0c990a79f46052f68670c1c32c48720192154c2"
+  },
+  {
+    "路径": "桌宠/requirements-companion.txt",
+    "SHA256": "f7dc527f283b9d7eb6d9a931350a9c755710506844098d38ad48b9f2fdfdb5f3"
+  },
+  {
+    "路径": "桌宠/requirements-features.txt",
+    "SHA256": "ba93900081e2446bfc03773049ab2bfb13bdfe001a3cca7a3562ff21f2e10a1b"
+  },
+  {
+    "路径": "桌宠/requirements.txt",
+    "SHA256": "dc0909963ea93c95b3817b0970582cc77eb87f285a661a21054b883454838878"
+  },
+  {
+    "路径": "桌宠/smart_audio.py",
+    "SHA256": "01eec106986e6706aef1de6d78483d9ec611f6c1037e9339a0e536ade3583df6"
+  },
+  {
+    "路径": "桌宠/smart_config.py",
+    "SHA256": "61fc21279f21af97ac512a889992cc291fc192c2d9061be7ddb3a5bbcbbde600"
+  },
+  {
+    "路径": "桌宠/smart_models.py",
+    "SHA256": "414b4f4e9a4500c8458224aa2c4668b9bd795fb78f1f02d9981eb6ea12b3aa7d"
+  },
+  {
+    "路径": "桌宠/smart_policy.py",
+    "SHA256": "bb06220481e46ce77978f47449f98f62b0c3411ca2acd27b57b32d56066e912f"
+  },
+  {
+    "路径": "桌宠/smart_runtime.py",
+    "SHA256": "ff36bb62ea5da7da07ddff21e7d2777f9c79e614f72a9278a5a1e8ea90ed1129"
+  },
+  {
+    "路径": "桌宠/smart_windows.py",
+    "SHA256": "5b43464792c16a67bc9dff2e7cf113a82383b47963f67188a84f4b6267f9ed69"
+  },
+  {
+    "路径": "桌宠/speech_input.py",
+    "SHA256": "a61b8d2af1c46c6fa8367d4179817b965aaf239bd4ef9113ce5cabe12ce2a50c"
+  },
+  {
+    "路径": "桌宠/speech_models.py",
+    "SHA256": "d8c01c9da51c6c0f93a5a701ffa425dc1c3354e2c17ecf8dca90390a969b58dc"
+  },
+  {
+    "路径": "桌宠/start_dynamic_pet.sh",
+    "SHA256": "3a457808f7bf6848b0d743376138a973fb8263630b57de89de25907bedd93af0"
+  },
+  {
+    "路径": "桌宠/start_pet.bat",
+    "SHA256": "5b56bc9370c530223826f8d5a8c6c769b20d0645eb8083d4e376ed429947015f"
+  },
+  {
+    "路径": "桌宠/start_pet.sh",
+    "SHA256": "59106704d547efefb1857c66909eec7f79056ba6f95fcbb25024896a93b9b494"
+  },
+  {
+    "路径": "桌宠/start_pet_silent.vbs",
+    "SHA256": "3ec150ac4cf888a1cbe0fb8b5e5b34cd34386020addf54eac6e820e3acd6a419"
+  },
+  {
+    "路径": "桌宠/tests/test_action_settings.py",
+    "SHA256": "b8cdb9cde4576c70d251079605b944589e742d6d965fd80db2fe18886efbdb4a"
+  },
+  {
+    "路径": "桌宠/tests/test_cloud_records.py",
+    "SHA256": "b9584c53a7d5f5d64bce78665ca47cb22f5e98e496df4b7b6735d7995a5e8009"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_capture.py",
+    "SHA256": "32eefc2cb38b9a290aea507e76657d1810639de6d515fc656493c0646e4cf68d"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_config.py",
+    "SHA256": "b7f91c480a14ef59b24a959b945ee31e4bbfcec2930e2eb5d282e3d2e9cb9836"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_controller.py",
+    "SHA256": "e47c3406561eafb512667074cd5eba6005a23fe60a50cb54980e3de429b9b96e"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_integration.py",
+    "SHA256": "2f84fdf3c01b83011590af25b83f0ddddf4c54000fcde63fadf6cf4548c779bd"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_link.py",
+    "SHA256": "d31c9b2a08130ca4cfc6a40155e47482704681be4c0f92e94dab7b9a45006223"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_models.py",
+    "SHA256": "3f901a66b5f99cd114d05d02586fac5ed82556d18a54d61965c24d27d37514b4"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_perception.py",
+    "SHA256": "ecf285471c7f5bce8a782d952f95a73808c26211b27efda65993b3a10280abb9"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_tts.py",
+    "SHA256": "a74cbe1f2f4bd510dd166f5e5a98c6902a947276cc3a7b8d0ca06f99e66f805d"
+  },
+  {
+    "路径": "桌宠/tests/test_companion_ui.py",
+    "SHA256": "81d98f7bc7b5cf2ea1a1eb4e3b34da94170798119401fee48272ebbd113a638a"
+  },
+  {
+    "路径": "桌宠/tests/test_deployment_bundle.py",
+    "SHA256": "c991cd54815b87a958b583a3a4ac045074dc013571f462974c16b47fe574e486"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_capture_visibility.py",
+    "SHA256": "dd26c9fb2f381914c748bec5314d227a20ad530c6138b8369bc6b27b54887d4a"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_entries.py",
+    "SHA256": "f8695792ba40e85a09d0fe9a3c6d6aef1dfe04ff547cdb922727a8d2d3b591c6"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_planner.py",
+    "SHA256": "9e8baae0029255ec8111214e1704d3bb056ce52800ef5e8fa5064ecae5b5df9c"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_runtime.py",
+    "SHA256": "844594e1a720ac4c50be0c657ebccb74f9b06afe76c013b9dcc8511dbac96c59"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_streaming.py",
+    "SHA256": "530e82e0ee08ff85df219cc87746d1e0c05cc2c451638690c493b65275b85798"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_taskbar.py",
+    "SHA256": "96b3e0ae01a87891f248b171d559efacc403354111259fbf4d034fef1db37bd8"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_tools.py",
+    "SHA256": "6e805a88ab9ed821a18c8dbc725dc942a24bc1d30925d42d14dce649a147794b"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_ui.py",
+    "SHA256": "ddc3bdcc363857dcc1c49dbe25091cf6446d161605c677d270ffff2f9b38c64a"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_control_voice.py",
+    "SHA256": "c59b9d566a27e34ac4807ca06e664e20c28926296916335ebfeac2dca29b6514"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_icon_targets.py",
+    "SHA256": "62cd1da9f94a6d5439026fd7446bccd066785312ee712b764bb01fcdc5e4120f"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_plugin.py",
+    "SHA256": "9d3d9d29154c22d77d41378532ab6bca48a0bc11aeb35c4e085785cf25349b0e"
+  },
+  {
+    "路径": "桌宠/tests/test_desktop_server.py",
+    "SHA256": "6aed178b2047f105a5993612db0925c1c9b45da270a55904dfe1b28aa80502d3"
+  },
+  {
+    "路径": "桌宠/tests/test_dynamic_actions.py",
+    "SHA256": "d3ec5bb8cbcb6620ec2babe27b3ba305ca2de96cde615aca9add7184e5056c9a"
+  },
+  {
+    "路径": "桌宠/tests/test_dynamic_geometry.py",
+    "SHA256": "526d58748a5caff9e4fb6133ac58b3688eeff0ee37e0ab968bd957aad2ed5a05"
+  },
+  {
+    "路径": "桌宠/tests/test_dynamic_interactions.py",
+    "SHA256": "a83a8e10cb78108fd56c7b12e2272fe41875440454390b698c892a1085cb12b3"
+  },
+  {
+    "路径": "桌宠/tests/test_external_desktop_motion.py",
+    "SHA256": "7f712a9e1ec0ebe1eb5622906fa625312b1d0cb757764625876e2862ac957f81"
+  },
+  {
+    "路径": "桌宠/tests/test_features_accounting.py",
+    "SHA256": "1d33a14f9568b4f9e938b860881cd3ec86527e6beb55b729d098a9bfaa26afd4"
+  },
+  {
+    "路径": "桌宠/tests/test_features_backend.py",
+    "SHA256": "5be65ce605cb059c145c96e253818af9c18b53d399e56f74a5fe5d79fee67978"
+  },
+  {
+    "路径": "桌宠/tests/test_features_balance_auto.py",
+    "SHA256": "61458379b2feb3dc70b1e74b6895c696376c64f78e407433afc4b3d4ec3b2d4f"
+  },
+  {
+    "路径": "桌宠/tests/test_features_balance_runtime.py",
+    "SHA256": "752c7cbda5ce5863e7c1b3ba5e84abeb39a495c8e90094dd9f8884c15f143035"
+  },
+  {
+    "路径": "桌宠/tests/test_features_config.py",
+    "SHA256": "f4f5edd9fa835d1792b815d232d6292a3e8503d44459d6cb8734e295afda7e0c"
+  },
+  {
+    "路径": "桌宠/tests/test_features_desktop.py",
+    "SHA256": "9cf19d9021ac57a0ecc4794d2f47b9b3fc1c796da5ac8c26c333306fa44537e2"
+  },
+  {
+    "路径": "桌宠/tests/test_features_events.py",
+    "SHA256": "e6a9033344ed304bd8703613b39088c1fbf9f3caec608af703b7227f48d46354"
+  },
+  {
+    "路径": "桌宠/tests/test_features_extended.py",
+    "SHA256": "84d6f063b84a592ff1434732958c22866090b572f0a82c63d075d99851663b5c"
+  },
+  {
+    "路径": "桌宠/tests/test_features_integration.py",
+    "SHA256": "0b7e4f1d52c393d6f98f7608463dc67bc5a15acde681615a0c81983708377bd3"
+  },
+  {
+    "路径": "桌宠/tests/test_features_local.py",
+    "SHA256": "8486f91d99997faae06e5c7717d7a06c163c493ff9d4532c05035a75ec9bb1a4"
+  },
+  {
+    "路径": "桌宠/tests/test_features_logs.py",
+    "SHA256": "73cceb5566ccd2592653afc2e31f64c919c3af542b17b264d40066de34e00f7a"
+  },
+  {
+    "路径": "桌宠/tests/test_features_media.py",
+    "SHA256": "2a2c2a283c74d31382cbcfd2a0485ebd4548f0e6b85949166056210204d02944"
+  },
+  {
+    "路径": "桌宠/tests/test_features_paint.py",
+    "SHA256": "1e8b7865c331af6a8f4aab6dd7cb5e9608ceea51f16a7a6a72216878e5be1b22"
+  },
+  {
+    "路径": "桌宠/tests/test_features_runtime.py",
+    "SHA256": "e66b176e8110aadf8289a6296c796f711a8b5b852151d105cf8b0633cb38d0f5"
+  },
+  {
+    "路径": "桌宠/tests/test_features_settings.py",
+    "SHA256": "a55ced37e4ddd07efafd71382025a9826d3784d95ab1ac4df75472f309f79335"
+  },
+  {
+    "路径": "桌宠/tests/test_features_sound.py",
+    "SHA256": "1370bfb421647a464a43e97b4910923030f6287698fccdddb2f3111a08df4cf1"
+  },
+  {
+    "路径": "桌宠/tests/test_features_system.py",
+    "SHA256": "33fbec4fe401c5191caef970ef4d00af0ab6bde59c45f4c279ff8d140914bf9f"
+  },
+  {
+    "路径": "桌宠/tests/test_features_weather.py",
+    "SHA256": "e56ee97243da735f287c4ba6d68bd3ba057881dbd9f2cd024627b9b8d99439be"
+  },
+  {
+    "路径": "桌宠/tests/test_interaction_integration.py",
+    "SHA256": "0dd012e9ca03a7ad17717d7a0bb247eec99e06cb2e179518c96a0eb0659cc0af"
+  },
+  {
+    "路径": "桌宠/tests/test_interaction_visual.py",
+    "SHA256": "10cb91d208d0cca03eb017678629c28ea201b4d7ff73510cbd9a00cdc158917d"
+  },
+  {
+    "路径": "桌宠/tests/test_key_bindings.py",
+    "SHA256": "6c67ba8bd2b79556284c0471ea43fab4d77ad80ae26acd94d4a6e1ea0b4b5bf6"
+  },
+  {
+    "路径": "桌宠/tests/test_model_entrypoints_timeout.py",
+    "SHA256": "3c24522dad27b129f6fec5069a64c29cf9821a00e7c71f109a59432657088f42"
+  },
+  {
+    "路径": "桌宠/tests/test_model_failures_visible.py",
+    "SHA256": "f995b73419bbaae1d738bba7dad366bb2b7f6352d36133477198698249d32703"
+  },
+  {
+    "路径": "桌宠/tests/test_model_selection.py",
+    "SHA256": "00098dc6560211ba5ecb4b7c6403e4af35cd6169ec0ab37b598680e31548e4f0"
+  },
+  {
+    "路径": "桌宠/tests/test_model_stream_review.py",
+    "SHA256": "2bd886ae702df0593b2fd265325d363877a99b1b67cfe71da80fbd580392be1e"
+  },
+  {
+    "路径": "桌宠/tests/test_model_timeout_settings.py",
+    "SHA256": "7d14ad32c42fccc8aee557d9c6e4e3ff679f10317abd14e4d20c9a130fe15275"
+  },
+  {
+    "路径": "桌宠/tests/test_model_transport.py",
+    "SHA256": "a7779e403dffe03efc2e4c8d95dc1e8802f898e234e018c49ecd5cbc18eab72c"
+  },
+  {
+    "路径": "桌宠/tests/test_motion.py",
+    "SHA256": "889fc297b471bd6e07a90f03977b2ace93a628eb859b54e112a50504b160f496"
+  },
+  {
+    "路径": "桌宠/tests/test_motion_bounds.py",
+    "SHA256": "39bb01ffb5881aea0b91a8810c50d165a97d0294dfd2fa0a528a9355ba1be6da"
+  },
+  {
+    "路径": "桌宠/tests/test_observation_logging.py",
+    "SHA256": "53ecb2f9b91ae909d6ae1412a1d6eb79fd2dd1c63b777b84735827ce2ef2c4fb"
+  },
+  {
+    "路径": "桌宠/tests/test_original_extension.py",
+    "SHA256": "24328c8662c1a6e6fb323ca97a7fa1c81270bb3c4979df8e5267b510f4d5ae86"
+  },
+  {
+    "路径": "桌宠/tests/test_original_shutdown.py",
+    "SHA256": "a7df3b307d1ea408aef41bbeb6f1b0464c4bc61c34213692bfdfb92dc035cdec"
+  },
+  {
+    "路径": "桌宠/tests/test_original_startup.py",
+    "SHA256": "5dfc44b9ffc0c0be7d89be4fa981f72422ed4d3f7a635b657a3ce11a8cb7ea1f"
+  },
+  {
+    "路径": "桌宠/tests/test_patrol_interval.py",
+    "SHA256": "3adcb7e92012bdfaaacaceba3eb95d4037c68cac9e4df94810715f80774cfe09"
+  },
+  {
+    "路径": "桌宠/tests/test_pet_actions.py",
+    "SHA256": "092008bdce9ed3f231ffbd0743d9d8db2b96cd2714873488915765c9869786fd"
+  },
+  {
+    "路径": "桌宠/tests/test_pet_interaction.py",
+    "SHA256": "1cb126555afc77cf215fa5505463279aa64c7c3b54fe3ab435595e2a61896434"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_backend_integration.py",
+    "SHA256": "b548d2236a6c1d5a81b867fb34607f4ff8b7fedfdc7aafdf023f3450901b5795"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_budget.py",
+    "SHA256": "85bc934a89c69d05bba0a907f79b013cd474e00c991e718b175e3d0afb8702bf"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_budget_cloud.py",
+    "SHA256": "38f8b02d8838b0be8d793c17214ada88b29b52395a8770deb7a57766c8326cd7"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_budget_requests.py",
+    "SHA256": "2dc9364f31a68d96f4c511ac5d344449adaa8254c6fb97ec40bc23efb5040774"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_capability_discovery.py",
+    "SHA256": "6e9db97a838803c91114d1def797be7f26402d92adde313d60f9c4fbd4b10ff9"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_cloud_context.py",
+    "SHA256": "7be6fe2f573767f982b2c2ade902c83e3eb8674bc333a6868c80fd6168faa50a"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_context_policy.py",
+    "SHA256": "1d7d089344584e49772a1a615ff8f165201ed9448c06e349a64e940edf3df6b6"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_context_settings.py",
+    "SHA256": "aab8ae921b61a9032bf6466cb31bf3494c55c1e42d81e26ab6a0846a1893b594"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_database_concurrency.py",
+    "SHA256": "7c0676fd66587a67189e27a9f2546d9efab90229b7aed762aab0d19c40d062c6"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_identity.py",
+    "SHA256": "5e789cd80f79607571f2fa13136421b68b71b9aa2bf85d64e5da14190a87e960"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_images.py",
+    "SHA256": "2ec5a641895b05a5870f4e792a46537f806c29d683839461e8dc09ee2490f7bb"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_lazy_images.py",
+    "SHA256": "7843d30d4401e0a5c2eafcdae76ea9be196b36eeb67daa90bc503e7f80435bfa"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_lifecycle.py",
+    "SHA256": "19b400032d2d8e6802b0f046ff8af88ee848fcd362bd3d591ae3fc7c8b97ce33"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_limits.py",
+    "SHA256": "66d91c23a6e6412ecd5c4558616e5693eadf469149b43dd8e279c985ce588f4a"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_mode_runtime.py",
+    "SHA256": "a10c2281e2a370f39cf2f9d5b0fdb72d80a9b5df399649650f217e732bf44e04"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_mode_session.py",
+    "SHA256": "95486fd397f8674179a297a5850b7a5537847a3e7e604da7fea607dc1ce8241a"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_mode_ui_native.py",
+    "SHA256": "68e5cea6e6998f6ee776cc6e3c47831d31a4e1111a60c3e4d1a8f63161f7fbbf"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_models.py",
+    "SHA256": "e330d5e48b938bde77bc715b0b6bf6ec265f94054fe46c84d4d721c30b722a75"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_outbox.py",
+    "SHA256": "5683ead4ceee0d91fe7a3bea6a81dba6857ca35b74cc04ac87915a2d6276b3c1"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_protocol.py",
+    "SHA256": "1ef0a2a4be07059e98c447fd86e630b9eda76469d0d9d5f490a43a6eb625356d"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_provider_guard.py",
+    "SHA256": "75a2d107f2753acb17266e90e3686ba0765abcc58166485ca128db88b540cbff"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_rendering.py",
+    "SHA256": "5458669e78654c7ed4d6f8cda57e6786f80b838550a43f42748fe41be6ff672d"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_request_guard.py",
+    "SHA256": "7db947147ecd43b83eefcf829129551bf2ffc238a46693a12ef781ab89416aa4"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_selection.py",
+    "SHA256": "2535ef22cb03345fb894fab43d83bf73b089c3050134103b633f330ebbbeb1ee"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_session.py",
+    "SHA256": "7f9075a881360d79d81ae43aeb9111137a00ff3e3978efcd01f0cd37e34df62e"
+  },
+  {
+    "路径": "桌宠/tests/test_qa_store.py",
+    "SHA256": "3dc1ee1e1897712c353c3a2f8eec4ba9b4b6b0113dea724375652ddb7debec16"
+  },
+  {
+    "路径": "桌宠/tests/test_remote_motion_context.py",
+    "SHA256": "ca9a75ce44e1fe92626d9d2968994c39a7f803cd25ae9af6ea5a712608860317"
+  },
+  {
+    "路径": "桌宠/tests/test_settings_layout.py",
+    "SHA256": "89daa402ae76843404e3548633508c55a593285516b4ced622f7bd9ef7b89eff"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_asr.py",
+    "SHA256": "2c35916fb938ba10cddacf8e52a23f619f540627cb5e88bfaddfe7de8e007aa6"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_audio.py",
+    "SHA256": "4d89a56a1ed04bd4cd264c3ec6e65a38efbda83a05ef9e4e671e76adf1911d27"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_entrypoints.py",
+    "SHA256": "ac5b76f388c94421b6d6fd2e0ce03865ca0e7fd25ee92573a313e5218dc8005c"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_models.py",
+    "SHA256": "20b1b5143af8c4e7e6eb2d2eae7f3c2f6762d404baecdef43dc04912b9cf427a"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_policy.py",
+    "SHA256": "f72934f5f7931f8a8c65ef2c084f178e878ca2f86b7881c9a5938746dbc54674"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_runtime.py",
+    "SHA256": "ececce16c94fb3ee8c32b61ed43a7b9d0d78690d8d278d7e7815315a714e09a1"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_settings.py",
+    "SHA256": "73b298152ee8fa081d482d52ea25475110c3502ccaeb4301b7a1772570c2e0a7"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_truncation.py",
+    "SHA256": "45232b0fd6901230d966c021d877dd222b419f96ca1a89164d35b3ab424985ae"
+  },
+  {
+    "路径": "桌宠/tests/test_smart_windows.py",
+    "SHA256": "15e16bd340916fc3fbed47fb24a47d15d5eeee3bd288064421ccf8f6dd0faeb5"
+  },
+  {
+    "路径": "桌宠/tests/test_speech_input.py",
+    "SHA256": "b5ce15e32515d0c14c587969e44d3d6bc9ba5fcbb20433652ca714973784504d"
+  },
+  {
+    "路径": "桌宠/tests/test_speech_models.py",
+    "SHA256": "7451b42aa5e11366a397a0416b3ea706790214098f690c16f5725e88700da84d"
+  },
+  {
+    "路径": "桌宠/tests/test_speech_runtime.py",
+    "SHA256": "2b4fbf4d592624a8ee7937bc6f8621c505a660d0ff84166cb44d50b5e94e4a0e"
+  },
+  {
+    "路径": "桌宠/tests/test_speech_settings.py",
+    "SHA256": "9681567d3bb285e67cd8034ca77b71c0c22a0840a7ddb1dffbdcda167436f052"
+  },
+  {
+    "路径": "桌宠/tts/__init__.py",
+    "SHA256": "c5ddb0cfeab9f098a52825a49075b9397569db9dcd0c10acaa06fddaa16c4eef"
+  },
+  {
+    "路径": "桌宠/tts/edge_speaker.py",
+    "SHA256": "d5ea22013511b6cf5285065ceedeabcd2265ede2e56d53ec40c532ee16fd1aec"
+  },
+  {
+    "路径": "桌宠/ui/__init__.py",
+    "SHA256": "f9030fe26844eed86253d67a0fc617cffe306d8bbbd626a1847893b3abffec8e"
+  },
+  {
+    "路径": "桌宠/ui/action_settings.py",
+    "SHA256": "5f2363de8a1c1fb916a2c0620f2a49b2e3cd20281ae3ed1d359dc1c58a1f8643"
+  },
+  {
+    "路径": "桌宠/ui/bubble_widget.py",
+    "SHA256": "753849c55c0ef2ac9e79a01f66323e0cad97b0b8c31208842fcfc7d64d2edb43"
+  },
+  {
+    "路径": "桌宠/ui/companion_settings.py",
+    "SHA256": "a33eb139c2f2e23eddda349fd016dcafdd64f5178b71f355b4a98c0e76b63dae"
+  },
+  {
+    "路径": "桌宠/ui/desktop_control.py",
+    "SHA256": "a4c6771b8f0396c46699aef3c6456ef7b6a9a186d91a4af1da8454f271ff3af4"
+  },
+  {
+    "路径": "桌宠/ui/dynamic_bubble_widget.py",
+    "SHA256": "b7e3f90a0def14dd13e22c6451763136bee269f17485846d1e14c176c82ac118"
+  },
+  {
+    "路径": "桌宠/ui/dynamic_pet_widget.py",
+    "SHA256": "30f48c33a81bbbad2f18338f59c19b4e70015ead58d0a569574ff94fd3320a11"
+  },
+  {
+    "路径": "桌宠/ui/features_rules.py",
+    "SHA256": "d3e13290efd1c4362110e61f41bec1db90c7f649627f2fc2106d92727e359a39"
+  },
+  {
+    "路径": "桌宠/ui/features_settings.py",
+    "SHA256": "e53d71e0f9a11781d2bddb66b1f2c75b128f90013a1cf4d31d65d27d115ab947"
+  },
+  {
+    "路径": "桌宠/ui/hotkey_settings.py",
+    "SHA256": "9ff92c5450912b0e31f731be47f49205d28b03ef409f40535b35f3ecb7279473"
+  },
+  {
+    "路径": "桌宠/ui/img_utils.py",
+    "SHA256": "6614b7398733511d3a6df1d824957ca9522494014350a8e68774ae2d586ca006"
+  },
+  {
+    "路径": "桌宠/ui/interaction_dialog.py",
+    "SHA256": "d588f851b76f228ef365f7736dcf1334022dfc02e1dd3ed63a04281c28e986ad"
+  },
+  {
+    "路径": "桌宠/ui/original_settings.py",
+    "SHA256": "e2d22657f730ae0bf72cec3544cff869da438367773d1c17952d159936efbbda"
+  },
+  {
+    "路径": "桌宠/ui/pet_widget.py",
+    "SHA256": "1dad87adcd411edbcd57ffcbd1f7f3f2b4b51f2e2c789b81f072e68a0c2286e2"
+  },
+  {
+    "路径": "桌宠/ui/qa_context_settings.py",
+    "SHA256": "39a1056dbf28e4d8536899d0afc6079d6a5cca8deca7012036054cb415c836e5"
+  },
+  {
+    "路径": "桌宠/ui/qa_markup.py",
+    "SHA256": "4604a81e565e5bcdf8894c37bc7a9b1dcfa49da8a442975882575053d47556e4"
+  },
+  {
+    "路径": "桌宠/ui/qa_renderer.py",
+    "SHA256": "816aadb0e0ad6d066f8e75a6084734bb414caa435959ba80427ea96a41bee37d"
+  },
+  {
+    "路径": "桌宠/ui/qa_window.py",
+    "SHA256": "23503496964bbf6c927ec7dfb621504abffbbef2040c64f4afe20233883e8e09"
+  },
+  {
+    "路径": "桌宠/ui/region_selector.py",
+    "SHA256": "ab6d651828ce141cb7fb78ec36faae8f5f11ca2ad3f650c1e25302ef2ea66689"
+  },
+  {
+    "路径": "桌宠/ui/settings_window.py",
+    "SHA256": "a3b5890965fe30a71caf7e25d7da67a9deef1c218eddece452811c1f59daecb1"
+  },
+  {
+    "路径": "桌宠/ui/smart_settings.py",
+    "SHA256": "8228835703785be2a2c15081e63d22e64ffa87fdd7b400f4481e0869f88d3522"
+  },
+  {
+    "路径": "桌宠/ui/speech_settings.py",
+    "SHA256": "95ad3930319cf6d3b498768f3da2b0b02ee923420e7b1821f00fde0a78d9dd13"
+  },
+  {
+    "路径": "桌宠/ui/tray_icon.py",
+    "SHA256": "ad082a34de746a7b58d3dda19c749325f5b800e6036c7b016bfc176f9f6eaf46"
+  },
+  {
+    "路径": "桌宠/ui/update_dialog.py",
+    "SHA256": "5ef546216ad6881de3563096b79806e2cb6facf7f3ca8b63980184ac8891e346"
+  },
+  {
+    "路径": "桌宠/update_checker.py",
+    "SHA256": "ebfb6db6949536ff9cb945f2b12e107bca61f25f086b9d3b669cedf8b43864a7"
+  },
+  {
+    "路径": "桌宠/version.py",
+    "SHA256": "ddfaa3525e693dfac98b2abf369e9e71e50fc2547395a24224867a99f55207f7"
+  },
+  {
+    "路径": "桌宠/启动动态版哈Gemi.bat",
+    "SHA256": "accb5f365561e72235bc5f786fd3693daa89c1fe4f189ddba844f893f843a11c"
+  },
+  {
+    "路径": "桌宠/启动桌宠.ps1",
+    "SHA256": "41e94cd17ac23cecdee6d7f8a01f830d30f1c07ac0b183fbea4deb7851a75cf8"
+  },
+  {
+    "路径": "桌宠/启动经典静态版哈Gemi.bat",
+    "SHA256": "522fb6d49814066236dbcb6150f38383d9a75c35fdb928fba6b111e25eac5b8a"
+  },
+  {
+    "路径": "桌宠/纯净版使用说明.md",
+    "SHA256": "d010c4f7af9a35cb431959cc1394585ccba2eb62cddd1733a1450d62d0207e72"
+  },
+  {
     "路径": "第三方与发布说明.md",
     "SHA256": "21d1e1363aaf84436ded26c0c6f3152dc906d89c5a21c193c6618c8aa5180f0a"
   },
   {
     "路径": "音色配置说明.json",
     "SHA256": "3e08f121728f70577bb19fd2d451d983ce53692eadf1262f06e5a1ca05a33449"
-  },
-  {
-    "路径": "docs/Gemini按需联网-20261110.md",
-    "SHA256": "481cd9ca8ce5c264b9c57f4e41ccc720ab8e6229254190d3a76c7c977127f4fa"
-  },
-  {
-    "路径": "docs/聊天无数据超时重试-20261110.md",
-    "SHA256": "2d434cb4f2d4033957cc1db56646d54e2467793a4d0564919f6854f9851b7e7b"
-  },
-  {
-    "路径": "AstrBot-master/data/plugins/astrbot_plugin_private_companion/tests/test_reasoning_output_boundary.py",
-    "SHA256": "4c2b7fba0608579b1a1ae043440e48042cb79b1d96d49e1901f51855221b15f7"
-  },
-  {
-    "路径": "docs/推理输出与任务结果反馈修复-20261115.md",
-    "SHA256": "94c472a7e1c5b9d3836038764bec75f1788bb2a0a37447b4846235a58ff5ddad"
   }
 ]

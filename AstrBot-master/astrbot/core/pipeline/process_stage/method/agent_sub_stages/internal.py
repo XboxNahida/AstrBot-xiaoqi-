@@ -209,6 +209,7 @@ class InternalAgentSubStage(Stage):
         original_send = None
         delivery = {"attempted": False, "confirmed": False, "unknown": False}
         agent_runner = None
+        runner_initialized = False
         try:
             streaming_response = self.streaming_response
             if (enable_streaming := event.get_extra("enable_streaming")) is not None:
@@ -405,6 +406,7 @@ class InternalAgentSubStage(Stage):
                     # apply reset
                     if reset_coro:
                         await reset_coro
+                    runner_initialized = True
 
                     if conversation_turn is not None:
                         agent_runner.conversation_turn = conversation_turn
@@ -610,7 +612,7 @@ class InternalAgentSubStage(Stage):
                     event.send = original_send
                 final = (
                     agent_runner.get_final_llm_resp()
-                    if agent_runner is not None
+                    if agent_runner is not None and runner_initialized
                     else None
                 )
                 complete = (

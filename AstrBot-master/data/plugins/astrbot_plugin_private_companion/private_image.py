@@ -1133,11 +1133,14 @@ class PrivateImageMixin:
             if callable(fallback_getter)
             else ""
         )
-        return [
+        candidates = [
             (_single_line(provider_settings.get("default_image_caption_provider_id"), 160), "astrbot_image_caption", prompt),
             (plugin_provider_id, "plugin_vision", prompt),
             (plugin_fallback_id, "plugin_vision_fallback", prompt),
         ]
+        if getattr(self, "provider_config_mode", "") == "centralized" and plugin_provider_id:
+            return candidates[1:]
+        return candidates
 
     def _private_image_visual_provider_card_key(self) -> str:
         # Image input is an independent capability in both provider modes.

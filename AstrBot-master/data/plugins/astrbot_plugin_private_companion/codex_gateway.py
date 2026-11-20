@@ -210,8 +210,8 @@ class CodexGateway:
             model: Exact permitted Responses model name.
             api_base: Host-selected API root; its path is preserved verbatim.
             api_key: Upstream secret held only by this host process.
-            idle_timeout: Connect/read idle boundary, capped at 60 seconds.
-            max_attempts: Failed-sequence upstream budget, capped at three.
+            idle_timeout: Connect/read idle boundary, capped at 600 seconds.
+            max_attempts: Host-configured failed-sequence upstream budget.
             on_event: Optional nonblocking metadata observer.
             headers: Optional host-selected headers, never supplied by Codex.
             proxy: Optional explicit host proxy; environment proxies are ignored.
@@ -276,8 +276,8 @@ class CodexGateway:
             model,
             api_base.rstrip("/"),
             api_key,
-            min(float(idle_timeout), 60.0),
-            min(max_attempts, 3),
+            min(float(idle_timeout), 600.0),
+            max_attempts,
             on_event,
             dict(headers or {}),
             proxy,

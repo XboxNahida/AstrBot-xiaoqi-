@@ -33,7 +33,7 @@ except ImportError:
 
 
 TASK_ROOT = Path("C:/AstrBotTasks")
-BOT_ROOT = Path(__file__).resolve().parents[4]
+BOT_ROOT = Path(__file__).resolve().parents[3]
 BROKER_ROOT = Path("C:/ProgramData/AstrBotTaskBroker")
 SCRIPT = BOT_ROOT / "deployment/配置受限任务执行.ps1"
 _SETUP_LOCK = asyncio.Lock()
@@ -379,7 +379,7 @@ class _SystemSetupProcess:
                 self.job, 9, ctypes.byref(limits), ctypes.sizeof(limits)
             ):
                 raise OSError("Cannot establish setup Job")
-            python = BOT_ROOT / "AstrBot-master/.venv/Scripts/python.exe"
+            python = BOT_ROOT / ".venv/Scripts/python.exe"
             argv = [
                 "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
                 "-NoLogo",

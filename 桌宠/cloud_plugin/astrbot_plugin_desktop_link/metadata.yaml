@@ -1,0 +1,8 @@
+name: astrbot_plugin_desktop_link
+display_name: 桌宠双向客户端
+short_desc: 桌宠连接、截图答疑、当日答疑与48小时观察记录。
+desc: 保留设备指令回执，新增独立多轮图文答疑与人格选择、当日纯文字答疑同步、观察日志过期和超过1000字总结。
+help: 管理员私聊发送“桌宠 配对 pc-one 我的电脑”，将配对码粘贴到本机桌宠。公开连接前须按说明配置Caddy路由。
+version: v1.2.2
+author: 本地工作区
+astrbot_version: ">=4.27,<5"

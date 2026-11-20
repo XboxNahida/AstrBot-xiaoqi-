@@ -256,7 +256,14 @@ class FinalResponsePersistenceCoordinator:
             original_send = getattr(event, "send", None)
             if callable(original_send):
                 async def tracked_send(message: Any, *args: Any, **kwargs: Any):
-                    send_result = await original_send(message, *args, **kwargs)
+                    try:
+                        send_result = await original_send(message, *args, **kwargs)
+                    except Exception as exc:
+                        # 适配器部分投递回执：只保存平台已确认内容，保留失败供调用方处理。
+                        confirmed = getattr(exc, "confirmed_delivery_chain", None)
+                        if isinstance(confirmed, (list, tuple)) and confirmed:
+                            await self.record(ledger.umo, confirmed)
+                        raise
                     if send_result is not False:
                         sent_chain = getattr(message, "chain", None)
                         if isinstance(sent_chain, (list, tuple)) and sent_chain:

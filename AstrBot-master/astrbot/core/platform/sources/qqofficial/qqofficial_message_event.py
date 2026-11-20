@@ -35,6 +35,18 @@ class APIReturnNoneError(Exception):
     pass
 
 
+class QQImageUploadError(RuntimeError):
+    """仅表示发消息之前的图片上传失败。"""
+
+
+class QQPartialDeliveryError(RuntimeError):
+    """发送未全部完成，携带平台已确认的组件供历史记录使用。"""
+
+    def __init__(self, reason: str, confirmed_delivery_chain: list):
+        super().__init__(reason)
+        self.confirmed_delivery_chain = tuple(confirmed_delivery_chain)
+
+
 def ensure_qq_client_active(bot: Client) -> None:
     """Cancel stale sends before botpy can reopen its HTTP session.
 
@@ -279,8 +291,43 @@ class QQOfficialMessageEvent(AstrMessageEvent):
         stream_for_chain = stream if len(message_chains) == 1 else None
 
         ret = None
+        confirmed = []
         for message_chain in message_chains:
-            ret = await self._post_send_one(message_chain, stream_for_chain)
+            try:
+                ret = await self._post_send_one(message_chain, stream_for_chain)
+            except QQImageUploadError as exc:
+                # 上传尚未发送任何消息，可安全保留本段正文；发送阶段异常不能走此分支。
+                text_chain = message_chain.derive(
+                    [c for c in message_chain.chain if not isinstance(c, Image)]
+                )
+                if any(isinstance(c, Plain) and c.text.strip() for c in text_chain.chain):
+                    try:
+                        ret = await self._post_send_one(text_chain)
+                    except Exception as send_exc:
+                        if confirmed:
+                            raise QQPartialDeliveryError(
+                                "image_upload_failed: text_delivery_unconfirmed", confirmed
+                            ) from send_exc
+                        raise
+                    if not self._extract_response_message_id(ret):
+                        raise QQPartialDeliveryError(
+                            "image_upload_failed: text_delivery_unconfirmed", confirmed
+                        ) from exc
+                    confirmed.extend(text_chain.chain)
+                    logger.warning(
+                        "[QQOfficial] 图片上传失败，已仅发送同条正文；图片未发送。"
+                    )
+                raise QQPartialDeliveryError(
+                    "image_upload_failed: image_not_delivered", confirmed
+                ) from exc
+            except Exception as exc:
+                if confirmed:
+                    raise QQPartialDeliveryError(
+                        "partial_delivery: remaining_delivery_unconfirmed", confirmed
+                    ) from exc
+                raise
+            if self._extract_response_message_id(ret):
+                confirmed.extend(message_chain.chain)
 
         self.send_buffer = None
 
@@ -372,7 +419,7 @@ class QQOfficialMessageEvent(AstrMessageEvent):
                     return None
 
                 if image_base64:
-                    media = await self.upload_group_and_c2c_image(
+                    media = await self._upload_image_before_send(
                         image_base64,
                         self.IMAGE_FILE_TYPE,
                         group_openid=source.group_openid,
@@ -429,7 +476,7 @@ class QQOfficialMessageEvent(AstrMessageEvent):
 
             case botpy.message.C2CMessage():
                 if image_base64:
-                    media = await self.upload_group_and_c2c_image(
+                    media = await self._upload_image_before_send(
                         image_base64,
                         self.IMAGE_FILE_TYPE,
                         openid=source.author.user_openid,
@@ -604,6 +651,19 @@ class QQOfficialMessageEvent(AstrMessageEvent):
             ensure_qq_client_active(self.bot)
             return await send_func(fallback_payload)
 
+    async def _upload_image_before_send(self, image_base64, file_type, **kwargs):
+        """将上传错误与结果可能未知的消息发送错误明确区分。"""
+        try:
+            media = await self.upload_group_and_c2c_image(
+                image_base64, file_type, **kwargs
+            )
+            if not media:
+                raise APIReturnNoneError("上传图片未返回媒体")
+            return media
+        except Exception as exc:
+            # CancelledError 不属于 Exception，停用/取消始终向上透传。
+            raise QQImageUploadError("image_upload_failed") from exc
+
     async def upload_group_and_c2c_image(
         self,
         image_base64: str,
@@ -644,7 +704,11 @@ class QQOfficialMessageEvent(AstrMessageEvent):
         try:
             result = await _do_upload()
         except APIReturnNoneError:
-            logger.warning(f"上传图片API返回None，共尝试5次后放弃: {payload}")
+            logger.warning(
+                "上传图片API返回None，重试耗尽；file_type=%s，base64_length=%s",
+                file_type,
+                len(image_base64),
+            )
             raise
 
         if not isinstance(result, dict):

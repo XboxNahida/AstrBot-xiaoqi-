@@ -1847,12 +1847,12 @@ QQ空间 = 公开札记
         <div class="section-head models-page-head">
           <div class="models-page-heading">
             <h2>模型配置</h2>
-            <span class="muted">任务分流、语音合成与生图后端</span>
+            <span class="muted">聊天 · 主模型 · 中枢 · 图片 · 语音</span>
           </div>
           <nav class="models-subnav" aria-label="模型配置分类" role="tablist">
-            <button id="modelsProvidersTab" type="button" class="active" data-index="01" data-models-section="providers" role="tab" aria-controls="modelsProviderPane" aria-selected="true">任务模型</button>
+            <button id="modelsProvidersTab" type="button" class="active" data-index="01" data-models-section="providers" role="tab" aria-controls="modelsProviderPane" aria-selected="true">聊天 / 主模型 / 中枢</button>
             <button id="modelsTtsTab" type="button" data-index="02" data-models-section="tts" role="tab" aria-controls="modelsTtsPane" aria-selected="false">语音合成</button>
-            <button id="modelsImageTab" type="button" data-index="03" data-models-section="image" role="tab" aria-controls="modelsImagePane" aria-selected="false" hidden>生图模型</button>
+            <button id="modelsImageTab" type="button" data-index="03" data-models-section="image" role="tab" aria-controls="modelsImagePane" aria-selected="false" hidden>图片：识图 / 生图改图</button>
           </nav>
         </div>
         <div id="modelsProviderPane" data-models-pane="providers" role="tabpanel" aria-labelledby="modelsProvidersTab">
@@ -1865,6 +1865,7 @@ QQ空间 = 公开札记
               <span id="providerConfigModeHint">插件功能通常会携带较多动态上下文，Token 缓存命中率可能较低，请结合调用频率和预算合理规划模型。</span>
             </div>
             <div class="provider-config-mode" aria-label="模型配置模式">
+              <button type="button" data-provider-config-mode="centralized">集中配置（推荐）</button>
               <button type="button" data-provider-config-mode="quick" class="active">快速配置</button>
               <button type="button" data-provider-config-mode="precision">精准配置</button>
             </div>
@@ -1891,6 +1892,7 @@ QQ空间 = 公开札记
           <div id="ttsModelEditor"></div>
         </div>
         <div id="modelsImagePane" class="image-model-pane" data-models-pane="image" role="tabpanel" aria-labelledby="modelsImageTab" hidden>
+          <div id="imageVisionConfig"></div>
           <div id="imageModelSummary" class="image-model-summary"></div>
           <div id="imageModelEditor"></div>
           <div class="image-model-actions">
@@ -2032,6 +2034,6 @@ QQ空间 = 公开札记
   <!-- Loaded on demand by app.js through AstrBot's relative dynamic-import rewriting:
        ./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&amp;manual=provider-input-v2
        ./js/panels/qzone-panel.js?v=20260810-qzone-classic-loader-v1 -->
-  <script src="./app.js?v=20260809-proactive-tts-external-ability-photo-fixed-v1&amp;build=20260810-reference-upload-v2&amp;page=lazy-classic-loader-v1&amp;scope=photo-scope-quota-v1&amp;touch=reality-workspace-v1&amp;memory-source=memory-companion-v2&amp;user-create=profile-v1&amp;relationship-role-photo=pr125-v1&amp;camera-runtime-scope=v1&amp;config=config-lifecycle-v1&amp;troubleshooting=diagnostic-category-label-v1&amp;content-visibility=v1&amp;migration-notice=v4&amp;component-order=v1&amp;release=6.3.1&amp;tts=singing-provider-20261031&amp;task-model=20261104"></script>
+  <script src="./app.js?v=20260809-proactive-tts-external-ability-photo-fixed-v1&amp;build=20260810-reference-upload-v2&amp;page=lazy-classic-loader-v1&amp;scope=photo-scope-quota-v1&amp;touch=reality-workspace-v1&amp;memory-source=memory-companion-v2&amp;user-create=profile-v1&amp;relationship-role-photo=pr125-v1&amp;camera-runtime-scope=v1&amp;config=config-lifecycle-v1&amp;troubleshooting=diagnostic-category-label-v1&amp;content-visibility=v1&amp;migration-notice=v4&amp;component-order=v1&amp;release=6.3.1&amp;tts=singing-provider-20261031&amp;task-model=20261104&amp;models=central-20261112&amp;request-policy=20261117"></script>
 </body>
 </html>

@@ -471,7 +471,7 @@ class CodexRuntime:
             api_key=key,
             api_base=config["api_base"],
             idle_timeout=policy.timeout_seconds,
-            max_attempts=min(policy.max_attempts, 3),
+            max_attempts=policy.max_attempts,
             headers=config.get("custom_headers"),
             proxy=config.get("proxy"),
             on_event=lambda event: self._gateway_event(state, event),
@@ -1203,8 +1203,8 @@ class CodexRuntime:
             policy = request_policy(
                 {"primary": "codex", **job.metadata.get("request", {})}
             )
-            retries = max(0, min(policy.max_attempts, 3) - 1)
-            idle = max(1, min(policy.timeout_seconds, 60))
+            retries = max(0, policy.max_attempts - 1)
+            idle = max(1, min(policy.timeout_seconds, 600))
             argv += [
                 "-c",
                 f"model_providers.astrbot.request_max_retries={retries}",

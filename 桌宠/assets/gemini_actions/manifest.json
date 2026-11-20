@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "id": "gemini-pet",
+  "name": "gemini",
+  "canvasWidth": 640,
+  "canvasHeight": 360,
+  "animations": [
+    {
+      "id": "待机呼吸休闲",
+      "name": "待机呼吸休闲",
+      "category": "待机",
+      "sources": {
+        "webp": "spritesheet/待机呼吸休闲.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    },
+    {
+      "id": "螃蟹走路",
+      "name": "螃蟹走路",
+      "category": "移动",
+      "sources": {
+        "webp": "spritesheet/螃蟹走路.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "moving": [
+        [
+          26,
+          89,
+          1.0
+        ]
+      ],
+      "facing": "left"
+    },
+    {
+      "id": "被鼠标拖拽悬空反馈",
+      "name": "被鼠标拖拽悬空反馈",
+      "category": "拖拽",
+      "sources": {
+        "webp": "spritesheet/被鼠标拖拽悬空反馈.webp"
+      },
+      "spritesheet": {
+        "frameWidth": 640,
+        "frameHeight": 360,
+        "columns": 8,
+        "rows": 15,
+        "frameCount": 120,
+        "fps": 12
+      },
+      "facing": "left"
+    }
+  ],
+  "metadata": {
+    "resourceFormat": "Per-action lossy WebP spritesheets with alpha; optional AAC m4a audio track",
+    "sourceVideos": "*.webm enumerated from --source-dir; filename without extension is the animation id",
+    "conversion": {
+      "frameWidth": 640,
+      "frameHeight": 360,
+      "fps": 12,
+      "columns": 8,
+      "rows": "ceil(actual fps-filtered frame count / columns)",
+      "frameCountMethod": "FFmpeg fps filter -> null output -> final progress frame count",
+      "imageFormat": "webp",
+      "lossless": false,
+      "maxImageBytes": 2000000,
+      "qualityCeiling": 100,
+      "qualitySearch": "Per-image RGB integer binary search; alpha quality 50/25/10/1 as needed; encoded bytes strictly below maxImageBytes",
+      "encoder": "cwebp -m 4 -mt",
+      "alphaHandling": "Source alpha preserved via RGBA tiles; alpha-free sources encode fully opaque and libwebp omits the alpha plane",
+      "audio": "First audio stream extracted to audio/<id>.m4a (AAC; stream copy when the source is already AAC, otherwise 192k re-encode); a silent source retains an existing m4a from an earlier export of the same performance (json AudioNote); no manifest audio reference only when neither exists",
+      "script": "convert_video_pet_spritesheet.py"
+    }
+  },
+  "idleAnimationId": "待机呼吸休闲",
+  "movement": {
+    "leftAnimationId": "螃蟹走路",
+    "rightAnimationId": "螃蟹走路",
+    "dragAnimationId": "被鼠标拖拽悬空反馈",
+    "speed": 40,
+    "minIdleSeconds": 10,
+    "maxIdleSeconds": 10
+  },
+  "regions": [
+    {
+      "id": "head",
+      "name": "head",
+      "x": 0.3611766247379455,
+      "y": 0.0685272536687631,
+      "width": 0.2566660115303983,
+      "height": 0.39156766829722806,
+      "enabled": true,
+      "priority": 0
+    },
+    {
+      "id": "body",
+      "name": "body",
+      "x": 0.33862355870020966,
+      "y": 0.4704315164220825,
+      "width": 0.32332612683438156,
+      "height": 0.4294636617749825,
+      "enabled": true,
+      "priority": 1
+    }
+  ]
+}

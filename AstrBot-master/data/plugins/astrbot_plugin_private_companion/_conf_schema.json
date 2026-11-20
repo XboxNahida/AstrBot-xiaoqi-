@@ -92,7 +92,7 @@
         "type": "string",
         "default": "",
         "_special": "select_provider",
-        "hint": "插件所有未单独指定模型的 LLM 任务都会回退到这里；留空则使用 AstrBot 默认会话模型。"
+        "hint": "集中配置模式下请选择此模型，零散文本功能统一继承这里的主备。其他模式下，未单独指定的任务回退到这里；留空使用 AstrBot 默认会话模型。"
       },
       "storage_backend": {
         "description": "主数据保存方式",
@@ -4771,6 +4771,7 @@
     "default": "",
     "options": [
       "",
+      "centralized",
       "quick",
       "precision"
     ],
@@ -4816,6 +4817,12 @@
   },
   "model_token_limit_overrides": {
     "description": "Legacy flat config: 模型卡片单次 Token 上限",
+    "type": "text",
+    "default": "{}",
+    "invisible": true
+  },
+  "model_request_attempt_overrides": {
+    "description": "模型卡片最多请求次数（包含首次）",
     "type": "text",
     "default": "{}",
     "invisible": true
@@ -4957,10 +4964,10 @@
         "hint": "常用low、medium、high、xhigh，也可填写模型支持的其他非空档位，最多64字符；新对话生效，Gemini可按对话修改。"
       },
       "task_model_timeout_seconds": {
-        "description": "后台模型流式无响应超时（秒，最多60）",
+        "description": "后台模型流式无响应超时（秒，最多600）",
         "type": "int",
         "default": 60,
-        "hint": "统一流式，沿用原超时作为连续无数据的等待时间，大于60秒按60秒；正文、推理和工具参数分片均刷新计时。单次模型请求总边界600秒，整体任务和工具执行另行计时。"
+        "hint": "首字等待和流中连续无数据均使用此值，可设1至600秒；正文、推理和工具参数分片刷新计时。单次模型请求总边界600秒，整体任务和工具执行另行计时。"
       },
       "task_model_max_attempts": {
         "description": "后台模型最多请求次数（包含首次）",
@@ -4986,13 +4993,15 @@
       "provider_config_mode": {
         "description": "模型配置模式",
         "type": "string",
-        "hint": "快速配置：只填写快速响应、复杂推理、创作和插件识图，运行时按这几项覆盖任务分流。精准配置：逐项指定下方任务 Provider，快速模型入口不参与回退。选择快速/精准后，官方配置页只显示当前模式需要填写的模型；切换不会清空另一套旧值。旧配置若没有保存过模式，启动时会按已填写的分流模型自动补成快速或精准。",
+        "hint": "集中配置：零散文本功能统一继承主模型及其备用，辅助识图统一继承插件识图；聊天、中枢、后台任务和真实图片/语音接口保持独立。快速配置和精准配置保留原分流，切换不会清空旧值。推荐在陪伴面板的模型配置页集中设置。",
         "default": "quick",
         "options": [
+          "centralized",
           "quick",
           "precision"
         ],
         "labels": [
+          "集中配置（推荐）",
           "快速配置",
           "精准配置"
         ]
@@ -5321,14 +5330,14 @@
         "hint": "快速配置的通用视觉入口。用于私聊单图/表情包转述、群聊图片理解、引用图片、合并消息图片和识屏；夹层阅读始终使用下方独立的专用模型。",
         "default": "",
         "condition": {
-          "provider_config_mode": "quick"
+          "provider_config_mode": ["quick", "centralized"]
         },
         "_special": "select_provider"
       },
       "PRIVATE_READING_VISION_PROVIDER_ID": {
         "description": "夹层阅读视觉模型",
         "type": "string",
-        "hint": "始终仅用于夹层阅读的封面/抽样页理解、页边批注、读后感、评分和阅读偏好标签，不会跟随通用插件识图模型。必须填写支持图片输入的视觉模型；留空或模型不可用时不会生成阅读视觉结果。",
+        "hint": "用于夹层阅读的封面/抽样页理解、页边批注、读后感、评分和阅读偏好标签。集中配置模式下继承插件识图主备；其他模式保留此独立视觉配置。必须使用支持图片输入的模型。",
         "default": "",
         "condition": {
           "enable_private_reading_integration": true

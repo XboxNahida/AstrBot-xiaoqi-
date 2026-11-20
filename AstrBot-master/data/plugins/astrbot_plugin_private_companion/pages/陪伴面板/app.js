@@ -143,6 +143,7 @@ const state = {
   providerConfigMode: "",
   providerDraft: {},
   providerTimeoutDraft: {},
+  providerAttemptDraft: {},
   providerTokenLimitDraft: {},
   providerFallbackDraft: {},
   providerTestResults: {},
@@ -279,7 +280,7 @@ const featureSwitchExcludedKeys = new Set([
 ]);
 
 const providerLabels = {
-  CONVERSATION_CHAT_PROVIDER_ID: "独立聊天模型（Gemini / Grok）",
+  CONVERSATION_CHAT_PROVIDER_ID: "独立聊天模型",
   CONVERSATION_CHAT_FALLBACK_PROVIDER_ID: "独立聊天备用模型",
   CONVERSATION_TASK_PROVIDER_ID: "独立后台任务模型",
   CONVERSATION_TASK_FALLBACK_PROVIDER_ID: "后台任务备用模型",
@@ -502,6 +503,7 @@ function providerNeedsLowLatency(key) {
 
 function normalizeProviderConfigMode(value) {
   const text = String(value || "").trim().toLowerCase();
+  if (["centralized", "集中配置"].includes(text)) return "centralized";
   const aliases = {
     fast: "quick",
     simple: "quick",
@@ -535,6 +537,9 @@ function currentProviderConfigMode() {
 }
 
 function providerAllowedInCurrentMode(key) {
+  if (currentProviderConfigMode() === "centralized") {
+    return ["LLM_PROVIDER_ID", "CONVERSATION_CHAT_PROVIDER_ID", "CONVERSATION_CHAT_FALLBACK_PROVIDER_ID", "CONVERSATION_HUB_PROVIDER_ID", "PLUGIN_VISION_PROVIDER_ID"].includes(key);
+  }
   if (alwaysVisibleProviderKeys.has(key)) return true;
   const mode = currentProviderConfigMode();
   return mode === "quick" ? quickProviderKeys.has(key) : !quickProviderKeys.has(key);
@@ -543,11 +548,15 @@ function providerAllowedInCurrentMode(key) {
 function syncProviderConfigModeControls() {
   const mode = currentProviderConfigMode();
   const quick = mode === "quick";
+  const central = mode === "centralized";
+  const saveButton = document.getElementById("saveProvidersBtn");
+  if (saveButton) saveButton.textContent = central ? "保存集中模型配置" : "保存并覆盖两套模型配置";
   document.querySelectorAll("[data-provider-config-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.providerConfigMode === mode);
   });
   const toolbar = document.querySelector(".provider-toolbar");
   toolbar?.classList.toggle("is-quick-mode", quick);
+  toolbar?.querySelectorAll("#providerFilter, .provider-mode-switch").forEach((item) => { item.hidden = central; });
   const filter = document.getElementById("providerFilter");
   if (filter && quick) filter.value = "";
   document.querySelectorAll("[data-provider-mode]").forEach((button) => {
@@ -558,7 +567,9 @@ function syncProviderConfigModeControls() {
   const hint = document.getElementById("providerConfigModeHint");
   if (hint) {
     const tokenCostHint = "插件功能通常会携带较多动态上下文，Token 缓存命中率可能较低，请结合调用频率和预算合理规划模型。";
-    hint.textContent = quick
+    hint.textContent = central
+      ? "聊天、主模型、中枢在下方固定配置；图片和语音使用上方固定入口。零散文本功能自动继承主模型及其备用，后台任务继续由聊天模型管理；旧分流值保留但不参与集中模式。"
+      : quick
       ? `${tokenCostHint} 快速配置显示通用场景模型；插件识图、夹层阅读视觉和通用嵌入模型各自独立。`
       : `${tokenCostHint} 精准配置显示各任务单独 Provider；独立识图与通用嵌入不会跟随文本模型改写。`;
   }
@@ -566,7 +577,7 @@ function syncProviderConfigModeControls() {
 
 function setProviderConfigMode(mode, { render = true } = {}) {
   state.providerConfigMode = normalizeProviderConfigMode(mode);
-  if (state.providerConfigMode === "quick") {
+  if (["quick", "centralized"].includes(state.providerConfigMode)) {
     state.providerMode = "all";
     state.providerFilter = "";
     const filter = document.getElementById("providerFilter");
@@ -5866,9 +5877,9 @@ function loadOptionalClassicScript(relativePath, retry = 0) {
 
 const optionalModuleLoaders = {
   providerTree: [
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 0),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 1),
-    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104", 2),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104&models=central-20261112&request-policy=20261117", 0),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104&models=central-20261112&request-policy=20261117", 1),
+    () => loadOptionalClassicScript("./js/panels/provider-tree.js?v=20260804-private-reading-capability-v1&manual=provider-input-v2&task-model=20261104&models=central-20261112&request-policy=20261117", 2),
   ],
   qzonePanel: [
     () => loadOptionalClassicScript("./js/panels/qzone-panel.js?v=20260810-qzone-classic-loader-v1", 0),
@@ -6704,6 +6715,7 @@ function applyOverviewData(overview) {
     .map((endpoint, index) => photoApiEndpointFingerprint(endpoint, index));
   state.providerConfigMode = inferProviderConfigMode(overview);
   state.providerTimeoutDraft = normalizeModelTimeoutOverrides(overview?.settings?.model_timeout_overrides);
+  state.providerAttemptDraft = {};
   state.providerTokenLimitDraft = normalizeModelTokenLimitOverrides(overview?.settings?.model_token_limit_overrides);
   state.providerFallbackDraft = normalizeModelFallbackOverrides(overview?.settings?.model_fallback_overrides);
   state.pageFontFamily = normalizePageFontFamily(overview?.settings?.page_font_family);
@@ -30877,21 +30889,23 @@ function renderTtsModelConfig() {
 }
 
 function syncModelsSectionControls() {
-  const sections = imageCompanionInstalled() ? ["providers", "tts", "image"] : ["providers", "tts"];
+  const central = typeof currentProviderConfigMode === "function" && currentProviderConfigMode() === "centralized";
+  const sections = imageCompanionInstalled() || central ? ["providers", "tts", "image"] : ["providers", "tts"];
   const requested = String(state.modelsSection || "providers");
   const section = sections.includes(requested) ? requested : "providers";
   state.modelsSection = section;
   const tablist = document.querySelector(".models-subnav");
   if (tablist) tablist.dataset.activeSection = section;
   document.querySelectorAll("[data-models-section]").forEach((button) => {
-    if (button.dataset.modelsSection === "image") button.hidden = !imageCompanionInstalled();
+    if (button.dataset.modelsSection === "image") button.hidden = !imageCompanionInstalled() && !central;
     const active = button.dataset.modelsSection === section;
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active ? "true" : "false");
     button.tabIndex = active ? 0 : -1;
     if (button.dataset.modelsSectionBound !== "1") {
       button.addEventListener("click", () => {
-        const currentSections = imageCompanionInstalled() ? ["providers", "tts", "image"] : ["providers", "tts"];
+        const currentCentral = typeof currentProviderConfigMode === "function" && currentProviderConfigMode() === "centralized";
+        const currentSections = imageCompanionInstalled() || currentCentral ? ["providers", "tts", "image"] : ["providers", "tts"];
         const previousIndex = Math.max(0, currentSections.indexOf(state.modelsSection));
         const nextSection = currentSections.includes(button.dataset.modelsSection) ? button.dataset.modelsSection : "providers";
         const nextIndex = Math.max(0, currentSections.indexOf(nextSection));
@@ -30901,7 +30915,7 @@ function syncModelsSectionControls() {
         }
         state.modelsSection = nextSection;
         renderProviders();
-        if (state.modelsSection === "image" && !state.lazyLoaded.imageApiStatus) {
+        if (state.modelsSection === "image" && imageCompanionInstalled() && !state.lazyLoaded.imageApiStatus) {
           loadImageApiStatus().catch((error) => showToast(`读取生图 API 状态失败：${error.message}`, "error"));
         }
         if (state.modelsSection === "tts" && !state.lazyLoaded.ttsProviderConfigs) {
@@ -30926,16 +30940,22 @@ function syncModelsSectionControls() {
     tablist.dataset.keyboardBound = "1";
   }
   document.querySelectorAll("[data-models-pane]").forEach((pane) => {
-    pane.hidden = pane.dataset.modelsPane !== section || (pane.dataset.modelsPane === "image" && !imageCompanionInstalled());
+    pane.hidden = pane.dataset.modelsPane !== section || (pane.dataset.modelsPane === "image" && !imageCompanionInstalled() && !central);
   });
   return section;
 }
 
 function renderImageModelConfig() {
-  if (!imageCompanionInstalled()) return;
   const summary = document.getElementById("imageModelSummary");
   const editor = document.getElementById("imageModelEditor");
   if (!summary || !editor) return;
+  const saveButton = document.getElementById("saveImageModelsBtn");
+  if (saveButton) saveButton.hidden = !imageCompanionInstalled();
+  if (!imageCompanionInstalled()) {
+    summary.textContent = "识图使用下方独立模型。生图／改图扩展未安装，保留已有配置。";
+    editor.innerHTML = "";
+    return;
+  }
   const settings = state.overview?.settings || {};
   const endpoints = photoApiEndpointDraft();
   const enabled = endpoints.filter((item) => item.enabled);
@@ -30997,14 +31017,13 @@ function renderProviders() {
   }
   if (section === "image") {
     renderImageModelConfig();
-    return;
   }
   if (window.PrivateCompanionProviderTree?.renderProviders) {
     const saveButton = document.getElementById("saveProvidersBtn");
     const testButton = document.getElementById("testAllProvidersBtn");
     if (saveButton) saveButton.disabled = false;
     if (testButton) testButton.disabled = false;
-    window.PrivateCompanionProviderTree.renderProviders({
+    const providerContext = {
       window,
       document,
       state,
@@ -31025,7 +31044,12 @@ function renderProviders() {
       syncProviderConfigModeControls,
       setProviderConfigMode,
       postJson,
-    });
+    };
+    if (section === "image") {
+      window.PrivateCompanionProviderTree.renderVisionConfig(providerContext);
+      return;
+    }
+    window.PrivateCompanionProviderTree.renderProviders(providerContext);
     bindProviderToolbar();
     return;
   }
@@ -31062,6 +31086,10 @@ function currentProviderTimeoutValues() {
     return window.PrivateCompanionProviderTree.currentProviderTimeoutValues({ document, state });
   }
   return normalizeModelTimeoutOverrides(state.overview?.settings?.model_timeout_overrides);
+}
+
+function currentProviderAttemptValues() {
+  return window.PrivateCompanionProviderTree.currentProviderAttemptValues({ document, state });
 }
 
 function currentProviderTokenLimitValues() {
@@ -38537,9 +38565,14 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
     return;
   }
   const values = currentProviderValues();
+  if (currentProviderConfigMode() === "centralized" && !String(values.LLM_PROVIDER_ID || "").trim()) {
+    showToast("请先选择通用主模型，零散文本功能将跟随此模型", "error");
+    return;
+  }
   const timeoutOverrides = currentProviderTimeoutValues();
-  let taskModelValues;
-  try { taskModelValues = window.PrivateCompanionProviderTree.currentTaskModelValues({ document, state }); }
+  const attemptOverrides = currentProviderAttemptValues();
+  let taskModelValues = {};
+  try { if (currentProviderConfigMode() !== "centralized") taskModelValues = window.PrivateCompanionProviderTree.currentTaskModelValues({ document, state }); }
   catch (error) { showToast(error.message, "error"); return; }
   const tokenLimitOverrides = currentProviderTokenLimitValues();
   const fallbackOverrides = currentProviderFallbackValues();
@@ -38549,20 +38582,23 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   Object.keys(providerLabels).forEach((key) => {
     if (visibleConfigKey(key) && providerAllowedInCurrentMode(key)) providers[key] = values[key] || "";
   });
-  providers.DEEPSEEK_PEAK_REPLACEMENT_PROVIDER_ID = deepseekPeak.provider;
+  if (provider_config_mode !== "centralized") providers.DEEPSEEK_PEAK_REPLACEMENT_PROVIDER_ID = deepseekPeak.provider;
   const saved = await runAction(
     () => postJson("/settings/update", { settings: {
       provider_config_mode,
       model_timeout_overrides: timeoutOverrides,
+      model_request_attempt_overrides: attemptOverrides,
       ...taskModelValues,
       model_token_limit_overrides: tokenLimitOverrides,
       model_fallback_overrides: fallbackOverrides,
-      enable_deepseek_peak_replacement: deepseekPeak.enabled,
-      deepseek_peak_windows: deepseekPeak.windows,
-      deepseek_peak_timezone: deepseekPeak.timezone,
-      deepseek_peak_match_keywords: deepseekPeak.keywords,
-    }, providers, overwrite_provider_modes: true }),
-    "已保存模型配置，并同步 quick / precision 文本分流；独立识图保持原配置",
+      ...(provider_config_mode === "centralized" ? {} : {
+        enable_deepseek_peak_replacement: deepseekPeak.enabled,
+        deepseek_peak_windows: deepseekPeak.windows,
+        deepseek_peak_timezone: deepseekPeak.timezone,
+        deepseek_peak_match_keywords: deepseekPeak.keywords,
+      }),
+    }, providers, overwrite_provider_modes: provider_config_mode !== "centralized" }),
+    provider_config_mode === "centralized" ? "已保存集中配置，零散文本功能跟随主模型及备用；后台任务与音色保留" : "已保存模型配置，并同步 quick / precision 文本分流；独立识图保持原配置",
     $("#saveProvidersBtn")
   );
   if (!actionResultPersisted(saved)) return;
@@ -38570,11 +38606,13 @@ $("#saveProvidersBtn").addEventListener("click", async () => {
   state.overview.settings = { ...(state.overview.settings || {}), provider_config_mode };
   state.providerDraft = {};
   state.providerTimeoutDraft = { ...timeoutOverrides };
+  state.providerAttemptDraft = { ...attemptOverrides };
   state.providerTokenLimitDraft = { ...tokenLimitOverrides };
   state.providerFallbackDraft = { ...fallbackOverrides };
   state.overview.settings.model_timeout_overrides = { ...timeoutOverrides };
+  state.overview.settings.model_request_attempt_overrides = { ...attemptOverrides };
   Object.assign(state.overview.settings, taskModelValues);
-  state.taskModelDraft = { ...taskModelValues };
+  if (provider_config_mode !== "centralized") state.taskModelDraft = { ...taskModelValues };
   state.overview.settings.model_token_limit_overrides = { ...tokenLimitOverrides };
   state.overview.settings.model_fallback_overrides = { ...fallbackOverrides };
   state.providerConfigMode = provider_config_mode;
@@ -38590,7 +38628,10 @@ $("#saveImageModelsBtn").addEventListener("click", async () => {
       settings: {
         photo_generation_backend,
         external_image_api_endpoints: endpoints,
+        model_timeout_overrides: currentProviderTimeoutValues(),
+        model_request_attempt_overrides: currentProviderAttemptValues(),
       },
+      providers: { PLUGIN_VISION_PROVIDER_ID: currentProviderValues().PLUGIN_VISION_PROVIDER_ID || "" },
     }),
     "已保存并应用生图模型配置",
     $("#saveImageModelsBtn"),

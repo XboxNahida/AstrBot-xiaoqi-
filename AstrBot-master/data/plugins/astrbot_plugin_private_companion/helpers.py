@@ -578,6 +578,7 @@ def _strip_internal_message_blocks(text: Any) -> str:
     normalized = re.sub(r"\[\[PCTTS:[^\]]*\]\]", "", normalized)
     normalized = re.sub(r"<timer\b[^>]*>.*?</timer>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
     normalized = re.sub(r"<tts\b[^>]*>.*?</tts>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = _strip_generated_tool_protocol(normalized)
     normalized = _strip_generated_reasoning_blocks(normalized)
     normalized = _strip_nonstandard_chat_control_tags(normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -640,6 +641,46 @@ _MARKDOWN_CODE_SPAN_PATTERN = re.compile(
     r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`)",
     re.MULTILINE,
 )
+
+
+def _strip_generated_tool_protocol(text: Any) -> str:
+    """Remove raw tool envelopes without interpreting or executing arguments.
+
+    Args:
+        text: Generated assistant text, rather than a user file or tool result.
+
+    Returns:
+        Visible prose with Markdown examples preserved. An unfinished tool
+        envelope hides its remaining arguments, including fenced code.
+    """
+    tokens = re.compile(
+        r"<[|｜]{1,2}tool[▁_](?:(calls?)[▁_](begin|end)|(sep))[|｜]{1,2}>",
+        re.IGNORECASE,
+    )
+    hidden: list[str] = []
+    visible: list[str] = []
+    for index, part in enumerate(_MARKDOWN_CODE_SPAN_PATTERN.split(str(text or ""))):
+        if index % 2:
+            if not hidden:
+                visible.append(part)
+            continue
+        cursor = 0
+        for match in tokens.finditer(part):
+            if not hidden:
+                visible.append(part[cursor : match.start()])
+            kind = (match.group(1) or "call").lower()
+            if match.group(2) and match.group(2).lower() == "end":
+                if kind in hidden:
+                    hidden = hidden[: len(hidden) - 1 - hidden[::-1].index(kind)]
+            elif match.group(3):
+                if not hidden:
+                    hidden.append("call")
+            else:
+                hidden.append(kind)
+            cursor = match.end()
+        if not hidden:
+            visible.append(part[cursor:])
+    return "".join(visible)
 
 
 def _strip_generated_reasoning_blocks(text: Any) -> str:
@@ -764,6 +805,7 @@ def _strip_outbound_control_blocks(
     elif not preserve_private_tts_tokens:
         normalized = re.sub(r"\[\[PCTTS:[^\]]*\]\]", "", normalized)
     normalized = re.sub(r"<timer\b[^>]*>.*?</timer>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = _strip_generated_tool_protocol(normalized)
     normalized = _strip_generated_reasoning_blocks(normalized)
     normalized = _strip_nonstandard_chat_control_tags(normalized)
     normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()

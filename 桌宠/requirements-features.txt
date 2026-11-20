@@ -1,0 +1,5 @@
+# 扩展功能依赖，保留原requirements与虚拟环境。
+psutil>=6,<8
+zstandard>=0.23,<1
+winrt-runtime>=3,<4; sys_platform == 'win32'
+winrt-Windows.Media.Control[all]>=3,<4; sys_platform == 'win32'

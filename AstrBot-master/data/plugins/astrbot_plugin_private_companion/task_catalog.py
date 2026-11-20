@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 from contextlib import closing
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 TASK_DEFINITIONS = {
@@ -44,7 +45,57 @@ TASK_CONTEXT_START = "【任务事实开始｜宿主只读快照】"
 TASK_CONTEXT_END = "【任务事实结束】"
 
 
-def with_task_context(system, snapshot):
+def compact_task_overview(data):
+    """仅投影前台摘要；完整目录、结果与执行证据仍由原查询接口读取。"""
+    result = {key: deepcopy(value) for key, value in data.items()
+              if key not in {"definitions", "items", "recent_history", "observed_at"}}
+    fields = {
+        "source", "item_id", "category", "status", "active", "needs_attention",
+        "engine", "enabled", "run_once", "group_id", "parent_task_id", "relation",
+        "created_at_text", "updated_at_text", "finished_at_text", "next_run_text",
+    }
+    execution_fields = {
+        "phase", "name", "phase_elapsed_seconds", "seconds_since_progress",
+        "worker_lease_valid", "connection_state",
+    }
+    for key in ("items", "recent_history"):
+        result[key] = []
+        for item in data.get(key, []):
+            projected = {name: deepcopy(value) for name, value in item.items() if name in fields}
+            title = str(item.get("title", ""))
+            projected["title"] = title[:140] + ("…" if len(title) > 140 else "")
+            execution = item.get("execution")
+            if isinstance(execution, dict):
+                projected["execution"] = {name: deepcopy(value) for name, value in execution.items()
+                                          if name in execution_fields}
+                issue = execution.get("last_tool_issue")
+                if isinstance(issue, dict) and issue:
+                    projected["execution"]["last_tool_issue"] = {
+                        name: deepcopy(value) for name, value in issue.items()
+                        if name in {"name", "status", "outcome", "kind"}
+                    }
+                    projected["execution"]["last_tool_issue"]["summary"] = str(issue.get("summary", ""))[:120]
+            result[key].append(projected)
+    result["view"] = "brief; details via pc_manage_tasks/pc_read_background; missing fields are not absent facts"
+    return result
+
+
+COMPACT_TASK_GUIDANCE = (
+    "【持久任务分类定义与管理】\n"
+    + "\n".join(TASK_DEFINITIONS.values())
+    + "\n仅据宿主状态、ID与北京时间区分工作；同名不合并，recent_history不是待办。"
+    "简表只保留状态证据与时间；细节用pc_manage_tasks或pc_read_background按页查询。"
+    "counts/group_counts分别是记录/关联目标数；来源不可用或next_offset非空时清单不完整。"
+    "paused、waiting_user、unknown_result不是正在推进；running/租约有效也不证明进展，"
+    "结合execution.phase、耗时及last_tool_issue判断，unconfirmed如实说明未知。"
+    "工具失败不自动判整项失败，可在原授权内修复；结果未知先查回执，不重放未知副作用。"
+    "周期一轮完成不等于安排结束；归档不取消工作，删除仅清已归档历史、不删工作文件。"
+    "变更复用真实ID；同一目标的新执行用related_task_id/relation关联，不自动取消父任务或继承成功。"
+    "缺文件先查旧结果并补发；用户要求停止/不用则收尾，不机械新建。"
+)
+
+
+def with_task_context(system, snapshot, *, compact=False):
     """Replace only host fact blocks, retaining persona and surrounding instructions."""
     system = re.sub(re.escape(TASK_CONTEXT_START) + r".*?" + re.escape(TASK_CONTEXT_END),
                     "", str(system or ""), flags=re.DOTALL)
@@ -60,7 +111,8 @@ def with_task_context(system, snapshot):
             continue
         system = system[:start] + system[value_start + consumed:]
         cursor = start
-    return system.rstrip() + "\n" + TASK_CONTEXT_START + "\n" + TASK_GUIDANCE + "\n" + snapshot + "\n" + TASK_CONTEXT_END
+    guidance = COMPACT_TASK_GUIDANCE if compact else TASK_GUIDANCE
+    return system.rstrip() + "\n" + TASK_CONTEXT_START + "\n" + guidance + "\n" + snapshot + "\n" + TASK_CONTEXT_END
 
 
 def task_time(value):
